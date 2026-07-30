@@ -2,7 +2,8 @@ import { findAtomById, findAtomsBySubjectId } from "@/db/repositories/atoms";
 import { findCardById } from "@/db/repositories/cards";
 import { upsertDailyStatistics } from "@/db/repositories/daily-statistics";
 import { createSessionEvent } from "@/db/repositories/session-events";
-import { findStudySessionById, recordSessionAnswer } from "@/db/repositories/study-sessions";
+import { recordSessionAnswer } from "@/db/repositories/study-sessions";
+import { assertSessionReadyForStudy } from "@/session";
 import {
   findUserAtomState,
   findUserAtomStatesByUserId,
@@ -35,22 +36,10 @@ import { unlockDependentAtoms } from "./unlock";
 export async function recordCardResponse(
   input: RecordCardResponseInput
 ): Promise<RecordCardResponseResult> {
-  const session = await findStudySessionById(input.sessionId);
-  if (!session || session.userId !== input.userId) {
-    throw new ProgressEngineError(
-      "Sessione di studio non trovata.",
-      "SESSION_NOT_FOUND",
-      404
-    );
-  }
-
-  if (session.endedAt) {
-    throw new ProgressEngineError(
-      "La sessione di studio è già terminata.",
-      "SESSION_ENDED",
-      409
-    );
-  }
+  const session = await assertSessionReadyForStudy(
+    input.userId,
+    input.sessionId
+  );
 
   const [card, atom] = await Promise.all([
     findCardById(input.cardId),

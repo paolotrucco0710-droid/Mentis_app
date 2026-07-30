@@ -5,10 +5,10 @@ import {
 import { findCardsByAtomIds } from "@/db/repositories/cards";
 import { findSubjectById } from "@/db/repositories/subjects";
 import {
-  findStudySessionById,
   incrementSessionCardsViewed,
 } from "@/db/repositories/study-sessions";
 import { findSessionEventsBySessionId } from "@/db/repositories/session-events";
+import { assertSessionReadyForStudy } from "@/session";
 import {
   findUserAtomStatesByUserId,
   upsertUserAtomState,
@@ -70,29 +70,17 @@ export async function getNextFeedItem(
 async function loadFeedContext(
   input: GetNextFeedItemInput
 ): Promise<FeedEngineContext> {
+  const session = await assertSessionReadyForStudy(
+    input.userId,
+    input.sessionId
+  );
+
   const subject = await findSubjectById(input.subjectId);
   if (!subject) {
     throw new FeedEngineError(
       "Materia non trovata.",
       "SUBJECT_NOT_FOUND",
       404
-    );
-  }
-
-  const session = await findStudySessionById(input.sessionId);
-  if (!session || session.userId !== input.userId) {
-    throw new FeedEngineError(
-      "Sessione di studio non trovata.",
-      "SESSION_NOT_FOUND",
-      404
-    );
-  }
-
-  if (session.endedAt) {
-    throw new FeedEngineError(
-      "La sessione di studio è già terminata.",
-      "SESSION_ENDED",
-      409
     );
   }
 
