@@ -7,9 +7,10 @@ import {
   upsertUserAtomState,
 } from "@/db/repositories/user-atom-states";
 import { ReviewOutcome, ReviewStatus } from "@/domain/enums";
-import { UserAtomLearningState } from "@/domain/enums";
 import type { ReviewId, UserId } from "@/domain/ids";
+import { estimateNextReviewAt } from "@/engine/scheduler";
 import { ReviewEngineError } from "./errors";
+import { computeReviewOutcomePatch } from "@/progress/mastery";
 import { rescheduleAfterCompletion } from "./scheduler";
 import type { CompleteReviewResult } from "./types";
 
@@ -43,15 +44,24 @@ export async function completeReviewForUser(
   }
 
   const wasSuccessful = outcome === ReviewOutcome.Success;
+  const now = new Date();
+  const reviewPatch = computeReviewOutcomePatch(atomState, wasSuccessful);
+  const nextReviewAt = estimateNextReviewAt(
+    {
+      ...atomState,
+      ...reviewPatch,
+      lastViewedAt: now,
+    },
+    now
+  );
+
   const updatedAtomState = await upsertUserAtomState({
     userId,
     atomId: review.atomId,
-    currentStage: wasSuccessful
-      ? atomState.mastery >= 85
-        ? UserAtomLearningState.Mastered
-        : UserAtomLearningState.Practicing
-      : UserAtomLearningState.Review,
-    lastViewedAt: new Date(),
+    ...reviewPatch,
+    lastViewedAt: now,
+    nextReviewAt,
+    lastAlgorithmUsed: "review-v1",
   });
 
   const rescheduledReview = await rescheduleAfterCompletion({
@@ -59,6 +69,7 @@ export async function completeReviewForUser(
     atomId: review.atomId,
     atomState: updatedAtomState,
     wasSuccessful,
+    now,
   });
 
   return {

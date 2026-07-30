@@ -5,5 +5,6 @@ export {
   pauseSession,
   endSession,
 } from "./feed";
+export { fetchSessionDetail } from "./sessions";
 export { submitCardResponse } from "./progress";
 export type { SubmitCardResponseInput } from "./progress";

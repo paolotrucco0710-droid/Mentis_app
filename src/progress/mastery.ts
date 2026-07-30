@@ -9,6 +9,7 @@ import {
   RETRIEVAL_CARD_TYPES,
 } from "@/engine/constants";
 import { computeForgetProbability } from "@/engine/decay";
+import { clamp, clamp01 } from "@/lib/math";
 import type { MasteryUpdate } from "./types";
 
 const EXPLAIN_TYPES = new Set<string>(EXPLANATION_CARD_TYPES);
@@ -219,12 +220,50 @@ function derivePersistedStage(input: {
   return UserAtomLearningState.Available;
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
+export function computeReviewOutcomePatch(
+  atomState: UserAtomState,
+  wasSuccessful: boolean
+): Pick<
+  UserAtomState,
+  | "mastery"
+  | "confidence"
+  | "estimatedDecay"
+  | "correctAnswerCount"
+  | "wrongAnswerCount"
+  | "errorCount"
+  | "streak"
+  | "currentStage"
+> {
+  if (wasSuccessful) {
+    const mastery = clamp(atomState.mastery + 5, 0, 100) as UserAtomState["mastery"];
 
-function clamp01(value: number): number {
-  return clamp(value, 0, 1);
+    return {
+      mastery,
+      confidence: clamp01(atomState.confidence + 0.05),
+      estimatedDecay: clamp01(atomState.estimatedDecay - 0.06),
+      correctAnswerCount: atomState.correctAnswerCount + 1,
+      wrongAnswerCount: atomState.wrongAnswerCount,
+      errorCount: atomState.errorCount,
+      streak: Math.min(atomState.streak + 1, 20),
+      currentStage:
+        mastery >= MASTERY_STABLE_THRESHOLD
+          ? UserAtomLearningState.Mastered
+          : UserAtomLearningState.Practicing,
+    };
+  }
+
+  const mastery = clamp(atomState.mastery - 4, 0, 100) as UserAtomState["mastery"];
+
+  return {
+    mastery,
+    confidence: clamp01(atomState.confidence - 0.04),
+    estimatedDecay: clamp01(atomState.estimatedDecay + 0.08),
+    correctAnswerCount: atomState.correctAnswerCount,
+    wrongAnswerCount: atomState.wrongAnswerCount + 1,
+    errorCount: atomState.errorCount + 1,
+    streak: 0,
+    currentStage: UserAtomLearningState.Review,
+  };
 }
 
 export function isRetrievalCard(type: CardType): boolean {
