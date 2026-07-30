@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: mentis
+      POSTGRES_PASSWORD: mentis
+      POSTGRES_DB: mentis
+    volumes:
+      - mentis_pg_data:/var/lib/postgresql/data
+
+volumes:
+  mentis_pg_data:

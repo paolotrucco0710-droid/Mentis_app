@@ -2,47 +2,53 @@
 
 App di apprendimento attivo per studenti delle superiori.
 
-## Milestone 2 — Domain Architecture
+## Milestone 3 — Database Layer
 
-Modello dati completo del dominio Mentis: entità, enum, relazioni e vincoli.
-Nessuna logica implementata — solo tipi TypeScript.
+PostgreSQL + Prisma: schema, migrazioni, indici, relazioni e query principali.
 
-### Struttura dominio
+### Struttura database
 
 ```text
-src/domain/
-├── ids.ts              # ID tipizzati (branded types)
-├── enums/              # Stati, tipologie, scale
-├── entities/           # User, Subject, Course, Chapter, Atom, Card, …
-├── knowledge/          # Schema Knowledge JSON (output LLM)
-└── constraints/        # Vincoli di integrità
+prisma/
+├── schema.prisma          # Schema completo (21 tabelle)
+└── migrations/            # Migrazioni SQL
+
+src/db/
+├── client.ts              # Prisma client singleton
+├── mappers/               # Prisma → tipi dominio
+└── repositories/          # Query principali
 ```
 
-### Entità principali
-
-| Layer         | Entità                                                       |
-| ------------- | ------------------------------------------------------------ |
-| Contenuto     | Subject, Course, Chapter, KnowledgeSource, Atom, Card, Image |
-| Elaborazione  | Upload, AIJob                                                |
-| Apprendimento | UserAtomState, UserCardState, Review, Progress               |
-| Comportamento | StudySession, SessionEvent, FeedItem                         |
-| Trasversali   | DailyStatistics, Achievement, Notification                   |
-
-### Setup
+### Setup database locale
 
 ```bash
+# 1. Avvia PostgreSQL
+docker compose up -d
+
+# 2. Configura env
 cp .env.example .env.local
-npm install
+
+# 3. Applica migrazioni
+npm run db:migrate
+
+# 4. Avvia l'app
 npm run dev
 ```
 
-### Script
+### Script database
 
-| Comando                | Descrizione                   |
-| ---------------------- | ----------------------------- |
-| `npm run dev`          | Avvia il server di sviluppo   |
-| `npm run build`        | Build di produzione           |
-| `npm run start`        | Avvia il server di produzione |
-| `npm run lint`         | ESLint                        |
-| `npm run format`       | Prettier (write)              |
-| `npm run format:check` | Prettier (check)              |
+| Comando                  | Descrizione                            |
+| ------------------------ | -------------------------------------- |
+| `npm run db:generate`    | Genera Prisma Client                   |
+| `npm run db:migrate`     | Applica migrazioni (produzione/locale) |
+| `npm run db:migrate:dev` | Crea e applica nuove migrazioni        |
+| `npm run db:studio`      | Apri Prisma Studio (GUI)               |
+
+### Script generali
+
+| Comando          | Descrizione         |
+| ---------------- | ------------------- |
+| `npm run dev`    | Server di sviluppo  |
+| `npm run build`  | Build di produzione |
+| `npm run lint`   | ESLint              |
+| `npm run format` | Prettier            |

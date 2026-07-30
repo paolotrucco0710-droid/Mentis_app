@@ -1,0 +1,726 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Account ---
+
+enum AccountStatus {
+  active
+  suspended
+  deleted
+}
+
+enum PremiumPlan {
+  free
+  premium
+}
+
+// --- Knowledge ---
+
+enum KnowledgeSourceType {
+  pdf
+  photograph
+  scan
+  book
+  handout
+}
+
+enum KnowledgeSourceProcessingStatus {
+  uploaded
+  queued
+  processing
+  completed
+  failed
+}
+
+enum AtomRelationshipType {
+  prerequisite
+  part_of
+  contains
+  cause
+  consequence
+  analogy
+  contrast
+  dependency
+  equivalence
+  generalization
+  specialization
+}
+
+enum CognitiveDependencyStrength {
+  strong
+  weak
+}
+
+enum LearningObjective {
+  know
+  understand
+  connect
+  distinguish
+  apply
+  recall
+  transfer
+}
+
+// --- Cards ---
+
+enum CardType {
+  explain
+  image_explain
+  quiz
+  multiple_choice
+  true_false
+  fill_blank
+  blurting
+  feynman
+  timeline
+  match
+  order
+  error_detection
+  memory_recall
+  visual_recall
+  audio
+  future
+}
+
+enum CognitiveObjective {
+  comprehension
+  memory
+  retrieval
+  connection
+  stability
+}
+
+// --- User learning state ---
+
+enum UserAtomLearningState {
+  locked
+  available
+  learning
+  practicing
+  mastered
+  review
+  forgotten
+  archived
+}
+
+// --- Sessions ---
+
+enum SessionEventType {
+  open_card
+  close_card
+  correct_answer
+  wrong_answer
+  skip
+  replay
+  voice_recording
+  image_zoom
+  hint
+  exit
+  resume
+  pause
+}
+
+enum SessionEventOutcome {
+  success
+  failure
+  skipped
+  neutral
+}
+
+// --- Reviews ---
+
+enum ReviewStatus {
+  scheduled
+  completed
+  missed
+  cancelled
+}
+
+enum ReviewOutcome {
+  success
+  partial
+  failure
+}
+
+// --- Processing ---
+
+enum UploadStatus {
+  pending
+  uploading
+  completed
+  failed
+}
+
+enum AIJobStatus {
+  queued
+  running
+  retry
+  completed
+  failed
+}
+
+enum AIJobStep {
+  ocr
+  text_cleaning
+  structure_recognition
+  image_extraction
+  llm_extraction
+  json_validation
+  normalization
+  persistence
+}
+
+// --- Notifications ---
+
+enum NotificationType {
+  review_reminder
+  streak_reminder
+  achievement
+  processing_complete
+  processing_failed
+  system
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  opened
+  dismissed
+}
+
+enum NotificationPriority {
+  low
+  normal
+  high
+}
+
+enum AchievementCategory {
+  study
+  mastery
+  streak
+  review
+  exploration
+}
+
+// --- Models ---
+
+model User {
+  id              String        @id @default(uuid()) @db.Uuid
+  firstName       String        @map("first_name")
+  lastName        String        @map("last_name")
+  email           String        @unique
+  passwordHash    String        @map("password_hash")
+  registeredAt    DateTime      @default(now()) @map("registered_at")
+  lastAccessAt    DateTime?     @map("last_access_at")
+  language        String        @default("it")
+  timezone        String        @default("Europe/Rome")
+  schoolGrade     String?       @map("school_grade")
+  schoolYear      String?       @map("school_year")
+  personalGoals   Json          @default("[]") @map("personal_goals")
+  preferences     Json          @default("{}")
+  profileImageUrl String?       @map("profile_image_url")
+  premiumPlan     PremiumPlan   @default(free) @map("premium_plan")
+  accountStatus   AccountStatus @default(active) @map("account_status")
+  deletedAt       DateTime?     @map("deleted_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  subjects         Subject[]
+  courses          Course[]
+  knowledgeSources KnowledgeSource[]
+  images           Image[]
+  uploads          Upload[]
+  aiJobs           AIJob[]
+  userAtomStates   UserAtomState[]
+  userCardStates   UserCardState[]
+  studySessions    StudySession[]
+  reviews          Review[]
+  dailyStatistics  DailyStatistics[]
+  userAchievements UserAchievement[]
+  notifications    Notification[]
+
+  @@index([email])
+  @@index([accountStatus])
+  @@map("users")
+}
+
+model Subject {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  name         String
+  color        String
+  icon         String
+  displayOrder Int       @default(0) @map("display_order")
+  deletedAt    DateTime? @map("deleted_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courses          Course[]
+  chapters         Chapter[]
+  knowledgeSources KnowledgeSource[]
+  atoms            Atom[]
+  studySessions    StudySession[]
+
+  @@index([userId])
+  @@index([userId, displayOrder])
+  @@map("subjects")
+}
+
+model Course {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  subjectId   String    @map("subject_id") @db.Uuid
+  title       String
+  description String?
+  deletedAt   DateTime? @map("deleted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapters Chapter[]
+  uploads Upload[]
+
+  @@index([userId])
+  @@index([subjectId])
+  @@map("courses")
+}
+
+model KnowledgeSource {
+  id               String                          @id @default(uuid()) @db.Uuid
+  userId           String                          @map("user_id") @db.Uuid
+  subjectId        String                          @map("subject_id") @db.Uuid
+  title            String
+  sourceType       KnowledgeSourceType             @map("source_type")
+  pageCount        Int                             @default(0) @map("page_count")
+  language         String                          @default("it")
+  uploadedAt       DateTime                        @default(now()) @map("uploaded_at")
+  processedAt      DateTime?                       @map("processed_at")
+  parserVersion    String?                         @map("parser_version")
+  promptVersion    String?                         @map("prompt_version")
+  processingStatus KnowledgeSourceProcessingStatus @default(uploaded) @map("processing_status")
+  fileSizeBytes    BigInt                          @default(0) @map("file_size_bytes")
+  fileHash         String                          @map("file_hash")
+  deletedAt        DateTime?                       @map("deleted_at")
+  createdAt        DateTime                        @default(now()) @map("created_at")
+  updatedAt        DateTime                        @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject  Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapters Chapter[]
+  images   Image[]
+  atoms    Atom[]
+  uploads  Upload[]
+  aiJobs   AIJob[]
+
+  @@index([userId])
+  @@index([subjectId])
+  @@index([processingStatus])
+  @@index([fileHash])
+  @@map("knowledge_sources")
+}
+
+model Chapter {
+  id                        String    @id @default(uuid()) @db.Uuid
+  courseId                  String    @map("course_id") @db.Uuid
+  subjectId                 String    @map("subject_id") @db.Uuid
+  knowledgeSourceId         String    @map("knowledge_source_id") @db.Uuid
+  title                     String
+  chapterNumber             Int?      @map("chapter_number")
+  displayOrder              Int       @default(0) @map("display_order")
+  estimatedStudyTimeMinutes Int?      @map("estimated_study_time_minutes")
+  difficultyLevel           Int?      @map("difficulty_level")
+  atomCount                 Int       @default(0) @map("atom_count")
+  deletedAt                 DateTime? @map("deleted_at")
+  createdAt                 DateTime  @default(now()) @map("created_at")
+  updatedAt                 DateTime  @updatedAt @map("updated_at")
+
+  course          Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  subject         Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  knowledgeSource KnowledgeSource @relation(fields: [knowledgeSourceId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([subjectId])
+  @@index([knowledgeSourceId])
+  @@map("chapters")
+}
+
+model Image {
+  id                String    @id @default(uuid()) @db.Uuid
+  knowledgeSourceId String    @map("knowledge_source_id") @db.Uuid
+  ownerId           String    @map("owner_id") @db.Uuid
+  storageKey        String    @map("storage_key")
+  hash              String
+  mimeType          String    @map("mime_type")
+  sizeBytes         BigInt    @map("size_bytes")
+  width             Int?
+  height            Int?
+  pageNumber        Int?      @map("page_number")
+  caption           String?
+  deletedAt         DateTime? @map("deleted_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  knowledgeSource KnowledgeSource @relation(fields: [knowledgeSourceId], references: [id], onDelete: Cascade)
+  owner           User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgeSourceId])
+  @@index([ownerId])
+  @@index([hash])
+  @@map("images")
+}
+
+model Upload {
+  id                String       @id @default(uuid()) @db.Uuid
+  userId            String       @map("user_id") @db.Uuid
+  subjectId         String?      @map("subject_id") @db.Uuid
+  courseId          String?      @map("course_id") @db.Uuid
+  knowledgeSourceId String?      @map("knowledge_source_id") @db.Uuid
+  status            UploadStatus @default(pending)
+  imageIds          Json         @default("[]") @map("image_ids")
+  startedAt         DateTime     @default(now()) @map("started_at")
+  completedAt       DateTime?    @map("completed_at")
+  errorMessage      String?      @map("error_message")
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course          Course?          @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  knowledgeSource KnowledgeSource? @relation(fields: [knowledgeSourceId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+  @@index([knowledgeSourceId])
+  @@map("uploads")
+}
+
+model AIJob {
+  id                String       @id @default(uuid()) @db.Uuid
+  knowledgeSourceId String       @map("knowledge_source_id") @db.Uuid
+  userId            String       @map("user_id") @db.Uuid
+  status            AIJobStatus  @default(queued)
+  currentStep       AIJobStep?   @map("current_step")
+  attemptCount      Int          @default(0) @map("attempt_count")
+  maxAttempts       Int          @default(3) @map("max_attempts")
+  promptVersion     String?      @map("prompt_version")
+  parserVersion     String?      @map("parser_version")
+  errorMessage      String?      @map("error_message")
+  queuedAt          DateTime     @default(now()) @map("queued_at")
+  startedAt         DateTime?    @map("started_at")
+  completedAt       DateTime?    @map("completed_at")
+
+  knowledgeSource KnowledgeSource @relation(fields: [knowledgeSourceId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgeSourceId])
+  @@index([userId])
+  @@index([status])
+  @@map("ai_jobs")
+}
+
+model Atom {
+  id                    String   @id @default(uuid()) @db.Uuid
+  knowledgeSourceId     String   @map("knowledge_source_id") @db.Uuid
+  subjectId             String   @map("subject_id") @db.Uuid
+  title                 String
+  summary               String
+  explanation           String   @db.Text
+  importance            Int
+  difficulty            Int
+  abstractionLevel      Int      @map("abstraction_level")
+  logicalOrder          Int      @map("logical_order")
+  originalOrder         Int      @map("original_order")
+  learningObjectives    Json     @default("[]") @map("learning_objectives")
+  keywords              Json     @default("[]")
+  aliases               Json     @default("[]")
+  formulas              Json     @default("[]")
+  definitions           Json     @default("[]")
+  examples              Json     @default("[]")
+  counterExamples       Json     @default("[]") @map("counter_examples")
+  commonMistakes        Json     @default("[]") @map("common_mistakes")
+  misconceptions        Json     @default("[]")
+  applications          Json     @default("[]")
+  historicalContext     String?  @map("historical_context")
+  notes                 String?
+  images                Json     @default("[]")
+  tables                Json     @default("[]")
+  diagrams              Json     @default("[]")
+  equations             Json     @default("[]")
+  citations             Json     @default("[]")
+  pageReferences        Json     @default("[]") @map("page_references")
+  confidence            Float
+  aiVersion             String   @map("ai_version")
+  tokensUsed            Int?     @map("tokens_used")
+  estimatedStudySeconds Int?     @map("estimated_study_seconds")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  knowledgeSource    KnowledgeSource     @relation(fields: [knowledgeSourceId], references: [id], onDelete: Cascade)
+  subject            Subject             @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  cards              Card[]
+  prerequisites      AtomPrerequisite[]  @relation("AtomPrerequisites")
+  prerequisiteOf     AtomPrerequisite[]  @relation("PrerequisiteOf")
+  relationshipsFrom  AtomRelationship[]  @relation("RelationshipSource")
+  relationshipsTo    AtomRelationship[]  @relation("RelationshipTarget")
+  userAtomStates     UserAtomState[]
+  reviews            Review[]
+  sessionEvents      SessionEvent[]
+
+  @@index([knowledgeSourceId])
+  @@index([subjectId])
+  @@index([knowledgeSourceId, logicalOrder])
+  @@map("atoms")
+}
+
+model AtomPrerequisite {
+  atomId             String @map("atom_id") @db.Uuid
+  prerequisiteAtomId String @map("prerequisite_atom_id") @db.Uuid
+
+  atom             Atom @relation("AtomPrerequisites", fields: [atomId], references: [id], onDelete: Cascade)
+  prerequisiteAtom Atom @relation("PrerequisiteOf", fields: [prerequisiteAtomId], references: [id], onDelete: Cascade)
+
+  @@id([atomId, prerequisiteAtomId])
+  @@index([prerequisiteAtomId])
+  @@map("atom_prerequisites")
+}
+
+model AtomRelationship {
+  id                 String                      @id @default(uuid()) @db.Uuid
+  sourceAtomId       String                      @map("source_atom_id") @db.Uuid
+  targetAtomId       String                      @map("target_atom_id") @db.Uuid
+  type               AtomRelationshipType
+  dependencyStrength CognitiveDependencyStrength? @map("dependency_strength")
+
+  sourceAtom Atom @relation("RelationshipSource", fields: [sourceAtomId], references: [id], onDelete: Cascade)
+  targetAtom Atom @relation("RelationshipTarget", fields: [targetAtomId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceAtomId, targetAtomId, type])
+  @@index([targetAtomId])
+  @@map("atom_relationships")
+}
+
+model Card {
+  id                       String             @id @default(uuid()) @db.Uuid
+  atomId                   String             @map("atom_id") @db.Uuid
+  type                     CardType
+  order                    Int
+  cognitiveObjective       CognitiveObjective @map("cognitive_objective")
+  prompt                   String?
+  text                     String             @db.Text
+  explanation              String?            @db.Text
+  correctFeedback          String?            @map("correct_feedback")
+  incorrectFeedback        String?            @map("incorrect_feedback")
+  estimatedDurationSeconds Int                @map("estimated_duration_seconds")
+  payload                  Json?
+  aiVersion                String?            @map("ai_version")
+  createdAt                DateTime           @default(now()) @map("created_at")
+
+  atom           Atom            @relation(fields: [atomId], references: [id], onDelete: Cascade)
+  userCardStates UserCardState[]
+  sessionEvents  SessionEvent[]
+
+  @@index([atomId])
+  @@index([atomId, order])
+  @@map("cards")
+}
+
+model UserAtomState {
+  userId                String                @map("user_id") @db.Uuid
+  atomId                String                @map("atom_id") @db.Uuid
+  mastery               Float                 @default(0)
+  confidence            Float                 @default(0)
+  currentStage          UserAtomLearningState @default(locked) @map("current_stage")
+  exposureCount         Int                   @default(0) @map("exposure_count")
+  errorCount            Int                   @default(0) @map("error_count")
+  correctAnswerCount    Int                   @default(0) @map("correct_answer_count")
+  wrongAnswerCount      Int                   @default(0) @map("wrong_answer_count")
+  lastViewedAt          DateTime?             @map("last_viewed_at")
+  nextReviewAt          DateTime?             @map("next_review_at")
+  averageResponseTimeMs Int?                  @map("average_response_time_ms")
+  totalStudyTimeMs      BigInt                @default(0) @map("total_study_time_ms")
+  streak                Int                   @default(0)
+  estimatedDecay        Float                 @default(0) @map("estimated_decay")
+  comprehensionLevel    Float                 @default(0) @map("comprehension_level")
+  lastAlgorithmUsed     String?               @map("last_algorithm_used")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  atom Atom @relation(fields: [atomId], references: [id], onDelete: Cascade)
+
+  @@id([userId, atomId])
+  @@index([userId])
+  @@index([atomId])
+  @@index([userId, nextReviewAt])
+  @@index([userId, currentStage])
+  @@map("user_atom_states")
+}
+
+model UserCardState {
+  userId                String    @map("user_id") @db.Uuid
+  cardId                String    @map("card_id") @db.Uuid
+  viewCount             Int       @default(0) @map("view_count")
+  correctAnswerCount    Int       @default(0) @map("correct_answer_count")
+  wrongAnswerCount      Int       @default(0) @map("wrong_answer_count")
+  averageResponseTimeMs Int?      @map("average_response_time_ms")
+  lastAnsweredAt        DateTime? @map("last_answered_at")
+  confidence            Float     @default(0)
+  perceivedDifficulty   Float     @default(0) @map("perceived_difficulty")
+  skipped               Boolean   @default(false)
+  liked                 Boolean?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@id([userId, cardId])
+  @@index([userId])
+  @@index([cardId])
+  @@map("user_card_states")
+}
+
+model StudySession {
+  id                  String    @id @default(uuid()) @db.Uuid
+  userId              String    @map("user_id") @db.Uuid
+  subjectId           String?   @map("subject_id") @db.Uuid
+  startedAt           DateTime  @default(now()) @map("started_at")
+  endedAt             DateTime? @map("ended_at")
+  durationMs          BigInt?   @map("duration_ms")
+  cardsViewed         Int       @default(0) @map("cards_viewed")
+  atomsCompleted      Int       @default(0) @map("atoms_completed")
+  reviewsCompleted    Int       @default(0) @map("reviews_completed")
+  errorCount          Int       @default(0) @map("error_count")
+  correctAnswerCount  Int       @default(0) @map("correct_answer_count")
+  focusScore          Float?    @map("focus_score")
+  fatigueScore        Float?    @map("fatigue_score")
+  initialMotivation   Float?    @map("initial_motivation")
+  finalMotivation     Float?    @map("final_motivation")
+  device              String?
+  appVersion          String?   @map("app_version")
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject?        @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  events  SessionEvent[]
+
+  @@index([userId])
+  @@index([userId, startedAt])
+  @@map("study_sessions")
+}
+
+model SessionEvent {
+  id                 String               @id @default(uuid()) @db.Uuid
+  sessionId          String               @map("session_id") @db.Uuid
+  timestamp          DateTime             @default(now())
+  type               SessionEventType
+  atomId             String?              @map("atom_id") @db.Uuid
+  cardId             String?              @map("card_id") @db.Uuid
+  durationMs         Int?                 @map("duration_ms")
+  outcome            SessionEventOutcome?
+  declaredConfidence Float?               @map("declared_confidence")
+  responseTimeMs     Int?                 @map("response_time_ms")
+  feedPosition       Int?                 @map("feed_position")
+  swipeCount         Int?                 @map("swipe_count")
+
+  session StudySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  atom    Atom?        @relation(fields: [atomId], references: [id], onDelete: SetNull)
+  card    Card?        @relation(fields: [cardId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@index([sessionId, timestamp])
+  @@index([atomId])
+  @@index([cardId])
+  @@map("session_events")
+}
+
+model Review {
+  id          String        @id @default(uuid()) @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  atomId      String        @map("atom_id") @db.Uuid
+  scheduledAt DateTime      @map("scheduled_at")
+  completedAt DateTime?     @map("completed_at")
+  outcome     ReviewOutcome?
+  algorithm   String
+  priority    Int           @default(0)
+  status      ReviewStatus  @default(scheduled)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  atom Atom @relation(fields: [atomId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, scheduledAt])
+  @@index([userId, status])
+  @@index([atomId])
+  @@map("reviews")
+}
+
+model DailyStatistics {
+  userId           String   @map("user_id") @db.Uuid
+  date             DateTime @db.Date
+  studyTimeMs      BigInt   @default(0) @map("study_time_ms")
+  cardsCompleted   Int      @default(0) @map("cards_completed")
+  atomsCompleted   Int      @default(0) @map("atoms_completed")
+  reviewsCompleted Int      @default(0) @map("reviews_completed")
+  accuracy         Float    @default(0)
+  averageFocus     Float?   @map("average_focus")
+  averageMastery   Float?   @map("average_mastery")
+  dailyStreak      Int      @default(0) @map("daily_streak")
+  activityLevel    Int      @default(0) @map("activity_level")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, date])
+  @@index([userId])
+  @@map("daily_statistics")
+}
+
+model Achievement {
+  id          String              @id @default(uuid()) @db.Uuid
+  name        String
+  description String
+  category    AchievementCategory
+  level       Int
+  icon        String
+  condition   String
+  reward      String?
+
+  userAchievements UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  userId        String   @map("user_id") @db.Uuid
+  achievementId String   @map("achievement_id") @db.Uuid
+  earnedAt      DateTime @default(now()) @map("earned_at")
+  progress      Float    @default(0)
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@id([userId, achievementId])
+  @@index([userId])
+  @@map("user_achievements")
+}
+
+model Notification {
+  id       String               @id @default(uuid()) @db.Uuid
+  userId   String               @map("user_id") @db.Uuid
+  type     NotificationType
+  title    String
+  message  String
+  sentAt   DateTime?            @map("sent_at")
+  openedAt DateTime?            @map("opened_at")
+  status   NotificationStatus   @default(pending)
+  priority NotificationPriority @default(normal)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, status])
+  @@map("notifications")
+}
