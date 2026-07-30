@@ -1,29 +1,32 @@
-<<<<<<< HEAD
-# Mentis_app
-=======
 # Mentis
 
 App di apprendimento attivo per studenti delle superiori.
 
-## Milestone 1 — Project Foundation
+## Milestone 2 — Domain Architecture
 
-Base tecnica del progetto: Next.js, TypeScript, Tailwind, ESLint, Prettier.
+Modello dati completo del dominio Mentis: entità, enum, relazioni e vincoli.
+Nessuna logica implementata — solo tipi TypeScript.
 
-### Struttura
+### Struttura dominio
 
 ```text
-src/
-├── app/           # Next.js App Router
-├── assets/        # Asset statici dell'app
-├── components/    # Componenti UI
-│   ├── layout/
-│   └── ui/
-├── engine/        # Cognitive Engine
-├── ai/            # Pipeline AI
-├── db/            # Database layer
-├── hooks/         # React hooks
-└── lib/           # Utility condivise
+src/domain/
+├── ids.ts              # ID tipizzati (branded types)
+├── enums/              # Stati, tipologie, scale
+├── entities/           # User, Subject, Course, Chapter, Atom, Card, …
+├── knowledge/          # Schema Knowledge JSON (output LLM)
+└── constraints/        # Vincoli di integrità
 ```
+
+### Entità principali
+
+| Layer         | Entità                                                       |
+| ------------- | ------------------------------------------------------------ |
+| Contenuto     | Subject, Course, Chapter, KnowledgeSource, Atom, Card, Image |
+| Elaborazione  | Upload, AIJob                                                |
+| Apprendimento | UserAtomState, UserCardState, Review, Progress               |
+| Comportamento | StudySession, SessionEvent, FeedItem                         |
+| Trasversali   | DailyStatistics, Achievement, Notification                   |
 
 ### Setup
 
@@ -43,4 +46,3 @@ npm run dev
 | `npm run lint`         | ESLint                        |
 | `npm run format`       | Prettier (write)              |
 | `npm run format:check` | Prettier (check)              |
->>>>>>> 4ce4c5e (feat: Milestone 1 — Project Foundation)

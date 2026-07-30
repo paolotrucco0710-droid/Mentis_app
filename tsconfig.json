@@ -26,7 +26,8 @@
       "@/db/*": ["./src/db/*"],
       "@/lib/*": ["./src/lib/*"],
       "@/hooks/*": ["./src/hooks/*"],
-      "@/assets/*": ["./src/assets/*"]
+      "@/assets/*": ["./src/assets/*"],
+      "@/domain/*": ["./src/domain/*"]
     }
   },
   "include": [
