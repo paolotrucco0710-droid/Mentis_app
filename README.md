@@ -2,36 +2,38 @@
 
 App di apprendimento attivo per studenti delle superiori.
 
-## Milestone 10 — Frontend Foundation
+## Milestone 11 — Feed UI
 
-Interfaccia completa con layout, navigazione, design system e pagine base.
+L'utente può studiare tramite il feed interattivo collegato al backend.
 
-### Pagine
+### Flusso studio
 
-| Route | Descrizione |
-| ----- | ----------- |
-| `/home` | Dashboard — "Cosa devi fare adesso?" |
-| `/feed` | Layout studio full-screen (card in M11) |
-| `/upload` | Caricamento materiale |
-| `/processing` | Stato pipeline AI |
-| `/review` | Ripassi programmati |
-| `/profile` | Profilo e statistiche |
-| `/settings` | Impostazioni |
-| `/login`, `/signup`, `/onboarding` | Auth layout |
+```text
+/feed → crea sessione → mostra card → invia risposta → prossima card
+```
 
-### Design System (`src/components/ui/`)
+### Card supportate
 
-Button, Card, Input, TextArea, Badge, Avatar, ProgressBar, Skeleton, Loader, EmptyState e icone condivise.
+| Tipo | Componente |
+| ---- | ---------- |
+| Explain | Learn Card |
+| ImageExplain | Image Card |
+| Quiz | Quiz Card |
+| TrueFalse | Vero/Falso |
+| Blurting | Blurting Card |
+| Feynman | Feynman Card |
+| ErrorDetection | Trova l'errore |
 
-### Layout (`src/components/layout/`)
+### API utilizzate
 
-- **AppShell** — top bar + bottom navigation (Home layout)
-- **AuthLayout** — login/signup centrati
-- **FeedLayout** — full-screen senza distrazioni
+- `POST /api/v1/sessions`
+- `GET /api/v1/feed/next`
+- `POST /api/v1/progress/responses`
+- `POST /api/v1/sessions/[id]/pause|end`
 
-### Bottom Navigation
+### Env frontend
 
-Home · Studio · Upload · Ripasso · Profilo
+`NEXT_PUBLIC_DEV_SUBJECT_ID` — materia usata dal feed (default: seed dev)
 
 ### Script
 
