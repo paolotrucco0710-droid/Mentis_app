@@ -1,3 +1,1 @@
-/**
- * Shared React hooks for the Mentis frontend.
- */
+export { useMediaQuery } from "./use-media-query";
