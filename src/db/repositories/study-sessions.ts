@@ -64,3 +64,13 @@ export async function endStudySession(
   });
   return toStudySession(record);
 }
+
+export async function incrementSessionCardsViewed(
+  id: StudySessionId
+): Promise<StudySession> {
+  const record = await prisma.studySession.update({
+    where: { id },
+    data: { cardsViewed: { increment: 1 } },
+  });
+  return toStudySession(record);
+}

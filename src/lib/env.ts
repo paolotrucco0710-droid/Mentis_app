@@ -12,6 +12,11 @@ export const env = {
   appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   databaseUrl: process.env.DATABASE_URL ?? "",
   devUserId: process.env.DEV_USER_ID ?? "",
+  devSubjectId: process.env.DEV_SUBJECT_ID ?? "",
+  feedSessionTargetCards: parsePositiveInt(
+    process.env.FEED_SESSION_TARGET_CARDS,
+    20
+  ),
   uploadStoragePath: process.env.UPLOAD_STORAGE_PATH ?? "./storage/uploads",
   maxUploadFileSizeMb: parsePositiveInt(
     process.env.MAX_UPLOAD_FILE_SIZE_MB,

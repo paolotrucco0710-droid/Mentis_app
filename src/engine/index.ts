@@ -1,11 +1,23 @@
-/**
- * Cognitive Engine — decides what the student should study next.
- * Pure, deterministic logic will be implemented in Milestone 6.
- */
-
-export type {
-  CognitiveAtomStage,
-  CognitiveObjective,
-  FeedItem,
-  FeedResponse,
-} from "@/domain";
+export { FeedEngineError } from "./errors";
+export {
+  PREREQUISITE_MASTERY_THRESHOLD,
+  REVIEW_FORGET_THRESHOLD,
+  MASTERY_STABLE_THRESHOLD,
+} from "./constants";
+export { computeForgetProbability } from "./decay";
+export {
+  prerequisitesMet,
+  resolveCognitiveStage,
+  initialLearningStage,
+} from "./stages";
+export {
+  scoreAtomCandidate,
+  selectBestCandidate,
+  countUnlocks,
+} from "./priority";
+export { selectCardForAtom } from "./card-selector";
+export { estimateNextReviewAt, isReviewDue } from "./scheduler";
+export { getNextFeedItem, countSubjectAtoms } from "./feed-engine";
+export { createFeedSession } from "./session";
+export { resolveDevUserId, resolveDevSubjectId } from "./dev";
+export type { FeedEngineContext, ScoredAtomCandidate } from "./types";
