@@ -38,3 +38,17 @@ export async function upsertUserCardState(
   });
   return toUserCardState(record);
 }
+
+export async function findUserCardStatesByUserAndCardIds(
+  userId: UserId,
+  cardIds: CardId[]
+): Promise<UserCardState[]> {
+  if (cardIds.length === 0) {
+    return [];
+  }
+
+  const records = await prisma.userCardState.findMany({
+    where: { userId, cardId: { in: cardIds } },
+  });
+  return records.map(toUserCardState);
+}

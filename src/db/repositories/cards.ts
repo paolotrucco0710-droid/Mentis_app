@@ -15,3 +15,15 @@ export async function findCardsByAtomId(atomId: AtomId): Promise<Card[]> {
   });
   return records.map(toCard);
 }
+
+export async function findCardsByAtomIds(atomIds: AtomId[]): Promise<Card[]> {
+  if (atomIds.length === 0) {
+    return [];
+  }
+
+  const records = await prisma.card.findMany({
+    where: { atomId: { in: atomIds } },
+    orderBy: [{ atomId: "asc" }, { order: "asc" }],
+  });
+  return records.map(toCard);
+}
