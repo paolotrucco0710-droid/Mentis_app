@@ -7,6 +7,7 @@ import type {
 } from "@/domain/ids";
 import { resolveDevUserId } from "@/engine/dev";
 import { ProgressEngineError, recordCardResponse } from "@/progress";
+import { SessionEngineError } from "@/session";
 
 export const runtime = "nodejs";
 
@@ -62,7 +63,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    if (error instanceof ProgressEngineError) {
+    if (
+      error instanceof ProgressEngineError ||
+      error instanceof SessionEngineError
+    ) {
       return NextResponse.json(
         { error: error.message, code: error.code },
         { status: error.statusCode }

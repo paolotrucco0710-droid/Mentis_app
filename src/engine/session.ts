@@ -1,8 +1,6 @@
-import { createStudySession } from "@/db/repositories/study-sessions";
-import { findSubjectById } from "@/db/repositories/subjects";
+import { openSession } from "@/session";
 import type { StudySession } from "@/domain/entities";
 import type { SubjectId, UserId } from "@/domain/ids";
-import { FeedEngineError } from "./errors";
 
 export interface CreateFeedSessionInput {
   userId: UserId;
@@ -12,25 +10,5 @@ export interface CreateFeedSessionInput {
 export async function createFeedSession(
   input: CreateFeedSessionInput
 ): Promise<StudySession> {
-  const subject = await findSubjectById(input.subjectId);
-  if (!subject) {
-    throw new FeedEngineError(
-      "Materia non trovata.",
-      "SUBJECT_NOT_FOUND",
-      404
-    );
-  }
-
-  if (subject.userId !== input.userId) {
-    throw new FeedEngineError(
-      "Non hai accesso a questa materia.",
-      "SUBJECT_FORBIDDEN",
-      403
-    );
-  }
-
-  return createStudySession({
-    userId: input.userId,
-    subjectId: input.subjectId,
-  });
+  return openSession(input.userId, { subjectId: input.subjectId });
 }

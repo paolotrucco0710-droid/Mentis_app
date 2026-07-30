@@ -6,6 +6,7 @@ import {
   resolveDevSubjectId,
   resolveDevUserId,
 } from "@/engine";
+import { SessionEngineError } from "@/session";
 
 export const runtime = "nodejs";
 
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(feed, { status: 200 });
   } catch (error) {
-    if (error instanceof FeedEngineError) {
+    if (error instanceof FeedEngineError || error instanceof SessionEngineError) {
       return NextResponse.json(
         { error: error.message, code: error.code },
         { status: error.statusCode }

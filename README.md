@@ -2,47 +2,40 @@
 
 App di apprendimento attivo per studenti delle superiori.
 
-## Milestone 7 — Progress Engine
+## Milestone 8 — Session Engine
 
-Ogni risposta dello studente aggiorna mastery, statistiche e progresso.
+Gestisce il ciclo di vita completo di una sessione di studio.
 
-### Flusso completo (M6 + M7)
+### Flusso completo (M6–M8)
 
 ```text
-POST /feed/sessions → GET /feed/next → POST /progress/responses → GET /feed/next
+POST /sessions → GET /feed/next → POST /progress/responses
+              → POST /sessions/:id/pause|resume → POST /sessions/:id/end
 ```
 
-### Endpoint
+### Endpoint sessione
 
 | Metodo | URL | Descrizione |
 | ------ | --- | ----------- |
-| `POST` | `/api/v1/progress/responses` | Registra risposta e aggiorna progresso |
-| `GET`  | `/api/v1/progress?scopeType=subject&scopeId=...` | Progresso aggregato |
+| `POST` | `/api/v1/sessions` | Apre una nuova sessione |
+| `GET`  | `/api/v1/sessions/[id]` | Stato e metriche della sessione |
+| `POST` | `/api/v1/sessions/[id]/pause` | Mette in pausa |
+| `POST` | `/api/v1/sessions/[id]/resume` | Riprende |
+| `POST` | `/api/v1/sessions/[id]/end` | Chiude e registra metriche finali |
 
-### Body `POST /progress/responses`
+`POST /api/v1/feed/sessions` resta disponibile come alias per aprire una sessione.
 
-```json
-{
-  "sessionId": "...",
-  "cardId": "...",
-  "atomId": "...",
-  "outcome": "success",
-  "isCorrect": true,
-  "responseTimeMs": 3200,
-  "durationMs": 15000
-}
-```
+### Stati sessione
 
-`outcome`: `success` | `failure` | `skipped` | `neutral`
+- `active` — studio in corso
+- `paused` — in pausa (feed e progresso bloccati)
+- `ended` — chiusa con metriche finali
 
-### Cosa viene aggiornato
+### Metriche calcolate
 
-- **UserAtomState** — mastery, comprensione, streak, decay, stage, prossimo ripasso
-- **UserCardState** — evidenze per card
-- **SessionEvent** — cronologia interazione
-- **StudySession** — contatori sessione
-- **DailyStatistics** — tempo studio, accuracy, streak giornaliero
-- **Unlock** — atom dipendenti sbloccati quando i prerequisiti sono soddisfatti
+- accuracy, durata attiva (escluse le pause)
+- pause count / tempo totale in pausa
+- cards per minuto, focus score, fatigue score
 
 ### Script
 
