@@ -1,9 +1,9 @@
 import { findScheduledReviewsByUserId } from "@/db/repositories/reviews";
-import { findAtomById } from "@/db/repositories/atoms";
+import { findAtomsByIds } from "@/db/repositories/atoms";
 import { findUserAtomStatesByUserId } from "@/db/repositories/user-atom-states";
 import type { Review } from "@/domain/entities";
 import type { UserAtomState } from "@/domain/entities";
-import type { SubjectId, UserId } from "@/domain/ids";
+import type { AtomId, SubjectId, UserId } from "@/domain/ids";
 import { computeForgetProbability } from "@/engine/decay";
 import { computeOverdueHours, computeReviewPriority } from "./priority";
 import { scheduleReviewForAtom } from "./scheduler";
@@ -37,8 +37,11 @@ export async function getReviewQueue(input: {
   userId: UserId;
   subjectId?: SubjectId | null;
   now?: Date;
+  syncBeforeRead?: boolean;
 }): Promise<ReviewQueue> {
-  await syncReviewsForUser(input.userId);
+  if (input.syncBeforeRead) {
+    await syncReviewsForUser(input.userId);
+  }
 
   const now = input.now ?? new Date();
   const [reviews, states] = await Promise.all([
@@ -46,14 +49,21 @@ export async function getReviewQueue(input: {
     findUserAtomStatesByUserId(input.userId),
   ]);
   const stateByAtomId = new Map(states.map((state) => [state.atomId, state]));
+  const atoms = await findAtomsByIds(
+    reviews.map((review) => review.atomId) as AtomId[]
+  );
+  const atomById = new Map(atoms.map((atom) => [atom.id, atom]));
 
-  const items = (
-    await Promise.all(
-      reviews.map((review) =>
-        enrichReviewItem(review, now, stateByAtomId.get(review.atomId) ?? null)
+  const items = reviews
+    .map((review) =>
+      enrichReviewItem(
+        review,
+        now,
+        stateByAtomId.get(review.atomId) ?? null,
+        atomById.get(review.atomId) ?? null
       )
     )
-  ).filter((item): item is ReviewQueueItem => Boolean(item));
+    .filter((item): item is ReviewQueueItem => Boolean(item));
 
   const filtered = input.subjectId
     ? items.filter((item) => item.subjectId === input.subjectId)
@@ -102,6 +112,7 @@ export async function generateDailyReview(input: {
     userId: input.userId,
     subjectId: input.subjectId,
     now,
+    syncBeforeRead: true,
   });
 
   const horizonMs = DAILY_REVIEW_HORIZON_HOURS * 3_600_000;
@@ -127,17 +138,13 @@ export async function generateDailyReview(input: {
   };
 }
 
-async function enrichReviewItem(
+function enrichReviewItem(
   review: Review,
   now: Date,
-  state: UserAtomState | null
-): Promise<ReviewQueueItem | null> {
-  if (!state) {
-    return null;
-  }
-
-  const atom = await findAtomById(review.atomId);
-  if (!atom) {
+  state: UserAtomState | null,
+  atom: Awaited<ReturnType<typeof findAtomsByIds>>[number] | null
+): ReviewQueueItem | null {
+  if (!state || !atom) {
     return null;
   }
 

@@ -19,6 +19,10 @@ import type {
 import type { Image, KnowledgeSource, Upload } from "@/domain/entities";
 import { env, getMaxUploadFileSizeBytes } from "@/lib/env";
 import {
+  DevAuthError,
+  resolveDevUserId as resolveDevUserIdBase,
+} from "@/lib/dev-auth";
+import {
   buildPageStorageKey,
   buildPdfStorageKey,
   getStorageProvider,
@@ -227,14 +231,14 @@ export async function getUploadResult(
 }
 
 export function resolveDevUserId(): UserId {
-  if (!env.devUserId) {
-    throw new UploadPipelineError(
-      "DEV_USER_ID non configurato. Aggiungilo in .env.local (vedi README).",
-      "DEV_USER_NOT_CONFIGURED",
-      500
-    );
+  try {
+    return resolveDevUserIdBase();
+  } catch (error) {
+    if (error instanceof DevAuthError) {
+      throw new UploadPipelineError(error.message, error.code, error.statusCode);
+    }
+    throw error;
   }
-  return env.devUserId as UserId;
 }
 
 export function parseCourseId(

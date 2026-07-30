@@ -3,6 +3,8 @@ import { findCardById } from "@/db/repositories/cards";
 import { upsertDailyStatistics } from "@/db/repositories/daily-statistics";
 import { createSessionEvent } from "@/db/repositories/session-events";
 import { recordSessionAnswer } from "@/db/repositories/study-sessions";
+import { prisma } from "@/db/client";
+import type { DbTx } from "@/db/transaction";
 import { assertSessionReadyForStudy } from "@/session";
 import {
   findUserAtomState,
@@ -14,7 +16,6 @@ import {
   upsertUserCardState,
 } from "@/db/repositories/user-card-states";
 import { findDailyStatistics } from "@/db/repositories/notifications";
-import type { Progress } from "@/domain/entities/progress";
 import { ProgressScopeType } from "@/domain/entities/progress";
 import { SessionEventOutcome, SessionEventType } from "@/domain/enums";
 import { UserAtomLearningState } from "@/domain/enums";
@@ -22,6 +23,7 @@ import type { SubjectId, UserId } from "@/domain/ids";
 import { estimateNextReviewAt } from "@/engine/scheduler";
 import { MASTERY_STABLE_THRESHOLD } from "@/engine/constants";
 import { scheduleReviewForAtom } from "@/review";
+import { mergeRunningAverage } from "@/lib/math";
 import { getProgress } from "./aggregation";
 import { ProgressEngineError } from "./errors";
 import { applyMasteryUpdate, computeMasteryUpdate } from "./mastery";
@@ -55,6 +57,14 @@ export async function recordCardResponse(
     throw new ProgressEngineError("Atom non trovato.", "ATOM_NOT_FOUND", 404);
   }
 
+  if (!session.subjectId || atom.subjectId !== session.subjectId) {
+    throw new ProgressEngineError(
+      "Il contenuto non appartiene alla sessione di studio.",
+      "CONTENT_SESSION_MISMATCH",
+      409
+    );
+  }
+
   const now = new Date();
   const existingAtomState =
     (await findUserAtomState(input.userId, input.atomId)) ??
@@ -83,104 +93,137 @@ export async function recordCardResponse(
     now
   );
 
-  const atomState = await upsertUserAtomState({
-    userId: input.userId,
-    atomId: input.atomId,
-    ...atomPatch,
-    lastViewedAt: now,
-    nextReviewAt,
-    averageResponseTimeMs: mergeAverageResponseTime(
-      existingAtomState.averageResponseTimeMs,
-      input.responseTimeMs
-    ),
-    totalStudyTimeMs:
-      existingAtomState.totalStudyTimeMs + (input.durationMs ?? 0),
-    lastAlgorithmUsed: "progress-v1",
+  const wasCorrect = masteryUpdate.wasCorrect && !masteryUpdate.wasSkipped;
+  const wasReview =
+    existingAtomState.currentStage === UserAtomLearningState.Review;
+  const atomMastered =
+    masteryBefore < MASTERY_STABLE_THRESHOLD &&
+    atomPatch.mastery >= MASTERY_STABLE_THRESHOLD;
+
+  const {
+    atomState,
+    cardState,
+    sessionEvent,
+    unlockedAtomIds,
+  } = await prisma.$transaction(async (tx) => {
+    const atomState = await upsertUserAtomState(
+      {
+        userId: input.userId,
+        atomId: input.atomId,
+        ...atomPatch,
+        lastViewedAt: now,
+        nextReviewAt,
+        averageResponseTimeMs: mergeRunningAverage(
+          existingAtomState.averageResponseTimeMs,
+          existingAtomState.exposureCount,
+          input.responseTimeMs
+        ),
+        totalStudyTimeMs:
+          existingAtomState.totalStudyTimeMs + (input.durationMs ?? 0),
+        lastAlgorithmUsed: "progress-v1",
+      },
+      tx
+    );
+
+    const existingCardState = await findUserCardState(
+      input.userId,
+      input.cardId,
+      tx
+    );
+    const cardState = await upsertUserCardState(
+      {
+        userId: input.userId,
+        cardId: input.cardId,
+        viewCount: (existingCardState?.viewCount ?? 0) + 1,
+        correctAnswerCount:
+          (existingCardState?.correctAnswerCount ?? 0) +
+          (masteryUpdate.wasCorrect && !masteryUpdate.wasSkipped ? 1 : 0),
+        wrongAnswerCount:
+          (existingCardState?.wrongAnswerCount ?? 0) +
+          (!masteryUpdate.wasCorrect && !masteryUpdate.wasSkipped ? 1 : 0),
+        averageResponseTimeMs: mergeRunningAverage(
+          existingCardState?.averageResponseTimeMs ?? null,
+          existingCardState?.viewCount ?? 0,
+          input.responseTimeMs
+        ),
+        lastAnsweredAt: now,
+        skipped: masteryUpdate.wasSkipped,
+      },
+      tx
+    );
+
+    const sessionEvent = await createSessionEvent(
+      {
+        sessionId: input.sessionId,
+        type: resolveSessionEventType(input.outcome, masteryUpdate.wasCorrect),
+        atomId: input.atomId,
+        cardId: input.cardId,
+        durationMs: input.durationMs ?? null,
+        outcome: input.outcome,
+        declaredConfidence: input.declaredConfidence ?? null,
+        responseTimeMs: input.responseTimeMs ?? null,
+        feedPosition: input.feedPosition ?? null,
+        timestamp: now,
+      },
+      tx
+    );
+
+    await recordSessionAnswer(
+      {
+        id: input.sessionId,
+        wasCorrect,
+        wasReview,
+        atomMastered: atomState.mastery >= MASTERY_STABLE_THRESHOLD,
+      },
+      tx
+    );
+
+    await updateDailyStatistics(
+      {
+        userId: input.userId,
+        now,
+        durationMs: input.durationMs ?? 0,
+        wasCorrect,
+        masteryAfter: atomState.mastery,
+        wasReview,
+        atomMastered,
+      },
+      tx
+    );
+
+    const subjectAtoms = await findAtomsBySubjectId(atom.subjectId);
+    const allStates = await findUserAtomStatesByUserId(input.userId);
+    const userAtomStates = new Map(
+      allStates.map((state) => [state.atomId, state])
+    );
+    userAtomStates.set(atomState.atomId, atomState);
+    const unlockedAtomIds = await unlockDependentAtoms({
+      userId: input.userId,
+      atoms: subjectAtoms,
+      userAtomStates,
+      tx,
+    });
+
+    return {
+      atomState,
+      cardState,
+      sessionEvent,
+      unlockedAtomIds,
+    };
   });
 
   await scheduleReviewForAtom({
     userId: input.userId,
     atomId: input.atomId,
     atomState,
-  });
-
-  const existingCardState = await findUserCardState(input.userId, input.cardId);
-  const cardState = await upsertUserCardState({
-    userId: input.userId,
-    cardId: input.cardId,
-    viewCount: (existingCardState?.viewCount ?? 0) + 1,
-    correctAnswerCount:
-      (existingCardState?.correctAnswerCount ?? 0) +
-      (masteryUpdate.wasCorrect && !masteryUpdate.wasSkipped ? 1 : 0),
-    wrongAnswerCount:
-      (existingCardState?.wrongAnswerCount ?? 0) +
-      (!masteryUpdate.wasCorrect && !masteryUpdate.wasSkipped ? 1 : 0),
-    averageResponseTimeMs: mergeAverageResponseTime(
-      existingCardState?.averageResponseTimeMs ?? null,
-      input.responseTimeMs
-    ),
-    lastAnsweredAt: now,
-    skipped: masteryUpdate.wasSkipped,
-  });
-
-  const sessionEvent = await createSessionEvent({
-    sessionId: input.sessionId,
-    type: resolveSessionEventType(input.outcome, masteryUpdate.wasCorrect),
-    atomId: input.atomId,
-    cardId: input.cardId,
-    durationMs: input.durationMs ?? null,
-    outcome: input.outcome,
-    declaredConfidence: input.declaredConfidence ?? null,
-    responseTimeMs: input.responseTimeMs ?? null,
-    feedPosition: input.feedPosition ?? null,
-    timestamp: now,
-  });
-
-  await recordSessionAnswer({
-    id: input.sessionId,
-    wasCorrect: masteryUpdate.wasCorrect && !masteryUpdate.wasSkipped,
-    wasReview:
-      existingAtomState.currentStage === UserAtomLearningState.Review,
-    atomMastered: atomState.mastery >= MASTERY_STABLE_THRESHOLD,
-  });
-
-  await updateDailyStatistics({
-    userId: input.userId,
     now,
-    durationMs: input.durationMs ?? 0,
-    wasCorrect: masteryUpdate.wasCorrect && !masteryUpdate.wasSkipped,
-    masteryAfter: atomState.mastery,
-    wasReview:
-      existingAtomState.currentStage === UserAtomLearningState.Review,
-    atomMastered:
-      masteryBefore < MASTERY_STABLE_THRESHOLD &&
-      atomState.mastery >= MASTERY_STABLE_THRESHOLD,
   });
 
-  const subjectAtoms = await findAtomsBySubjectId(atom.subjectId);
-  const allStates = await findUserAtomStatesByUserId(input.userId);
-  const userAtomStates = new Map(allStates.map((state) => [state.atomId, state]));
-  userAtomStates.set(atomState.atomId, atomState);
-  const unlockedAtomIds = await unlockDependentAtoms({
+  const subjectProgress = await getProgress({
     userId: input.userId,
-    atoms: subjectAtoms,
-    userAtomStates,
+    scopeType: ProgressScopeType.Subject,
+    scopeId: session.subjectId as SubjectId,
   });
-
-  let subjectProgress: Progress | null = null;
-  if (session.subjectId) {
-    subjectProgress = await getProgress({
-      userId: input.userId,
-      scopeType: ProgressScopeType.Subject,
-      scopeId: session.subjectId,
-    });
-  } else {
-    subjectProgress = await getProgress({
-      userId: input.userId,
-      scopeType: ProgressScopeType.Subject,
-      scopeId: atom.subjectId as SubjectId,
-    });
-  }
 
   return {
     sessionEventId: sessionEvent.id,
@@ -194,15 +237,18 @@ export async function recordCardResponse(
   };
 }
 
-async function updateDailyStatistics(input: {
-  userId: UserId;
-  now: Date;
-  durationMs: number;
-  wasCorrect: boolean;
-  masteryAfter: number;
-  wasReview: boolean;
-  atomMastered: boolean;
-}): Promise<void> {
+async function updateDailyStatistics(
+  input: {
+    userId: UserId;
+    now: Date;
+    durationMs: number;
+    wasCorrect: boolean;
+    masteryAfter: number;
+    wasReview: boolean;
+    atomMastered: boolean;
+  },
+  tx: DbTx
+): Promise<void> {
   const today = startOfDay(input.now);
   const yesterday = previousDay(input.now);
   const [existingToday, existingYesterday] = await Promise.all([
@@ -224,26 +270,14 @@ async function updateDailyStatistics(input: {
     streak
   );
 
-  await upsertDailyStatistics({
-    userId: input.userId,
-    date: today,
-    ...update,
-  });
-}
-
-function mergeAverageResponseTime(
-  current: number | null,
-  responseTimeMs?: number
-): number | null {
-  if (responseTimeMs === undefined) {
-    return current;
-  }
-
-  if (current === null) {
-    return responseTimeMs;
-  }
-
-  return Math.round((current + responseTimeMs) / 2);
+  await upsertDailyStatistics(
+    {
+      userId: input.userId,
+      date: today,
+      ...update,
+    },
+    tx
+  );
 }
 
 function resolveSessionEventType(

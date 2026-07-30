@@ -1,3 +1,4 @@
+import { prisma } from "@/db/client";
 import {
   createAIJob,
   findAIJobById,
@@ -68,6 +69,26 @@ export async function processKnowledgeSource(
     );
   }
 
+  const claimed = await prisma.knowledgeSource.updateMany({
+    where: {
+      id: knowledgeSourceId,
+      processingStatus: {
+        not: KnowledgeSourceProcessingStatus.Processing,
+      },
+    },
+    data: {
+      processingStatus: KnowledgeSourceProcessingStatus.Processing,
+    },
+  });
+
+  if (claimed.count === 0) {
+    throw new AIProcessingError(
+      "Elaborazione già in corso.",
+      "ALREADY_PROCESSING",
+      409
+    );
+  }
+
   const existingAtoms = await countAtomsByKnowledgeSourceId(knowledgeSourceId);
   if (
     existingAtoms > 0 &&
@@ -96,11 +117,6 @@ export async function processKnowledgeSource(
     promptVersion: env.aiPromptVersion,
     parserVersion: env.knowledgeJsonVersion,
   });
-
-  await updateKnowledgeSourceStatus(
-    knowledgeSourceId,
-    KnowledgeSourceProcessingStatus.Processing
-  );
 
   try {
     await updateAIJobStatus(job.id, AIJobStatus.Running, AIJobStep.Ocr);

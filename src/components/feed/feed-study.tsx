@@ -11,10 +11,12 @@ import {
   createStudySession,
   endSession,
   fetchNextFeedItem,
+  fetchSessionDetail,
   pauseSession,
   submitCardResponse,
 } from "@/lib/api";
 import { clientConfig } from "@/lib/client-config";
+import { SessionStatus } from "@/session/types";
 import {
   Badge,
   Button,
@@ -72,8 +74,23 @@ export function FeedStudy() {
       const storedSessionId = sessionStorage.getItem(SESSION_STORAGE_KEY);
 
       if (storedSessionId) {
-        await loadNext(storedSessionId as StudySessionId);
-        return;
+        try {
+          const detail = await fetchSessionDetail(
+            storedSessionId as StudySessionId
+          );
+
+          if (
+            detail.status === SessionStatus.Active &&
+            detail.session.subjectId === subjectId
+          ) {
+            await loadNext(storedSessionId as StudySessionId, detail.session);
+            return;
+          }
+        } catch {
+          // Sessione non valida: ne verrà creata una nuova.
+        }
+
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
       }
 
       const session = await createStudySession(subjectId);

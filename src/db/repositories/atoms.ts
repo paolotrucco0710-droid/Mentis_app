@@ -15,6 +15,18 @@ export async function findAtomById(id: AtomId): Promise<Atom | null> {
   return record ? toAtom(record) : null;
 }
 
+export async function findAtomsByIds(ids: AtomId[]): Promise<Atom[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const records = await prisma.atom.findMany({
+    where: { id: { in: ids } },
+    include: atomInclude,
+  });
+  return records.map(toAtom);
+}
+
 export async function findAtomsByKnowledgeSourceId(
   knowledgeSourceId: KnowledgeSourceId
 ): Promise<Atom[]> {

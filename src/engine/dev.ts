@@ -1,31 +1,35 @@
 import type { SubjectId, UserId } from "@/domain/ids";
-import { env } from "@/lib/env";
+import {
+  DevAuthError,
+  resolveDevSubjectId as resolveDevSubjectIdBase,
+  resolveDevUserId as resolveDevUserIdBase,
+} from "@/lib/dev-auth";
 import { FeedEngineError } from "./errors";
 
-export function resolveDevUserId(): UserId {
-  if (!env.devUserId) {
-    throw new FeedEngineError(
-      "DEV_USER_ID non configurato. Aggiungilo nelle variabili ambiente.",
-      "DEV_USER_NOT_CONFIGURED",
-      500
-    );
-  }
+function toFeedEngineError(error: DevAuthError): FeedEngineError {
+  return new FeedEngineError(error.message, error.code, error.statusCode);
+}
 
-  return env.devUserId as UserId;
+export function resolveDevUserId(): UserId {
+  try {
+    return resolveDevUserIdBase();
+  } catch (error) {
+    if (error instanceof DevAuthError) {
+      throw toFeedEngineError(error);
+    }
+    throw error;
+  }
 }
 
 export function resolveDevSubjectId(
   requestedSubjectId: string | null
 ): SubjectId {
-  const subjectId = requestedSubjectId ?? env.devSubjectId;
-
-  if (!subjectId) {
-    throw new FeedEngineError(
-      "DEV_SUBJECT_ID non configurato. Aggiungilo nelle variabili ambiente.",
-      "DEV_SUBJECT_NOT_CONFIGURED",
-      500
-    );
+  try {
+    return resolveDevSubjectIdBase(requestedSubjectId);
+  } catch (error) {
+    if (error instanceof DevAuthError) {
+      throw toFeedEngineError(error);
+    }
+    throw error;
   }
-
-  return subjectId as SubjectId;
 }

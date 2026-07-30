@@ -1,6 +1,6 @@
 import type { UserId } from "@/domain/ids";
 import type { DailyStatistics } from "@/domain/entities";
-import { prisma } from "../client";
+import { getDb, type DbTx } from "../transaction";
 import { toDailyStatistics } from "../mappers";
 
 export interface UpsertDailyStatisticsInput {
@@ -17,9 +17,10 @@ export interface UpsertDailyStatisticsInput {
 }
 
 export async function upsertDailyStatistics(
-  input: UpsertDailyStatisticsInput
+  input: UpsertDailyStatisticsInput,
+  tx?: DbTx
 ): Promise<DailyStatistics> {
-  const record = await prisma.dailyStatistics.upsert({
+  const record = await getDb(tx).dailyStatistics.upsert({
     where: {
       userId_date: {
         userId: input.userId,

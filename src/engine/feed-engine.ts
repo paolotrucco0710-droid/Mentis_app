@@ -3,10 +3,8 @@ import {
   findAtomsBySubjectId,
 } from "@/db/repositories/atoms";
 import { findCardsByAtomIds } from "@/db/repositories/cards";
+import { createSessionEvent } from "@/db/repositories/session-events";
 import { findSubjectById } from "@/db/repositories/subjects";
-import {
-  incrementSessionCardsViewed,
-} from "@/db/repositories/study-sessions";
 import { findSessionEventsBySessionId } from "@/db/repositories/session-events";
 import { assertSessionReadyForStudy } from "@/session";
 import {
@@ -14,12 +12,12 @@ import {
   upsertUserAtomState,
 } from "@/db/repositories/user-atom-states";
 import { findUserCardStatesByUserAndCardIds } from "@/db/repositories/user-card-states";
-import type { Atom, Card, FeedItem, FeedResponse } from "@/domain/entities";
+import type { Atom, Card, FeedItem, FeedResponse, UserAtomState } from "@/domain/entities";
 import { CardType, SessionEventType } from "@/domain/enums";
 import type { StudySessionId, SubjectId, UserId } from "@/domain/ids";
 import { env } from "@/lib/env";
 import { selectCardForAtom } from "./card-selector";
-import { DEFAULT_SESSION_TARGET_CARDS } from "./constants";
+import { DEFAULT_SESSION_TARGET_CARDS, MASTERY_STABLE_THRESHOLD } from "./constants";
 import { FeedEngineError } from "./errors";
 import { countUnlocks, scoreAtomCandidate, selectBestCandidate } from "./priority";
 import { initialLearningStage, prerequisitesMet } from "./stages";
@@ -36,6 +34,10 @@ export async function getNextFeedItem(
 ): Promise<FeedResponse> {
   const context = await loadFeedContext(input);
 
+  if (context.session.cardsViewed >= getSessionTargetCards()) {
+    return emptyFeedResponse(context.session.id, true);
+  }
+
   if (context.atoms.length === 0) {
     return emptyFeedResponse(context.session.id, true);
   }
@@ -50,18 +52,26 @@ export async function getNextFeedItem(
     return emptyFeedResponse(context.session.id, sessionComplete);
   }
 
-  const updatedSession = await incrementSessionCardsViewed(context.session.id);
+  const now = new Date();
+  await createSessionEvent({
+    sessionId: context.session.id,
+    type: SessionEventType.OpenCard,
+    atomId: selection.candidate.atom.id,
+    cardId: selection.card.id,
+    feedPosition: context.session.cardsViewed,
+    timestamp: now,
+  });
+
   const feedItem = buildFeedItem({
     context,
     atom: selection.candidate.atom,
     card: selection.card,
-    session: updatedSession,
     masteryBefore: selection.candidate.state.mastery,
   });
 
   return {
     item: feedItem,
-    sessionComplete: updatedSession.cardsViewed >= getSessionTargetCards(),
+    sessionComplete: false,
     rewards: [],
     notifications: [],
   };
@@ -75,6 +85,14 @@ async function loadFeedContext(
     input.sessionId
   );
 
+  if (session.subjectId && session.subjectId !== input.subjectId) {
+    throw new FeedEngineError(
+      "La sessione non appartiene alla materia richiesta.",
+      "SESSION_SUBJECT_MISMATCH",
+      409
+    );
+  }
+
   const subject = await findSubjectById(input.subjectId);
   if (!subject) {
     throw new FeedEngineError(
@@ -84,13 +102,16 @@ async function loadFeedContext(
     );
   }
 
-  const atoms = await findAtomsBySubjectId(input.subjectId);
-  await ensureUserAtomStates(input.userId, atoms);
+  if (subject.userId !== input.userId) {
+    throw new FeedEngineError(
+      "Non hai accesso a questa materia.",
+      "SUBJECT_FORBIDDEN",
+      403
+    );
+  }
 
-  const userAtomStateList = await findUserAtomStatesByUserId(input.userId);
-  const userAtomStates = new Map(
-    userAtomStateList.map((state) => [state.atomId, state])
-  );
+  const atoms = await findAtomsBySubjectId(input.subjectId);
+  const userAtomStates = await ensureUserAtomStates(input.userId, atoms);
 
   const cards = await findCardsByAtomIds(atoms.map((atom) => atom.id));
   const cardsByAtomId = groupCardsByAtom(cards);
@@ -124,7 +145,7 @@ async function loadFeedContext(
 async function ensureUserAtomStates(
   userId: UserId,
   atoms: Atom[]
-): Promise<void> {
+): Promise<Map<string, UserAtomState>> {
   const existingStates = await findUserAtomStatesByUserId(userId);
   const existingAtomIds = new Set(existingStates.map((state) => state.atomId));
   const stateByAtomId = new Map(
@@ -176,6 +197,8 @@ async function ensureUserAtomStates(
       stateByAtomId.set(atom.id, updated);
     }
   }
+
+  return stateByAtomId;
 }
 
 function selectNextItem(context: FeedEngineContext) {
@@ -227,14 +250,13 @@ function buildFeedItem(input: {
   context: FeedEngineContext;
   atom: Atom;
   card: Card;
-  session: FeedEngineContext["session"];
   masteryBefore: number;
 }): FeedItem {
-  const { context, atom, card, session, masteryBefore } = input;
+  const { context, atom, card, masteryBefore } = input;
   const sessionTarget = getSessionTargetCards();
   const totalAtoms = context.atoms.length;
   const masteredCount = [...context.userAtomStates.values()].filter(
-    (state) => state.mastery >= 85
+    (state) => state.mastery >= MASTERY_STABLE_THRESHOLD
   ).length;
 
   return {
@@ -244,9 +266,9 @@ function buildFeedItem(input: {
     subjectId: context.subjectId,
     courseId: null,
     chapterId: null,
-    sessionId: session.id,
-    position: session.cardsViewed,
-    sessionProgress: Math.min(session.cardsViewed / sessionTarget, 1),
+    sessionId: context.session.id,
+    position: context.session.cardsViewed,
+    sessionProgress: Math.min(context.session.cardsViewed / sessionTarget, 1),
     chapterProgress: totalAtoms > 0 ? masteredCount / totalAtoms : null,
     estimatedDurationSeconds: card.estimatedDurationSeconds,
     masteryBefore,

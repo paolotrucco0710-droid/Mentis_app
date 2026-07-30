@@ -1,14 +1,15 @@
 import type { AtomId, UserId } from "@/domain/ids";
 import type { UserAtomState } from "@/domain/entities";
 import type { UserAtomLearningState } from "@/domain/enums";
-import { prisma } from "../client";
+import { getDb, type DbTx } from "../transaction";
 import { toUserAtomState } from "../mappers";
 
 export async function findUserAtomState(
   userId: UserId,
-  atomId: AtomId
+  atomId: AtomId,
+  tx?: DbTx
 ): Promise<UserAtomState | null> {
-  const record = await prisma.userAtomState.findUnique({
+  const record = await getDb(tx).userAtomState.findUnique({
     where: { userId_atomId: { userId, atomId } },
   });
   return record ? toUserAtomState(record) : null;
@@ -17,7 +18,7 @@ export async function findUserAtomState(
 export async function findUserAtomStatesByUserId(
   userId: UserId
 ): Promise<UserAtomState[]> {
-  const records = await prisma.userAtomState.findMany({
+  const records = await getDb().userAtomState.findMany({
     where: { userId },
     orderBy: { updatedAt: "desc" },
   });
@@ -28,7 +29,7 @@ export async function findDueUserAtomStates(
   userId: UserId,
   before: Date = new Date()
 ): Promise<UserAtomState[]> {
-  const records = await prisma.userAtomState.findMany({
+  const records = await getDb().userAtomState.findMany({
     where: {
       userId,
       nextReviewAt: { lte: before },
@@ -60,10 +61,11 @@ export interface UpsertUserAtomStateInput {
 }
 
 export async function upsertUserAtomState(
-  input: UpsertUserAtomStateInput
+  input: UpsertUserAtomStateInput,
+  tx?: DbTx
 ): Promise<UserAtomState> {
   const { userId, atomId, totalStudyTimeMs, ...rest } = input;
-  const record = await prisma.userAtomState.upsert({
+  const record = await getDb(tx).userAtomState.upsert({
     where: { userId_atomId: { userId, atomId } },
     create: {
       userId,

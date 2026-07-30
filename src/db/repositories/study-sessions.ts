@@ -1,6 +1,6 @@
 import type { StudySessionId, SubjectId, UserId } from "@/domain/ids";
 import type { StudySession } from "@/domain/entities";
-import { prisma } from "../client";
+import { getDb, type DbTx } from "../transaction";
 import { toStudySession } from "../mappers";
 
 export interface CreateStudySessionInput {
@@ -14,7 +14,7 @@ export interface CreateStudySessionInput {
 export async function findStudySessionById(
   id: StudySessionId
 ): Promise<StudySession | null> {
-  const record = await prisma.studySession.findUnique({ where: { id } });
+  const record = await getDb().studySession.findUnique({ where: { id } });
   return record ? toStudySession(record) : null;
 }
 
@@ -22,7 +22,7 @@ export async function findStudySessionsByUserId(
   userId: UserId,
   limit = 20
 ): Promise<StudySession[]> {
-  const records = await prisma.studySession.findMany({
+  const records = await getDb().studySession.findMany({
     where: { userId },
     orderBy: { startedAt: "desc" },
     take: limit,
@@ -33,7 +33,7 @@ export async function findStudySessionsByUserId(
 export async function createStudySession(
   input: CreateStudySessionInput
 ): Promise<StudySession> {
-  const record = await prisma.studySession.create({ data: input });
+  const record = await getDb().studySession.create({ data: input });
   return toStudySession(record);
 }
 
@@ -55,7 +55,7 @@ export async function endStudySession(
   input: EndStudySessionInput
 ): Promise<StudySession> {
   const { id, durationMs, ...rest } = input;
-  const record = await prisma.studySession.update({
+  const record = await getDb().studySession.update({
     where: { id },
     data: {
       ...rest,
@@ -66,9 +66,10 @@ export async function endStudySession(
 }
 
 export async function incrementSessionCardsViewed(
-  id: StudySessionId
+  id: StudySessionId,
+  tx?: DbTx
 ): Promise<StudySession> {
-  const record = await prisma.studySession.update({
+  const record = await getDb(tx).studySession.update({
     where: { id },
     data: { cardsViewed: { increment: 1 } },
   });
@@ -83,11 +84,13 @@ export interface RecordSessionAnswerInput {
 }
 
 export async function recordSessionAnswer(
-  input: RecordSessionAnswerInput
+  input: RecordSessionAnswerInput,
+  tx?: DbTx
 ): Promise<StudySession> {
-  const record = await prisma.studySession.update({
+  const record = await getDb(tx).studySession.update({
     where: { id: input.id },
     data: {
+      cardsViewed: { increment: 1 },
       correctAnswerCount: input.wasCorrect
         ? { increment: 1 }
         : undefined,

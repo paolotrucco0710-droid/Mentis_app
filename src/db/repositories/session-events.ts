@@ -1,7 +1,7 @@
 import type { StudySessionId } from "@/domain/ids";
 import type { SessionEvent } from "@/domain/entities";
 import type { SessionEventOutcome, SessionEventType } from "@/domain/enums";
-import { prisma } from "../client";
+import { getDb, type DbTx } from "../transaction";
 import { toSessionEvent } from "../mappers";
 
 export interface CreateSessionEventInput {
@@ -19,16 +19,17 @@ export interface CreateSessionEventInput {
 }
 
 export async function createSessionEvent(
-  input: CreateSessionEventInput
+  input: CreateSessionEventInput,
+  tx?: DbTx
 ): Promise<SessionEvent> {
-  const record = await prisma.sessionEvent.create({ data: input });
+  const record = await getDb(tx).sessionEvent.create({ data: input });
   return toSessionEvent(record);
 }
 
 export async function findSessionEventsBySessionId(
   sessionId: StudySessionId
 ): Promise<SessionEvent[]> {
-  const records = await prisma.sessionEvent.findMany({
+  const records = await getDb().sessionEvent.findMany({
     where: { sessionId },
     orderBy: { timestamp: "asc" },
   });

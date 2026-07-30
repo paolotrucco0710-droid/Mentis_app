@@ -1,13 +1,14 @@
 import type { CardId, UserId } from "@/domain/ids";
 import type { UserCardState } from "@/domain/entities";
-import { prisma } from "../client";
+import { getDb, type DbTx } from "../transaction";
 import { toUserCardState } from "../mappers";
 
 export async function findUserCardState(
   userId: UserId,
-  cardId: CardId
+  cardId: CardId,
+  tx?: DbTx
 ): Promise<UserCardState | null> {
-  const record = await prisma.userCardState.findUnique({
+  const record = await getDb(tx).userCardState.findUnique({
     where: { userId_cardId: { userId, cardId } },
   });
   return record ? toUserCardState(record) : null;
@@ -28,10 +29,11 @@ export interface UpsertUserCardStateInput {
 }
 
 export async function upsertUserCardState(
-  input: UpsertUserCardStateInput
+  input: UpsertUserCardStateInput,
+  tx?: DbTx
 ): Promise<UserCardState> {
   const { userId, cardId, ...rest } = input;
-  const record = await prisma.userCardState.upsert({
+  const record = await getDb(tx).userCardState.upsert({
     where: { userId_cardId: { userId, cardId } },
     create: { userId, cardId, ...rest },
     update: rest,
@@ -47,7 +49,7 @@ export async function findUserCardStatesByUserAndCardIds(
     return [];
   }
 
-  const records = await prisma.userCardState.findMany({
+  const records = await getDb().userCardState.findMany({
     where: { userId, cardId: { in: cardIds } },
   });
   return records.map(toUserCardState);

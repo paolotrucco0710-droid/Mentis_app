@@ -4,13 +4,15 @@ import { UserAtomLearningState } from "@/domain/enums";
 import type { AtomId, UserId } from "@/domain/ids";
 import { initialLearningStage, prerequisitesMet } from "@/engine/stages";
 import { upsertUserAtomState } from "@/db/repositories/user-atom-states";
+import type { DbTx } from "@/db/transaction";
 
 export async function unlockDependentAtoms(input: {
   userId: UserId;
   atoms: Atom[];
   userAtomStates: Map<string, UserAtomState>;
+  tx?: DbTx;
 }): Promise<AtomId[]> {
-  const { userId, atoms, userAtomStates } = input;
+  const { userId, atoms, userAtomStates, tx } = input;
   const unlockedAtomIds: AtomId[] = [];
 
   for (const atom of atoms) {
@@ -27,7 +29,7 @@ export async function unlockDependentAtoms(input: {
       userId,
       atomId: atom.id,
       currentStage: initialLearningStage(true),
-    });
+    }, tx);
 
     userAtomStates.set(atom.id, updated);
     unlockedAtomIds.push(atom.id);
