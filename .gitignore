@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# uploads (Milestone 4)
+/storage/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
