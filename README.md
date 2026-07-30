@@ -2,40 +2,31 @@
 
 App di apprendimento attivo per studenti delle superiori.
 
-## Milestone 8 — Session Engine
+## Milestone 9 — Review Engine
 
-Gestisce il ciclo di vita completo di una sessione di studio.
+Gestisce scheduling, coda, overdue e priorità delle revisioni.
 
-### Flusso completo (M6–M8)
-
-```text
-POST /sessions → GET /feed/next → POST /progress/responses
-              → POST /sessions/:id/pause|resume → POST /sessions/:id/end
-```
-
-### Endpoint sessione
+### Endpoint
 
 | Metodo | URL | Descrizione |
 | ------ | --- | ----------- |
-| `POST` | `/api/v1/sessions` | Apre una nuova sessione |
-| `GET`  | `/api/v1/sessions/[id]` | Stato e metriche della sessione |
-| `POST` | `/api/v1/sessions/[id]/pause` | Mette in pausa |
-| `POST` | `/api/v1/sessions/[id]/resume` | Riprende |
-| `POST` | `/api/v1/sessions/[id]/end` | Chiude e registra metriche finali |
+| `GET` | `/api/v1/reviews/queue?subjectId=...` | Coda revisioni (due, overdue, upcoming) |
+| `GET` | `/api/v1/reviews/daily?subjectId=...` | Piano revisione giornaliero |
+| `POST` | `/api/v1/reviews/sync` | Sincronizza revisioni da UserAtomState |
+| `POST` | `/api/v1/reviews/[id]/complete` | Completa una revisione |
 
-`POST /api/v1/feed/sessions` resta disponibile come alias per aprire una sessione.
+### Body `POST /reviews/[id]/complete`
 
-### Stati sessione
+```json
+{ "outcome": "success" }
+```
 
-- `active` — studio in corso
-- `paused` — in pausa (feed e progresso bloccati)
-- `ended` — chiusa con metriche finali
+`outcome`: `success` | `partial` | `failure`
 
-### Metriche calcolate
+### Integrazione
 
-- accuracy, durata attiva (escluse le pause)
-- pause count / tempo totale in pausa
-- cards per minuto, focus score, fatigue score
+- Il **Progress Engine** (M7) programma automaticamente la prossima revisione dopo ogni risposta
+- Il **Feed Engine** (M6) usa `nextReviewAt` e priorità per proporre atom in ripasso
 
 ### Script
 

@@ -33,6 +33,61 @@ export async function findDueReviewsByUserId(
   return records.map(toReview);
 }
 
+export async function findScheduledReviewsByUserId(
+  userId: UserId
+): Promise<Review[]> {
+  const records = await prisma.review.findMany({
+    where: { userId, status: "scheduled" },
+    orderBy: [{ priority: "desc" }, { scheduledAt: "asc" }],
+  });
+  return records.map(toReview);
+}
+
+export async function findScheduledReviewByUserAndAtom(
+  userId: UserId,
+  atomId: AtomId
+): Promise<Review | null> {
+  const record = await prisma.review.findFirst({
+    where: { userId, atomId, status: "scheduled" },
+    orderBy: { scheduledAt: "desc" },
+  });
+  return record ? toReview(record) : null;
+}
+
+export async function upsertScheduledReview(
+  input: CreateReviewInput
+): Promise<Review> {
+  const existing = await findScheduledReviewByUserAndAtom(
+    input.userId,
+    input.atomId
+  );
+
+  if (existing) {
+    const record = await prisma.review.update({
+      where: { id: existing.id },
+      data: {
+        scheduledAt: input.scheduledAt,
+        priority: input.priority ?? existing.priority,
+        algorithm: input.algorithm,
+      },
+    });
+    return toReview(record);
+  }
+
+  return createReview(input);
+}
+
+export async function cancelScheduledReviewsForAtom(
+  userId: UserId,
+  atomId: AtomId
+): Promise<number> {
+  const result = await prisma.review.updateMany({
+    where: { userId, atomId, status: "scheduled" },
+    data: { status: "cancelled" },
+  });
+  return result.count;
+}
+
 export async function createReview(input: CreateReviewInput): Promise<Review> {
   const record = await prisma.review.create({ data: input });
   return toReview(record);

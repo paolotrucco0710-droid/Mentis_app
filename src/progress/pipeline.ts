@@ -21,6 +21,7 @@ import { UserAtomLearningState } from "@/domain/enums";
 import type { SubjectId, UserId } from "@/domain/ids";
 import { estimateNextReviewAt } from "@/engine/scheduler";
 import { MASTERY_STABLE_THRESHOLD } from "@/engine/constants";
+import { scheduleReviewForAtom } from "@/review";
 import { getProgress } from "./aggregation";
 import { ProgressEngineError } from "./errors";
 import { applyMasteryUpdate, computeMasteryUpdate } from "./mastery";
@@ -95,6 +96,12 @@ export async function recordCardResponse(
     totalStudyTimeMs:
       existingAtomState.totalStudyTimeMs + (input.durationMs ?? 0),
     lastAlgorithmUsed: "progress-v1",
+  });
+
+  await scheduleReviewForAtom({
+    userId: input.userId,
+    atomId: input.atomId,
+    atomState,
   });
 
   const existingCardState = await findUserCardState(input.userId, input.cardId);
