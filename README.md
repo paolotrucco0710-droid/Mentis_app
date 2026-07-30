@@ -2,53 +2,44 @@
 
 App di apprendimento attivo per studenti delle superiori.
 
-## Milestone 3 — Database Layer
+## Milestone 4 — Upload Pipeline
 
-PostgreSQL + Prisma: schema, migrazioni, indici, relazioni e query principali.
+API per caricare capitoli (foto multipagina o PDF): validazione, compressione immagini, salvataggio file e registrazione nel database.
 
-### Struttura database
+### Endpoint
 
-```text
-prisma/
-├── schema.prisma          # Schema completo (21 tabelle)
-└── migrations/            # Migrazioni SQL
+| Metodo | URL                   | Descrizione        |
+| ------ | --------------------- | ------------------ |
+| `POST` | `/api/v1/upload`      | Carica un capitolo |
+| `GET`  | `/api/v1/upload/[id]` | Stato upload       |
 
-src/db/
-├── client.ts              # Prisma client singleton
-├── mappers/               # Prisma → tipi dominio
-└── repositories/          # Query principali
-```
+### Formato richiesta (POST)
 
-### Setup database locale
+`multipart/form-data`:
 
-```bash
-# 1. Avvia PostgreSQL
-docker compose up -d
+| Campo       | Obbligatorio | Descrizione                        |
+| ----------- | ------------ | ---------------------------------- |
+| `files`     | Sì           | Una o più foto, oppure un solo PDF |
+| `subjectId` | Sì           | ID materia (da seed)               |
+| `title`     | No           | Titolo capitolo                    |
+| `courseId`  | No           | ID corso                           |
+| `language`  | No           | Default `it`                       |
 
-# 2. Configura env
-cp .env.example .env.local
+### Setup (quando avrai database + deploy)
 
-# 3. Applica migrazioni
-npm run db:migrate
+Questi passi servono **quando** collegherai Supabase e pubblicherai l'app. Con solo Agent + merge su GitHub non devi farli subito.
 
-# 4. Avvia l'app
-npm run dev
-```
+1. Crea progetto su [supabase.com](https://supabase.com)
+2. Copia `DATABASE_URL` in `.env.local` (su Vercel → Environment Variables)
+3. Applica migrazioni: `npm run db:migrate`
+4. Crea utente dev: `npm run db:seed`
+5. Aggiungi `DEV_USER_ID` e `DEV_SUBJECT_ID` nelle variabili ambiente
 
-### Script database
+### Script
 
-| Comando                  | Descrizione                            |
-| ------------------------ | -------------------------------------- |
-| `npm run db:generate`    | Genera Prisma Client                   |
-| `npm run db:migrate`     | Applica migrazioni (produzione/locale) |
-| `npm run db:migrate:dev` | Crea e applica nuove migrazioni        |
-| `npm run db:studio`      | Apri Prisma Studio (GUI)               |
-
-### Script generali
-
-| Comando          | Descrizione         |
-| ---------------- | ------------------- |
-| `npm run dev`    | Server di sviluppo  |
-| `npm run build`  | Build di produzione |
-| `npm run lint`   | ESLint              |
-| `npm run format` | Prettier            |
+| Comando              | Descrizione                   |
+| -------------------- | ----------------------------- |
+| `npm run dev`        | Server di sviluppo            |
+| `npm run build`      | Build di produzione           |
+| `npm run db:migrate` | Applica migrazioni DB         |
+| `npm run db:seed`    | Crea utente e materia di test |
