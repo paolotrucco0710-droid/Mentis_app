@@ -2,31 +2,36 @@
 
 App di apprendimento attivo per studenti delle superiori.
 
-## Milestone 9 — Review Engine
+## Milestone 10 — Frontend Foundation
 
-Gestisce scheduling, coda, overdue e priorità delle revisioni.
+Interfaccia completa con layout, navigazione, design system e pagine base.
 
-### Endpoint
+### Pagine
 
-| Metodo | URL | Descrizione |
-| ------ | --- | ----------- |
-| `GET` | `/api/v1/reviews/queue?subjectId=...` | Coda revisioni (due, overdue, upcoming) |
-| `GET` | `/api/v1/reviews/daily?subjectId=...` | Piano revisione giornaliero |
-| `POST` | `/api/v1/reviews/sync` | Sincronizza revisioni da UserAtomState |
-| `POST` | `/api/v1/reviews/[id]/complete` | Completa una revisione |
+| Route | Descrizione |
+| ----- | ----------- |
+| `/home` | Dashboard — "Cosa devi fare adesso?" |
+| `/feed` | Layout studio full-screen (card in M11) |
+| `/upload` | Caricamento materiale |
+| `/processing` | Stato pipeline AI |
+| `/review` | Ripassi programmati |
+| `/profile` | Profilo e statistiche |
+| `/settings` | Impostazioni |
+| `/login`, `/signup`, `/onboarding` | Auth layout |
 
-### Body `POST /reviews/[id]/complete`
+### Design System (`src/components/ui/`)
 
-```json
-{ "outcome": "success" }
-```
+Button, Card, Input, TextArea, Badge, Avatar, ProgressBar, Skeleton, Loader, EmptyState e icone condivise.
 
-`outcome`: `success` | `partial` | `failure`
+### Layout (`src/components/layout/`)
 
-### Integrazione
+- **AppShell** — top bar + bottom navigation (Home layout)
+- **AuthLayout** — login/signup centrati
+- **FeedLayout** — full-screen senza distrazioni
 
-- Il **Progress Engine** (M7) programma automaticamente la prossima revisione dopo ogni risposta
-- Il **Feed Engine** (M6) usa `nextReviewAt` e priorità per proporre atom in ripasso
+### Bottom Navigation
+
+Home · Studio · Upload · Ripasso · Profilo
 
 ### Script
 
@@ -34,5 +39,3 @@ Gestisce scheduling, coda, overdue e priorità delle revisioni.
 | ------- | ----------- |
 | `npm run dev` | Server di sviluppo |
 | `npm run build` | Build di produzione |
-| `npm run db:migrate` | Applica migrazioni DB |
-| `npm run db:seed` | Crea utente e materia di test |
