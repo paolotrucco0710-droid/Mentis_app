@@ -4,4 +4,7 @@
  * Domain types live in `@/domain`.
  */
 
-export type * from "@/domain";
+export { prisma } from "./client";
+export type { PrismaClient } from "./client";
+export * from "./repositories";
+export * from "./mappers";
