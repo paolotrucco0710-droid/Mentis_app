@@ -1,12 +1,10 @@
-/**
- * AI pipeline — OCR, atom extraction, card generation (Milestone 5).
- */
-
-export type {
-  AIJob,
-  AIJobStatus,
-  AIJobStep,
-  KnowledgeJson,
-  KnowledgeJsonAtom,
-  KnowledgeJsonMetadata,
-} from "@/domain";
+export { getOpenAIClient } from "./client";
+export { knowledgeJsonSchema } from "./schema";
+export type { ParsedKnowledgeJson } from "./schema";
+export {
+  AIProcessingError,
+  processKnowledgeSource,
+  getProcessingJob,
+  scheduleKnowledgeSourceProcessing,
+} from "./pipeline";
+export type { ProcessingResult } from "./pipeline";

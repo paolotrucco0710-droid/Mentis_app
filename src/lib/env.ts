@@ -11,7 +11,6 @@ export const env = {
   isProduction: nodeEnv === "production",
   appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   databaseUrl: process.env.DATABASE_URL ?? "",
-  /** Temporary dev user until Milestone 13 (Auth). */
   devUserId: process.env.DEV_USER_ID ?? "",
   uploadStoragePath: process.env.UPLOAD_STORAGE_PATH ?? "./storage/uploads",
   maxUploadFileSizeMb: parsePositiveInt(
@@ -19,8 +18,24 @@ export const env = {
     20
   ),
   maxUploadFiles: parsePositiveInt(process.env.MAX_UPLOAD_FILES, 50),
+  openaiApiKey: process.env.OPENAI_API_KEY ?? "",
+  aiVisionModel: process.env.AI_VISION_MODEL ?? "gpt-4o-mini",
+  aiReasoningModel: process.env.AI_REASONING_MODEL ?? "gpt-4o-mini",
+  knowledgeJsonVersion: process.env.KNOWLEDGE_JSON_VERSION ?? "1.0.0",
+  aiPromptVersion: process.env.AI_PROMPT_VERSION ?? "1.0.0",
+  autoProcessAfterUpload:
+    process.env.AUTO_PROCESS_AFTER_UPLOAD === "true" &&
+    Boolean(process.env.OPENAI_API_KEY),
 } as const;
 
 export function getMaxUploadFileSizeBytes(): number {
   return env.maxUploadFileSizeMb * 1024 * 1024;
+}
+
+export function assertOpenAIConfigured(): void {
+  if (!env.openaiApiKey) {
+    throw new Error(
+      "OPENAI_API_KEY non configurato. Aggiungilo nelle variabili ambiente."
+    );
+  }
 }

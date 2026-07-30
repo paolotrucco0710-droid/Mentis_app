@@ -2,38 +2,40 @@
 
 App di apprendimento attivo per studenti delle superiori.
 
-## Milestone 4 — Upload Pipeline
+## Milestone 5 — AI Processing Pipeline
 
-API per caricare capitoli (foto multipagina o PDF): validazione, compressione immagini, salvataggio file e registrazione nel database.
+Trasforma il materiale caricato in Atoms e Cards tramite pipeline AI.
+
+### Pipeline
+
+```text
+Upload → OCR → Pulizia testo → LLM → Validazione JSON
+       → Normalizzazione → Salvataggio Atoms/Cards
+```
 
 ### Endpoint
 
-| Metodo | URL                   | Descrizione        |
-| ------ | --------------------- | ------------------ |
-| `POST` | `/api/v1/upload`      | Carica un capitolo |
-| `GET`  | `/api/v1/upload/[id]` | Stato upload       |
+| Metodo | URL                                      | Descrizione                                                 |
+| ------ | ---------------------------------------- | ----------------------------------------------------------- |
+| `POST` | `/api/v1/knowledge-sources/[id]/process` | Avvia elaborazione AI                                       |
+| `GET`  | `/api/v1/ai-jobs/[id]`                   | Stato job AI                                                |
+| `POST` | `/api/v1/upload`                         | Upload (+ elaborazione se `AUTO_PROCESS_AFTER_UPLOAD=true`) |
 
-### Formato richiesta (POST)
+### Variabili ambiente (quando deployerai)
 
-`multipart/form-data`:
+| Variabile                   | Descrizione                                           |
+| --------------------------- | ----------------------------------------------------- |
+| `OPENAI_API_KEY`            | Chiave API OpenAI (obbligatoria per M5)               |
+| `AI_VISION_MODEL`           | Modello per OCR immagini (default: `gpt-4o-mini`)     |
+| `AI_REASONING_MODEL`        | Modello per estrazione Atoms (default: `gpt-4o-mini`) |
+| `AUTO_PROCESS_AFTER_UPLOAD` | `true` per elaborare subito dopo upload               |
 
-| Campo       | Obbligatorio | Descrizione                        |
-| ----------- | ------------ | ---------------------------------- |
-| `files`     | Sì           | Una o più foto, oppure un solo PDF |
-| `subjectId` | Sì           | ID materia (da seed)               |
-| `title`     | No           | Titolo capitolo                    |
-| `courseId`  | No           | ID corso                           |
-| `language`  | No           | Default `it`                       |
+### Setup database (quando deployerai)
 
-### Setup (quando avrai database + deploy)
-
-Questi passi servono **quando** collegherai Supabase e pubblicherai l'app. Con solo Agent + merge su GitHub non devi farli subito.
-
-1. Crea progetto su [supabase.com](https://supabase.com)
-2. Copia `DATABASE_URL` in `.env.local` (su Vercel → Environment Variables)
-3. Applica migrazioni: `npm run db:migrate`
-4. Crea utente dev: `npm run db:seed`
-5. Aggiungi `DEV_USER_ID` e `DEV_SUBJECT_ID` nelle variabili ambiente
+1. Crea progetto Supabase
+2. Imposta `DATABASE_URL` nelle variabili ambiente
+3. `npm run db:migrate`
+4. `npm run db:seed`
 
 ### Script
 

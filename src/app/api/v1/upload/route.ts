@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import type { SubjectId } from "@/domain/ids";
+import { scheduleKnowledgeSourceProcessing } from "@/ai";
+import { env } from "@/lib/env";
 import {
   UploadPipelineError,
   formDataToUploadFiles,
@@ -40,6 +42,10 @@ export async function POST(request: Request) {
       files,
     });
 
+    if (env.autoProcessAfterUpload) {
+      scheduleKnowledgeSourceProcessing(result.knowledgeSource.id, userId);
+    }
+
     return NextResponse.json(
       {
         uploadId: result.upload.id,
@@ -49,6 +55,7 @@ export async function POST(request: Request) {
         sourceType: result.knowledgeSource.sourceType,
         imageCount: result.images.length,
         totalSizeBytes: result.totalSizeBytes,
+        processingScheduled: env.autoProcessAfterUpload,
       },
       { status: 201 }
     );
