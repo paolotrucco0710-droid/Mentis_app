@@ -2,42 +2,47 @@
 
 App di apprendimento attivo per studenti delle superiori.
 
-## Milestone 6 — Feed Engine
+## Milestone 7 — Progress Engine
 
-Il motore cognitivo decide in tempo reale quale card mostrare allo studente.
+Ogni risposta dello studente aggiorna mastery, statistiche e progresso.
 
-### Pipeline decisionale
+### Flusso completo (M6 + M7)
 
 ```text
-Carica contesto → Calcola priorità Atom → Seleziona card → FeedItem
+POST /feed/sessions → GET /feed/next → POST /progress/responses → GET /feed/next
 ```
 
 ### Endpoint
 
 | Metodo | URL | Descrizione |
 | ------ | --- | ----------- |
-| `POST` | `/api/v1/feed/sessions` | Avvia una sessione di studio |
-| `GET`  | `/api/v1/feed/next?sessionId=...&subjectId=...` | Prossima card del feed |
+| `POST` | `/api/v1/progress/responses` | Registra risposta e aggiorna progresso |
+| `GET`  | `/api/v1/progress?scopeType=subject&scopeId=...` | Progresso aggregato |
 
-### Flusso tipico
+### Body `POST /progress/responses`
 
-1. `POST /api/v1/feed/sessions` con `{ "subjectId": "..." }` (opzionale, default `DEV_SUBJECT_ID`)
-2. `GET /api/v1/feed/next?sessionId=<id>` — ripeti per ogni card
+```json
+{
+  "sessionId": "...",
+  "cardId": "...",
+  "atomId": "...",
+  "outcome": "success",
+  "isCorrect": true,
+  "responseTimeMs": 3200,
+  "durationMs": 15000
+}
+```
 
-### Variabili ambiente
+`outcome`: `success` | `failure` | `skipped` | `neutral`
 
-| Variabile | Descrizione |
-| --------- | ----------- |
-| `DEV_USER_ID` | Utente dev (fino a M13 Auth) |
-| `DEV_SUBJECT_ID` | Materia dev di default |
-| `FEED_SESSION_TARGET_CARDS` | Numero card per sessione (default: `20`) |
+### Cosa viene aggiornato
 
-### Setup database (quando deployerai)
-
-1. Crea progetto Supabase
-2. Imposta `DATABASE_URL` nelle variabili ambiente
-3. `npm run db:migrate`
-4. `npm run db:seed`
+- **UserAtomState** — mastery, comprensione, streak, decay, stage, prossimo ripasso
+- **UserCardState** — evidenze per card
+- **SessionEvent** — cronologia interazione
+- **StudySession** — contatori sessione
+- **DailyStatistics** — tempo studio, accuracy, streak giornaliero
+- **Unlock** — atom dipendenti sbloccati quando i prerequisiti sono soddisfatti
 
 ### Script
 
