@@ -13,3 +13,4 @@ export * from "./reviews";
 export * from "./ai-jobs";
 export * from "./uploads";
 export * from "./notifications";
+export * from "./daily-statistics";

@@ -74,3 +74,29 @@ export async function incrementSessionCardsViewed(
   });
   return toStudySession(record);
 }
+
+export interface RecordSessionAnswerInput {
+  id: StudySessionId;
+  wasCorrect: boolean;
+  wasReview: boolean;
+  atomMastered: boolean;
+}
+
+export async function recordSessionAnswer(
+  input: RecordSessionAnswerInput
+): Promise<StudySession> {
+  const record = await prisma.studySession.update({
+    where: { id: input.id },
+    data: {
+      correctAnswerCount: input.wasCorrect
+        ? { increment: 1 }
+        : undefined,
+      errorCount: input.wasCorrect ? undefined : { increment: 1 },
+      reviewsCompleted: input.wasReview && input.wasCorrect
+        ? { increment: 1 }
+        : undefined,
+      atomsCompleted: input.atomMastered ? { increment: 1 } : undefined,
+    },
+  });
+  return toStudySession(record);
+}
