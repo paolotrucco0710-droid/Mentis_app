@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { FeedItem } from "@/domain/entities/feed-item";
 import type { StudySession } from "@/domain/entities/study-session";
 import { SessionEventOutcome } from "@/domain/enums";
-import type { StudySessionId, SubjectId } from "@/domain/ids";
+import type { StudySessionId } from "@/domain/ids";
 import {
   ApiError,
   createStudySession,
@@ -15,7 +15,7 @@ import {
   pauseSession,
   submitCardResponse,
 } from "@/lib/api";
-import { clientConfig } from "@/lib/client-config";
+import { useActiveSubjectId } from "@/hooks";
 import { SessionStatus } from "@/session/types";
 import {
   Badge,
@@ -37,16 +37,17 @@ type FeedState =
   | { status: "error"; message: string; code?: string };
 
 export function FeedStudy() {
+  const { subjectId, loading: loadingSubject, error: subjectError } =
+    useActiveSubjectId();
   const [state, setState] = useState<FeedState>({ status: "loading" });
   const [submitting, setSubmitting] = useState(false);
   const cardStartedAt = useRef<number>(0);
   const prefetchedItem = useRef<FeedItem | null>(null);
   const prefetching = useRef(false);
-  const subjectId = clientConfig.devSubjectId as SubjectId;
 
   const prefetchNext = useCallback(
     async (sessionId: StudySessionId) => {
-      if (prefetching.current || prefetchedItem.current) {
+      if (!subjectId || prefetching.current || prefetchedItem.current) {
         return;
       }
 
@@ -80,6 +81,10 @@ export function FeedStudy() {
 
   const loadNext = useCallback(
     async (sessionId: StudySessionId, session?: StudySession) => {
+      if (!subjectId) {
+        return;
+      }
+
       if (prefetchedItem.current) {
         const item = prefetchedItem.current;
         prefetchedItem.current = null;
@@ -108,6 +113,10 @@ export function FeedStudy() {
   );
 
   const bootstrap = useCallback(async () => {
+    if (!subjectId) {
+      return;
+    }
+
     try {
       const storedSessionId = sessionStorage.getItem(SESSION_STORAGE_KEY);
 
@@ -148,12 +157,16 @@ export function FeedStudy() {
   }, [loadNext, subjectId]);
 
   useEffect(() => {
+    if (!subjectId || loadingSubject) {
+      return;
+    }
+
     const timer = window.setTimeout(() => {
       void bootstrap();
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [bootstrap]);
+  }, [bootstrap, loadingSubject, subjectId]);
 
   async function handleAnswer(result: CardAnswerResult) {
     if (state.status !== "ready" || submitting) {
@@ -226,6 +239,24 @@ export function FeedStudy() {
           : "Impossibile chiudere la sessione.";
       setState({ status: "error", message });
     }
+  }
+
+  if (loadingSubject) {
+    return <Loader label="Preparazione del feed..." />;
+  }
+
+  if (subjectError || !subjectId) {
+    return (
+      <EmptyState
+        title="Feed non disponibile"
+        description={subjectError ?? "Materia non disponibile."}
+        action={
+          <Link href="/home">
+            <Button>Torna alla home</Button>
+          </Link>
+        }
+      />
+    );
   }
 
   if (state.status === "loading") {

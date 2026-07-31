@@ -22,6 +22,7 @@ import { KnowledgeSourceProcessingStatus } from "@/domain/enums";
 import { AIJobStep, AIJobStatus } from "@/domain/enums";
 import type { AIJobId, KnowledgeSourceId, UserId } from "@/domain/ids";
 import { env } from "@/lib/env";
+import { logger } from "@/lib/logger";
 import { extractKnowledgeJson } from "./extract";
 import { extractDocumentText } from "./ocr";
 import { normalizeKnowledgeJson } from "./normalize";
@@ -295,6 +296,9 @@ export function scheduleKnowledgeSourceProcessing(
   userId: UserId
 ): void {
   void processKnowledgeSource(knowledgeSourceId, userId).catch((error) => {
-    console.error("Background AI processing failed:", error);
+    logger.error("Background AI processing failed", error, {
+      knowledgeSourceId,
+      userId,
+    });
   });
 }

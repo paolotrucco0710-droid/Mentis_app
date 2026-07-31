@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import type { CourseId, SubjectId } from "@/domain/ids";
+import { listChaptersForUser } from "@/course";
 import { resolveDevUserId } from "@/engine/dev";
-import { assertSubjectOwned } from "@/course/helpers";
-import { findChaptersByCourseId, findChaptersBySubjectId } from "@/db/repositories/chapters";
-import { countAtomsByKnowledgeSourceId } from "@/db/repositories/atoms";
-import { findKnowledgeSourceById } from "@/db/repositories/knowledge-sources";
 
 export const runtime = "nodejs";
 
@@ -16,53 +13,13 @@ export async function GET(request: Request) {
     const subjectId = searchParams.get("subjectId");
     const courseId = searchParams.get("courseId");
 
-    if (!subjectId && !courseId) {
-      return NextResponse.json(
-        {
-          error: "subjectId o courseId è obbligatorio.",
-          code: "SCOPE_REQUIRED",
-        },
-        { status: 400 }
-      );
-    }
+    const chapters = await listChaptersForUser(userId, {
+      subjectId: subjectId ? (subjectId as SubjectId) : undefined,
+      courseId: courseId ? (courseId as CourseId) : undefined,
+    });
 
-    if (subjectId) {
-      await assertSubjectOwned(userId, subjectId as SubjectId);
-    }
-
-    const chapters = courseId
-      ? await findChaptersByCourseId(courseId as CourseId)
-      : await findChaptersBySubjectId(subjectId as SubjectId);
-
-    const enriched = await Promise.all(
-      chapters.map(async (chapter) => {
-        const knowledgeSource = await findKnowledgeSourceById(
-          chapter.knowledgeSourceId
-        );
-        if (!knowledgeSource) {
-          return null;
-        }
-
-        const atomCount = await countAtomsByKnowledgeSourceId(
-          chapter.knowledgeSourceId
-        );
-
-        return {
-          ...chapter,
-          knowledgeSource,
-          atomCount,
-        };
-      })
-    );
-
-    return NextResponse.json(
-      {
-        chapters: enriched.filter((chapter) => Boolean(chapter)),
-      },
-      { status: 200 }
-    );
+    return NextResponse.json({ chapters }, { status: 200 });
   } catch (error) {
     return handleApiRouteError(error, { route: "/api/v1/chapters", request });
   }
 }
-

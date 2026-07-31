@@ -27,9 +27,10 @@ export async function createSessionEvent(
 }
 
 export async function findSessionEventsBySessionId(
-  sessionId: StudySessionId
+  sessionId: StudySessionId,
+  tx?: DbTx
 ): Promise<SessionEvent[]> {
-  const records = await getDb().sessionEvent.findMany({
+  const records = await getDb(tx).sessionEvent.findMany({
     where: { sessionId },
     orderBy: { timestamp: "asc" },
   });

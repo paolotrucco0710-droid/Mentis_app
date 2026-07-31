@@ -12,9 +12,10 @@ export interface CreateStudySessionInput {
 }
 
 export async function findStudySessionById(
-  id: StudySessionId
+  id: StudySessionId,
+  tx?: DbTx
 ): Promise<StudySession | null> {
-  const record = await getDb().studySession.findUnique({ where: { id } });
+  const record = await getDb(tx).studySession.findUnique({ where: { id } });
   return record ? toStudySession(record) : null;
 }
 

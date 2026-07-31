@@ -13,6 +13,9 @@ export async function GET(request: Request) {
     const history = await getDailyStatisticsHistory(userId, days);
     return NextResponse.json({ history }, { status: 200 });
   } catch (error) {
-    return handleProfileRouteError(error);
+    return handleProfileRouteError(error, {
+      route: "/api/v1/profile/statistics/daily",
+      request,
+    });
   }
 }

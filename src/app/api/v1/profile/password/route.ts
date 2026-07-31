@@ -21,6 +21,9 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error) {
-    return handleProfileRouteError(error);
+    return handleProfileRouteError(error, {
+      route: "/api/v1/profile/password",
+      request,
+    });
   }
 }

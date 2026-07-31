@@ -21,7 +21,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return handleStorageRouteError(error);
+    return handleStorageRouteError(error, {
+      route: "/api/v1/profile/avatar",
+      request,
+    });
   }
 }
 
@@ -47,8 +50,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ profile }, { status: 200 });
   } catch (error) {
     if (error instanceof ProfileError) {
-      return handleProfileRouteError(error);
+      return handleProfileRouteError(error, {
+        route: "/api/v1/profile/avatar",
+        request,
+      });
     }
-    return handleStorageRouteError(error);
+    return handleStorageRouteError(error, {
+      route: "/api/v1/profile/avatar",
+      request,
+    });
   }
 }

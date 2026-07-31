@@ -15,7 +15,10 @@ export async function GET(request: Request) {
     const profile = await getUserProfile(userId);
     return NextResponse.json({ profile }, { status: 200 });
   } catch (error) {
-    return handleProfileRouteError(error);
+    return handleProfileRouteError(error, {
+      route: "/api/v1/profile",
+      request,
+    });
   }
 }
 
@@ -40,7 +43,10 @@ export async function PATCH(request: Request) {
     const profile = await updateUserProfile(userId, body);
     return NextResponse.json({ profile }, { status: 200 });
   } catch (error) {
-    return handleProfileRouteError(error);
+    return handleProfileRouteError(error, {
+      route: "/api/v1/profile",
+      request,
+    });
   }
 }
 
@@ -50,6 +56,9 @@ export async function DELETE(request: Request) {
     await deleteUserAccount(userId);
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error) {
-    return handleProfileRouteError(error);
+    return handleProfileRouteError(error, {
+      route: "/api/v1/profile",
+      request,
+    });
   }
 }

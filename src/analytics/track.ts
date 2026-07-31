@@ -2,7 +2,9 @@ import {
   countAnalyticsEventsByName,
   createAnalyticsEvent,
 } from "@/db/repositories/analytics-events";
+import { prisma } from "@/db/client";
 import type { UserId } from "@/domain/ids";
+import { logger } from "@/lib/logger";
 import type { TrackAnalyticsEventInput } from "./types";
 
 export function trackAnalyticsEvent(input: TrackAnalyticsEventInput): void {
@@ -14,7 +16,7 @@ export function trackAnalyticsEvent(input: TrackAnalyticsEventInput): void {
     properties: input.properties,
     occurredAt: input.occurredAt,
   }).catch((error) => {
-    console.error("Analytics tracking failed:", error);
+    logger.error("Analytics tracking failed", error);
   });
 }
 
@@ -25,17 +27,26 @@ export async function trackFunnelMilestone(input: {
   source: TrackAnalyticsEventInput["source"];
   properties?: Record<string, unknown>;
 }): Promise<void> {
-  const existing = await countAnalyticsEventsByName(input.userId, input.name);
-  if (existing > 0) {
-    return;
-  }
+  await prisma.$transaction(async (tx) => {
+    const existing = await countAnalyticsEventsByName(
+      input.userId,
+      input.name,
+      tx
+    );
+    if (existing > 0) {
+      return;
+    }
 
-  await createAnalyticsEvent({
-    userId: input.userId,
-    name: input.name,
-    category: input.category,
-    source: input.source,
-    properties: input.properties,
+    await createAnalyticsEvent(
+      {
+        userId: input.userId,
+        name: input.name,
+        category: input.category,
+        source: input.source,
+        properties: input.properties,
+      },
+      tx
+    );
   });
 }
 
@@ -47,7 +58,7 @@ export function trackFunnelMilestoneAsync(input: {
   properties?: Record<string, unknown>;
 }): void {
   void trackFunnelMilestone(input).catch((error) => {
-    console.error("Funnel milestone tracking failed:", error);
+    logger.error("Funnel milestone tracking failed", error);
   });
 }
 

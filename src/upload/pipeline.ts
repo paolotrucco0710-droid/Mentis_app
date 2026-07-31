@@ -25,7 +25,6 @@ import type {
 } from "@/domain/ids";
 import type { Image, KnowledgeSource, Upload } from "@/domain/entities";
 import { env, getMaxUploadFileSizeBytes } from "@/lib/env";
-import { AuthError, resolveAuthenticatedUserId } from "@/auth";
 import {
   buildPageStorageKey,
   buildPdfStorageKey,
@@ -312,16 +311,7 @@ export async function getUploadResult(
   return { upload, knowledgeSource };
 }
 
-export async function resolveDevUserId(request: Request): Promise<UserId> {
-  try {
-    return await resolveAuthenticatedUserId(request);
-  } catch (error) {
-    if (error instanceof AuthError) {
-      throw new UploadPipelineError(error.message, error.code, error.statusCode);
-    }
-    throw error;
-  }
-}
+export { resolveDevUserId } from "@/engine/dev";
 
 export function parseCourseId(
   value: FormDataEntryValue | null

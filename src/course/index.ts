@@ -13,6 +13,7 @@ export {
   getLibraryOverview,
   getSubjectDetail,
   getSubjectStats,
+  listChaptersForUser,
   listCoursesForSubject,
   listKnowledgeSourcesForSubject,
   updateCourseForUser,

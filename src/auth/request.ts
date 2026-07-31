@@ -72,14 +72,19 @@ export function getRefreshTokenFromRequest(request: Request): string | null {
   return cookies.mentis_refresh ?? null;
 }
 
-export function getAccessSessionIdFromRequest(
+export async function getAccessSessionIdFromRequest(
   request: Request
-): string | null {
+): Promise<string | null> {
   const cookies = parseCookies(request.headers.get("cookie"));
   const accessToken = cookies[ACCESS_TOKEN_COOKIE];
   if (!accessToken) {
     return null;
   }
 
-  return null;
+  try {
+    const payload = await verifyAccessToken(accessToken);
+    return payload.sid;
+  } catch {
+    return null;
+  }
 }

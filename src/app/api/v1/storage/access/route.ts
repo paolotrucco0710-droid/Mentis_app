@@ -51,6 +51,9 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    return handleStorageRouteError(error);
+    return handleStorageRouteError(error, {
+      route: "/api/v1/storage/access",
+      request,
+    });
   }
 }

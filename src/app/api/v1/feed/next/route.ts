@@ -3,8 +3,8 @@ import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import type { StudySessionId } from "@/domain/ids";
 import {
   getNextFeedItem,
-  resolveDevSubjectId,
   resolveDevUserId,
+  resolveRequestedSubjectId,
 } from "@/engine";
 
 export const runtime = "nodejs";
@@ -14,7 +14,10 @@ export async function GET(request: Request) {
     const userId = await resolveDevUserId(request);
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get("sessionId");
-    const subjectId = resolveDevSubjectId(searchParams.get("subjectId"));
+    const subjectId = await resolveRequestedSubjectId(
+      userId,
+      searchParams.get("subjectId")
+    );
 
     if (!sessionId) {
       return NextResponse.json(

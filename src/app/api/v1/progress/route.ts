@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import { ProgressScopeType } from "@/domain/entities/progress";
 import type { ChapterId, CourseId, SubjectId } from "@/domain/ids";
-import { resolveDevSubjectId, resolveDevUserId } from "@/engine/dev";
+import { resolveDevUserId, resolveRequestedSubjectId } from "@/engine/dev";
 import { getProgress } from "@/progress";
+import { assertProgressScopeOwned } from "@/progress/scope-access";
 
 export const runtime = "nodejs";
 
@@ -28,16 +29,20 @@ export async function GET(request: Request) {
 
     let scopeId = scopeIdParam;
     if (scopeType === ProgressScopeType.Subject) {
-      scopeId = resolveDevSubjectId(scopeIdParam);
-    }
-
-    if (!scopeId) {
+      scopeId = await resolveRequestedSubjectId(userId, scopeIdParam);
+    } else if (!scopeId) {
       return NextResponse.json(
         {
           error: "scopeId è obbligatorio per course e chapter.",
           code: "SCOPE_ID_REQUIRED",
         },
         { status: 400 }
+      );
+    } else {
+      await assertProgressScopeOwned(
+        userId,
+        scopeType as ProgressScopeType,
+        scopeId
       );
     }
 

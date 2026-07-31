@@ -2,6 +2,7 @@ import { countAtomsByKnowledgeSourceId } from "@/db/repositories/atoms";
 import {
   findChapterById,
   findChapterByKnowledgeSourceId,
+  findChaptersByCourseId,
   findChaptersBySubjectId,
   softDeleteChapter,
 } from "@/db/repositories/chapters";
@@ -32,6 +33,7 @@ import type {
 } from "@/domain/ids";
 import { CourseManagementError } from "./errors";
 import {
+  assertCourseOwned,
   assertSubjectOwned,
   getSubjectChapterCount,
   listSubjectSummaries,
@@ -61,6 +63,42 @@ async function enrichChapter(
     knowledgeSource,
     atomCount,
   };
+}
+
+export async function listChaptersForUser(
+  userId: UserId,
+  input: { subjectId?: SubjectId; courseId?: CourseId }
+): Promise<ChapterWithSource[]> {
+  if (!input.subjectId && !input.courseId) {
+    throw new CourseManagementError(
+      "subjectId o courseId è obbligatorio.",
+      "SCOPE_REQUIRED",
+      400
+    );
+  }
+
+  if (input.courseId) {
+    const course = await assertCourseOwned(userId, input.courseId);
+
+    if (input.subjectId && course.subjectId !== input.subjectId) {
+      throw new CourseManagementError(
+        "Il corso non appartiene alla materia indicata.",
+        "COURSE_SUBJECT_MISMATCH",
+        409
+      );
+    }
+
+    const chapters = await findChaptersByCourseId(input.courseId);
+    return (
+      await Promise.all(chapters.map((chapter) => enrichChapter(chapter)))
+    ).filter((chapter): chapter is ChapterWithSource => Boolean(chapter));
+  }
+
+  await assertSubjectOwned(userId, input.subjectId!);
+  const chapters = await findChaptersBySubjectId(input.subjectId!);
+  return (
+    await Promise.all(chapters.map((chapter) => enrichChapter(chapter)))
+  ).filter((chapter): chapter is ChapterWithSource => Boolean(chapter));
 }
 
 export async function getLibraryOverview(
