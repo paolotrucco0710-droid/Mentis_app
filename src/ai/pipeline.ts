@@ -3,6 +3,7 @@ import {
   createAIJob,
   findAIJobById,
   updateAIJobStatus,
+  updateAIJobUsage,
 } from "@/db/repositories/ai-jobs";
 import {
   findKnowledgeSourceById,
@@ -21,6 +22,10 @@ import { normalizeKnowledgeJson } from "./normalize";
 import { persistKnowledgeGraph } from "./persist";
 import { cleanExtractedText } from "./text-cleaning";
 import { validateKnowledgeSemantics } from "./validate";
+import {
+  findCompletedKnowledgeSourceByFileHash,
+  UsageTracker,
+} from "./optimization";
 
 export class AIProcessingError extends Error {
   constructor(
@@ -39,10 +44,19 @@ export interface ProcessingResult {
   atomCount: number;
   cardCount: number;
   status: AIJobStatus;
+  estimatedCostUsd: number;
+  cacheHits: number;
+  cacheMisses: number;
+  deduplicatedFrom?: { id: string; title: string } | null;
 }
 
 async function updateStep(jobId: AIJobId, step: AIJobStep): Promise<void> {
   await updateAIJobStatus(jobId, AIJobStatus.Running, step);
+}
+
+async function persistJobUsage(jobId: AIJobId, tracker: UsageTracker) {
+  const snapshot = tracker.snapshot();
+  await updateAIJobUsage(jobId, snapshot);
 }
 
 export async function processKnowledgeSource(
@@ -111,6 +125,12 @@ export async function processKnowledgeSource(
     );
   }
 
+  const duplicateSource = await findCompletedKnowledgeSourceByFileHash({
+    userId,
+    fileHash: knowledgeSource.fileHash,
+    excludeId: knowledgeSourceId,
+  });
+
   const job = await createAIJob({
     knowledgeSourceId,
     userId,
@@ -118,10 +138,13 @@ export async function processKnowledgeSource(
     parserVersion: env.knowledgeJsonVersion,
   });
 
+  const tracker = new UsageTracker();
+
   try {
     await updateAIJobStatus(job.id, AIJobStatus.Running, AIJobStep.Ocr);
     const images = await findImagesByKnowledgeSourceId(knowledgeSourceId);
-    const rawText = await extractDocumentText(knowledgeSource, images);
+    const rawText = await extractDocumentText(knowledgeSource, images, tracker);
+    await persistJobUsage(job.id, tracker);
 
     await updateStep(job.id, AIJobStep.TextCleaning);
     const cleanedText = cleanExtractedText(rawText);
@@ -133,12 +156,17 @@ export async function processKnowledgeSource(
     }
 
     await updateStep(job.id, AIJobStep.LlmExtraction);
-    const extracted = await extractKnowledgeJson({
-      title: knowledgeSource.title,
-      subject: subject.name,
-      language: knowledgeSource.language,
-      cleanedText,
-    });
+    const extracted = await extractKnowledgeJson(
+      {
+        title: knowledgeSource.title,
+        subject: subject.name,
+        language: knowledgeSource.language,
+        cleanedText,
+        fileHash: knowledgeSource.fileHash,
+      },
+      tracker
+    );
+    await persistJobUsage(job.id, tracker);
 
     await updateStep(job.id, AIJobStep.JsonValidation);
     const semantic = validateKnowledgeSemantics(extracted);
@@ -170,6 +198,9 @@ export async function processKnowledgeSource(
       AIJobStatus.Completed,
       AIJobStep.Persistence
     );
+    await persistJobUsage(job.id, tracker);
+
+    const usage = tracker.snapshot();
 
     return {
       jobId: job.id,
@@ -177,6 +208,10 @@ export async function processKnowledgeSource(
       atomCount,
       cardCount,
       status: AIJobStatus.Completed,
+      estimatedCostUsd: usage.estimatedCostUsd,
+      cacheHits: usage.cacheHits,
+      cacheMisses: usage.cacheMisses,
+      deduplicatedFrom: duplicateSource,
     };
   } catch (error) {
     const message =
@@ -187,6 +222,7 @@ export async function processKnowledgeSource(
       KnowledgeSourceProcessingStatus.Failed
     );
 
+    await persistJobUsage(job.id, tracker);
     await updateAIJobStatus(job.id, AIJobStatus.Failed, null, message);
 
     throw error instanceof AIProcessingError
