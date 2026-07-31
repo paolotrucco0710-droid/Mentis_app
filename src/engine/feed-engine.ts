@@ -4,6 +4,10 @@ import {
 } from "@/db/repositories/atoms";
 import { findCardsByAtomIds } from "@/db/repositories/cards";
 import { createSessionEvent } from "@/db/repositories/session-events";
+import {
+  AnalyticsEvents,
+  trackAnalyticsEvent,
+} from "@/analytics";
 import { findSubjectById } from "@/db/repositories/subjects";
 import { findSessionEventsBySessionId } from "@/db/repositories/session-events";
 import { assertSessionReadyForStudy } from "@/session";
@@ -60,6 +64,19 @@ export async function getNextFeedItem(
     cardId: selection.card.id,
     feedPosition: context.session.cardsViewed,
     timestamp: now,
+  });
+
+  trackAnalyticsEvent({
+    userId: input.userId,
+    name: AnalyticsEvents.StudyCardOpened,
+    category: "study",
+    source: "engine",
+    properties: {
+      sessionId: context.session.id,
+      cardId: selection.card.id,
+      atomId: selection.candidate.atom.id,
+      feedPosition: context.session.cardsViewed,
+    },
   });
 
   const feedItem = buildFeedItem({

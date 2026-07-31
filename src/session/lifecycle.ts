@@ -8,6 +8,11 @@ import {
   findSessionEventsBySessionId,
 } from "@/db/repositories/session-events";
 import { findSubjectById } from "@/db/repositories/subjects";
+import {
+  AnalyticsEvents,
+  trackAnalyticsEvent,
+  trackFunnelMilestoneAsync,
+} from "@/analytics";
 import type { StudySession } from "@/domain/entities";
 import { SessionEventOutcome, SessionEventType } from "@/domain/enums";
 import type { StudySessionId, SubjectId, UserId } from "@/domain/ids";
@@ -43,13 +48,30 @@ export async function openSession(
     );
   }
 
-  return createStudySession({
+  const session = await createStudySession({
     userId,
     subjectId: input.subjectId as SubjectId,
     device: input.device ?? null,
     appVersion: input.appVersion ?? null,
     initialMotivation: input.initialMotivation ?? null,
   });
+
+  trackAnalyticsEvent({
+    userId,
+    name: AnalyticsEvents.StudySessionOpened,
+    category: "study",
+    source: "engine",
+    properties: { sessionId: session.id, subjectId: session.subjectId },
+  });
+  trackFunnelMilestoneAsync({
+    userId,
+    name: AnalyticsEvents.FunnelFirstStudySession,
+    category: "funnel",
+    source: "engine",
+    properties: { sessionId: session.id },
+  });
+
+  return session;
 }
 
 export async function getSessionDetail(
@@ -99,6 +121,14 @@ export async function pauseSession(
     outcome: SessionEventOutcome.Neutral,
   });
 
+  trackAnalyticsEvent({
+    userId,
+    name: AnalyticsEvents.StudySessionPaused,
+    category: "study",
+    source: "engine",
+    properties: { sessionId },
+  });
+
   return getSessionDetail(userId, sessionId);
 }
 
@@ -130,6 +160,14 @@ export async function resumeSession(
     sessionId,
     type: SessionEventType.Resume,
     outcome: SessionEventOutcome.Neutral,
+  });
+
+  trackAnalyticsEvent({
+    userId,
+    name: AnalyticsEvents.StudySessionResumed,
+    category: "study",
+    source: "engine",
+    properties: { sessionId },
   });
 
   return getSessionDetail(userId, sessionId);
@@ -173,6 +211,18 @@ export async function endSession(
     type: SessionEventType.Exit,
     outcome: SessionEventOutcome.Success,
     timestamp: endedAt,
+  });
+
+  trackAnalyticsEvent({
+    userId,
+    name: AnalyticsEvents.StudySessionEnded,
+    category: "study",
+    source: "engine",
+    properties: {
+      sessionId,
+      durationMs: metrics.activeDurationMs,
+      cardsViewed: updatedSession.cardsViewed,
+    },
   });
 
   return {

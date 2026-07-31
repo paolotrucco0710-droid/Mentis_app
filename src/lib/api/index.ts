@@ -63,3 +63,13 @@ export {
   uploadAvatar,
 } from "./storage";
 export { fetchAICostSummary, fetchAIJobCosts } from "./ai-costs";
+export {
+  trackAnalyticsEvent,
+  fetchAnalyticsOverview,
+  fetchOnboardingFunnel,
+  fetchLearningMetrics,
+  fetchStudyTimeInsights,
+  fetchAIUsageInsights,
+  fetchAnalyticsErrors,
+  fetchFeatureUsage,
+} from "./analytics";

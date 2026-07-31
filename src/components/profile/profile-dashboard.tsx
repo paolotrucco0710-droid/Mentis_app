@@ -80,12 +80,19 @@ export function ProfileDashboard() {
         title="Profilo"
         description="Statistiche e riepilogo del tuo percorso."
         action={
-          <Link href="/settings">
-            <Button variant="secondary" type="button">
-              <SettingsIcon className="h-4 w-4" />
-              Impostazioni
-            </Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/analytics">
+              <Button variant="secondary" type="button">
+                Analytics
+              </Button>
+            </Link>
+            <Link href="/settings">
+              <Button variant="secondary" type="button">
+                <SettingsIcon className="h-4 w-4" />
+                Impostazioni
+              </Button>
+            </Link>
+          </div>
         }
       />
 

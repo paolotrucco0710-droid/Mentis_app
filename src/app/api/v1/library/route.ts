@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { AnalyticsEvents, trackAnalyticsEvent } from "@/analytics";
 import { resolveDevUserId } from "@/engine/dev";
 import { FeedEngineError } from "@/engine/errors";
 import { CourseManagementError, getLibraryOverview } from "@/course";
@@ -15,6 +16,12 @@ export async function GET(request: Request) {
       env.serverQueryCacheTtlSeconds * 1000,
       () => getLibraryOverview(userId)
     );
+    trackAnalyticsEvent({
+      userId,
+      name: AnalyticsEvents.FeatureLibraryViewed,
+      category: "feature",
+      source: "api",
+    });
     return NextResponse.json({ overview }, { status: 200 });
   } catch (error) {
     if (error instanceof CourseManagementError || error instanceof FeedEngineError) {

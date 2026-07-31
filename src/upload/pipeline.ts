@@ -1,3 +1,9 @@
+import {
+  AnalyticsEvents,
+  trackAnalyticsEvent,
+  trackFunnelMilestoneAsync,
+  trackPipelineError,
+} from "@/analytics";
 import { ensureChapterForUpload } from "@/course";
 import { prisma } from "@/db/client";
 import { createKnowledgeSource } from "@/db/repositories/knowledge-sources";
@@ -190,6 +196,18 @@ export async function processChapterUpload(
     imageIds: [],
   });
 
+  trackAnalyticsEvent({
+    userId: input.userId,
+    name: AnalyticsEvents.UploadStarted,
+    category: "upload",
+    source: "pipeline",
+    properties: {
+      uploadId: upload.id,
+      knowledgeSourceId: knowledgeSource.id,
+      fileCount: normalizedFiles.length,
+    },
+  });
+
   try {
     const images =
       sourceType === KnowledgeSourceType.Pdf
@@ -221,6 +239,26 @@ export async function processChapterUpload(
       });
     }
 
+    trackAnalyticsEvent({
+      userId: input.userId,
+      name: AnalyticsEvents.UploadCompleted,
+      category: "upload",
+      source: "pipeline",
+      properties: {
+        uploadId: upload.id,
+        knowledgeSourceId: knowledgeSource.id,
+        chapterId: chapter.id,
+        pageCount: knowledgeSource.pageCount,
+      },
+    });
+    trackFunnelMilestoneAsync({
+      userId: input.userId,
+      name: AnalyticsEvents.FunnelFirstUpload,
+      category: "funnel",
+      source: "pipeline",
+      properties: { uploadId: upload.id },
+    });
+
     return {
       upload: { ...completedUpload, imageIds: images.map((image) => image.id), courseId },
       knowledgeSource,
@@ -235,6 +273,22 @@ export async function processChapterUpload(
       UploadStatus.Failed,
       error instanceof Error ? error.message : "Upload failed"
     );
+    trackPipelineError({
+      userId: input.userId,
+      pipeline: "upload",
+      code: error instanceof UploadPipelineError ? error.code : "UPLOAD_FAILED",
+      message: error instanceof Error ? error.message : "Upload failed",
+    });
+    trackAnalyticsEvent({
+      userId: input.userId,
+      name: AnalyticsEvents.UploadFailed,
+      category: "upload",
+      source: "pipeline",
+      properties: {
+        uploadId: upload.id,
+        knowledgeSourceId: knowledgeSource.id,
+      },
+    });
     throw error;
   }
 }

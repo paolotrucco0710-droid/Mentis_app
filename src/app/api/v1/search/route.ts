@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { AnalyticsEvents, trackAnalyticsEvent } from "@/analytics";
 import { resolveDevUserId } from "@/engine/dev";
 import { FeedEngineError } from "@/engine/errors";
 import { CourseManagementError, searchLibrary } from "@/course";
@@ -18,6 +19,15 @@ export async function GET(request: Request) {
       env.serverQueryCacheTtlSeconds * 1000,
       () => searchLibrary(userId, query)
     );
+    if (query.trim()) {
+      trackAnalyticsEvent({
+        userId,
+        name: AnalyticsEvents.FeatureSearch,
+        category: "feature",
+        source: "api",
+        properties: { queryLength: query.trim().length },
+      });
+    }
     return NextResponse.json({ results }, { status: 200 });
   } catch (error) {
     if (error instanceof CourseManagementError || error instanceof FeedEngineError) {

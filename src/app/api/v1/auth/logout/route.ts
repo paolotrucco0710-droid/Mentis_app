@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       : null;
 
     if (sessionId) {
-      await logoutSession(sessionId);
+      await logoutSession(sessionId, userId);
     }
 
     const response = NextResponse.json({ ok: true, userId }, { status: 200 });
