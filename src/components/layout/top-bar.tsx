@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Avatar } from "@/components/ui";
+import { UserMenu } from "@/components/auth";
 
 export function TopBar() {
   return (
@@ -21,8 +21,7 @@ export function TopBar() {
           >
             Cerca
           </Link>
-          <span className="hidden text-sm text-muted sm:inline">Ciao, Paolo</span>
-          <Avatar name="Paolo Dev" className="h-9 w-9 text-xs" />
+          <UserMenu />
         </div>
       </div>
     </header>

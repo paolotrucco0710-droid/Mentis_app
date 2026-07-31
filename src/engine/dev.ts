@@ -1,8 +1,8 @@
 import type { SubjectId, UserId } from "@/domain/ids";
+import { AuthError, resolveAuthenticatedUserId } from "@/auth";
 import {
   DevAuthError,
   resolveDevSubjectId as resolveDevSubjectIdBase,
-  resolveDevUserId as resolveDevUserIdBase,
 } from "@/lib/dev-auth";
 import { FeedEngineError } from "./errors";
 
@@ -10,12 +10,12 @@ function toFeedEngineError(error: DevAuthError): FeedEngineError {
   return new FeedEngineError(error.message, error.code, error.statusCode);
 }
 
-export function resolveDevUserId(): UserId {
+export async function resolveDevUserId(request: Request): Promise<UserId> {
   try {
-    return resolveDevUserIdBase();
+    return await resolveAuthenticatedUserId(request);
   } catch (error) {
-    if (error instanceof DevAuthError) {
-      throw toFeedEngineError(error);
+    if (error instanceof AuthError) {
+      throw new FeedEngineError(error.message, error.code, error.statusCode);
     }
     throw error;
   }

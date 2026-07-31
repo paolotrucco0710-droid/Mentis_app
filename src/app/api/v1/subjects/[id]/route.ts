@@ -15,9 +15,9 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const { id } = await context.params;
     const detail = await getSubjectDetail(userId, id as SubjectId);
     return NextResponse.json(detail, { status: 200 });
@@ -28,7 +28,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const { id } = await context.params;
     const body = (await request.json()) as {
       name?: string;
@@ -43,9 +43,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const { id } = await context.params;
     await deleteSubjectForUser(userId, id as SubjectId);
     return NextResponse.json({ ok: true }, { status: 200 });

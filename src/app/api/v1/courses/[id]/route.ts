@@ -16,7 +16,7 @@ interface RouteContext {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const { id } = await context.params;
     const body = (await request.json()) as {
       title?: string;
@@ -30,9 +30,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const { id } = await context.params;
     await deleteCourseForUser(userId, id as CourseId);
     return NextResponse.json({ ok: true }, { status: 200 });

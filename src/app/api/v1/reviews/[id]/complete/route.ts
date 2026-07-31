@@ -15,7 +15,7 @@ interface RouteContext {
 
 export async function POST(request: Request, context: RouteContext) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const { id } = await context.params;
     const body = (await request.json()) as { outcome?: string };
 

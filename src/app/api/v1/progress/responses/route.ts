@@ -15,7 +15,7 @@ const VALID_OUTCOMES = new Set<string>(Object.values(SessionEventOutcome));
 
 export async function POST(request: Request) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const body = (await request.json()) as {
       sessionId?: string;
       cardId?: string;

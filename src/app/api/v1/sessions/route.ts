@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const body = (await request.json().catch(() => ({}))) as {
       subjectId?: string;
       device?: string;

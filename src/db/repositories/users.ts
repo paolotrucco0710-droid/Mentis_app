@@ -54,3 +54,13 @@ export async function updateUserLastAccess(id: UserId): Promise<void> {
     data: { lastAccessAt: new Date() },
   });
 }
+
+export async function updateUserPasswordHash(
+  id: UserId,
+  passwordHash: string
+): Promise<void> {
+  await prisma.user.update({
+    where: { id },
+    data: { passwordHash },
+  });
+}

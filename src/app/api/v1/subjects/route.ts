@@ -9,9 +9,9 @@ import {
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const subjects = await listSubjectSummaries(userId);
     return NextResponse.json({ subjects }, { status: 200 });
   } catch (error) {
@@ -21,7 +21,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const body = (await request.json()) as {
       name?: string;
       color?: string;
