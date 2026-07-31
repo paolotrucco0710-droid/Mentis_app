@@ -5,9 +5,9 @@ import { ReviewEngineError, syncReviewsForUser } from "@/review";
 
 export const runtime = "nodejs";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const synced = await syncReviewsForUser(userId);
 
     return NextResponse.json({ synced }, { status: 200 });

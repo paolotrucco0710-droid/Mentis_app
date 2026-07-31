@@ -16,7 +16,7 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const subjectId = formData.get("subjectId");
 
     if (typeof subjectId !== "string" || subjectId.trim() === "") {

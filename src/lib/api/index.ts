@@ -6,6 +6,16 @@ export {
   endSession,
 } from "./feed";
 export { fetchSessionDetail } from "./sessions";
+export {
+  login,
+  register,
+  logout,
+  fetchCurrentUser,
+  requestPasswordReset,
+  resetPassword,
+  fetchAuthSessions,
+  revokeAuthSession,
+} from "./auth";
 export { submitCardResponse } from "./progress";
 export type { SubmitCardResponseInput } from "./progress";
 export {

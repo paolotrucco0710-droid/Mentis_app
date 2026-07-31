@@ -10,9 +10,9 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const { id } = await context.params;
     const detail = await getSessionDetail(userId, id as StudySessionId);
 

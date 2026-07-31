@@ -31,6 +31,21 @@ export const env = {
   autoProcessAfterUpload:
     process.env.AUTO_PROCESS_AFTER_UPLOAD === "true" &&
     Boolean(process.env.OPENAI_API_KEY),
+  authJwtSecret:
+    process.env.AUTH_JWT_SECRET ?? "dev-only-change-in-production-mentis",
+  authAccessTokenTtlMinutes: parsePositiveInt(
+    process.env.AUTH_ACCESS_TOKEN_TTL_MINUTES,
+    15
+  ),
+  authRefreshTokenTtlDays: parsePositiveInt(
+    process.env.AUTH_REFRESH_TOKEN_TTL_DAYS,
+    30
+  ),
+  authPasswordResetTtlMinutes: parsePositiveInt(
+    process.env.AUTH_PASSWORD_RESET_TTL_MINUTES,
+    60
+  ),
+  authDevFallback: process.env.AUTH_DEV_FALLBACK === "true",
 } as const;
 
 export function getMaxUploadFileSizeBytes(): number {

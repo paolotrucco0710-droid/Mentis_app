@@ -10,10 +10,10 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function POST(_request: Request, context: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const result = await processKnowledgeSource(
       id as KnowledgeSourceId,
       userId

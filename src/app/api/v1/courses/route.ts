@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const { searchParams } = new URL(request.url);
     const subjectId = searchParams.get("subjectId");
 
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const body = (await request.json()) as {
       subjectId?: string;
       title?: string;

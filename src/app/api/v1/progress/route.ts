@@ -11,7 +11,7 @@ const VALID_SCOPES = new Set<string>(Object.values(ProgressScopeType));
 
 export async function GET(request: Request) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const { searchParams } = new URL(request.url);
     const scopeType = searchParams.get("scopeType") ?? ProgressScopeType.Subject;
     const scopeIdParam = searchParams.get("scopeId");

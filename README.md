@@ -2,38 +2,51 @@
 
 App di apprendimento attivo per studenti delle superiori.
 
-## Milestone 11 — Feed UI
+## Milestone 13 — Authentication
 
-L'utente può studiare tramite il feed interattivo collegato al backend.
+Sistema utenti completo: registrazione, login, reset password e gestione sessioni.
 
-### Flusso studio
+### Flusso auth
 
 ```text
-/feed → crea sessione → mostra card → invia risposta → prossima card
+/signup o /login → cookie httpOnly → accesso alle pagine protette
+/forgot-password → /reset-password?token=... → nuova password
+/settings → sessioni attive → revoca dispositivi
 ```
 
-### Card supportate
+### Pagine
 
-| Tipo | Componente |
-| ---- | ---------- |
-| Explain | Learn Card |
-| ImageExplain | Image Card |
-| Quiz | Quiz Card |
-| TrueFalse | Vero/Falso |
-| Blurting | Blurting Card |
-| Feynman | Feynman Card |
-| ErrorDetection | Trova l'errore |
+| Route | Descrizione |
+| ----- | ----------- |
+| `/login` | Accesso con email e password |
+| `/signup` | Registrazione nuovo account |
+| `/forgot-password` | Richiesta link reset password |
+| `/reset-password` | Impostazione nuova password |
+| `/settings` | Account e sessioni attive |
 
 ### API utilizzate
 
-- `POST /api/v1/sessions`
-- `GET /api/v1/feed/next`
-- `POST /api/v1/progress/responses`
-- `POST /api/v1/sessions/[id]/pause|end`
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
+- `POST /api/v1/auth/refresh`
+- `GET /api/v1/auth/me`
+- `POST /api/v1/auth/forgot-password`
+- `POST /api/v1/auth/reset-password`
+- `GET /api/v1/auth/sessions`
+- `DELETE /api/v1/auth/sessions/[id]`
 
-### Env frontend
+### Env auth
 
-`NEXT_PUBLIC_DEV_SUBJECT_ID` — materia usata dal feed (default: seed dev)
+| Variabile | Descrizione |
+| --------- | ----------- |
+| `AUTH_JWT_SECRET` | Segreto per firmare i JWT (obbligatorio in produzione) |
+| `AUTH_ACCESS_TOKEN_TTL_MINUTES` | Durata access token (default: 15) |
+| `AUTH_REFRESH_TOKEN_TTL_DAYS` | Durata refresh token (default: 30) |
+| `AUTH_PASSWORD_RESET_TTL_MINUTES` | Validità link reset (default: 60) |
+| `AUTH_DEV_FALLBACK` | Se `true`, consente accesso senza login usando `DEV_USER_ID` |
+
+In sviluppo, senza configurare auth, imposta `AUTH_DEV_FALLBACK=true` e `DEV_USER_ID` per mantenere il workflow locale precedente.
 
 ### Script
 
@@ -41,3 +54,5 @@ L'utente può studiare tramite il feed interattivo collegato al backend.
 | ------- | ----------- |
 | `npm run dev` | Server di sviluppo |
 | `npm run build` | Build di produzione |
+| `npm run db:migrate` | Applica migration Prisma |
+| `npm run db:seed` | Seed database dev |

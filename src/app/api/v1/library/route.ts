@@ -5,9 +5,9 @@ import { CourseManagementError, getLibraryOverview } from "@/course";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const overview = await getLibraryOverview(userId);
     return NextResponse.json({ overview }, { status: 200 });
   } catch (error) {

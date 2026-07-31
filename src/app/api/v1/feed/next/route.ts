@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get("sessionId");
     const subjectId = resolveDevSubjectId(searchParams.get("subjectId"));

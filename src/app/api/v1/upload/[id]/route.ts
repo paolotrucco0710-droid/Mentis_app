@@ -12,10 +12,10 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const result = await getUploadResult(id as UploadId, userId);
 
     if (!result) {

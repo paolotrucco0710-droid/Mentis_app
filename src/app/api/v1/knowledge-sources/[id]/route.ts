@@ -14,9 +14,9 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const { id } = await context.params;
     const chapter = await getChapterByKnowledgeSource(
       userId,
@@ -29,9 +29,9 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
   try {
-    const userId = resolveDevUserId();
+    const userId = await resolveDevUserId(request);
     const { id } = await context.params;
     await deleteKnowledgeSourceForUser(userId, id as KnowledgeSourceId);
     return NextResponse.json({ ok: true }, { status: 200 });
