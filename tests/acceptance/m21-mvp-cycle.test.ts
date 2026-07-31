@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { persistKnowledgeGraph } from "@/ai/persist";
@@ -77,8 +78,10 @@ describe.skipIf(!hasDatabase)("acceptance/m21-mvp-cycle", () => {
       ],
     });
 
+    const atomId = randomUUID() as AtomId;
     const knowledge = makeMvpKnowledgeJson({
       imageId: upload.images[0]?.id,
+      atomId,
     });
 
     const persisted = await persistKnowledgeGraph({
@@ -90,7 +93,6 @@ describe.skipIf(!hasDatabase)("acceptance/m21-mvp-cycle", () => {
     expect(persisted.atomCount).toBe(1);
     expect(persisted.cardCount).toBeGreaterThanOrEqual(6);
 
-    const atomId = knowledge.atoms[0].id as AtomId;
     const cards = await findCardsByAtomId(atomId);
     const cardTypes = cards.map((card) => card.type);
 

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { getGeneratedCardTypes } from "@/ai/persist";
 import { CardType } from "@/domain/enums";
@@ -7,6 +8,7 @@ describe("ai/persist MVP card generation", () => {
   it("generates all feed card types when an image reference exists", () => {
     const atom = makeMvpKnowledgeJson({
       imageId: "00000000-0000-4000-8000-000000000301",
+      atomId: randomUUID(),
     }).atoms[0];
 
     expect(getGeneratedCardTypes(atom)).toEqual([
@@ -21,7 +23,7 @@ describe("ai/persist MVP card generation", () => {
   });
 
   it("omits image cards when no image reference is available", () => {
-    const atom = makeMvpKnowledgeJson().atoms[0];
+    const atom = makeMvpKnowledgeJson({ atomId: randomUUID() }).atoms[0];
 
     expect(getGeneratedCardTypes(atom)).not.toContain(CardType.ImageExplain);
     expect(getGeneratedCardTypes(atom)).toHaveLength(6);

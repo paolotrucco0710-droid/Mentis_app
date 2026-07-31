@@ -1,22 +1,28 @@
 import { PrismaClient } from "@prisma/client";
+import { hashPassword } from "../src/auth/password";
 import type { SubjectId, UserId } from "../src/domain/ids";
+import { DEV_SEED_USER } from "../tests/fixtures/dev-user";
 import { seedMvpDemo } from "./seed-mvp-demo";
 
 const prisma = new PrismaClient();
 
-const DEV_USER_ID = "00000000-0000-4000-8000-000000000001" as UserId;
-const DEV_SUBJECT_ID = "00000000-0000-4000-8000-000000000002" as SubjectId;
+const DEV_USER_ID = DEV_SEED_USER.id as UserId;
+const DEV_SUBJECT_ID = DEV_SEED_USER.subjectId as SubjectId;
 
 async function main() {
+  const passwordHash = await hashPassword(DEV_SEED_USER.password);
+
   await prisma.user.upsert({
     where: { id: DEV_USER_ID },
-    update: {},
+    update: {
+      passwordHash,
+    },
     create: {
       id: DEV_USER_ID,
       firstName: "Paolo",
       lastName: "Dev",
-      email: "paolo.dev@mentis.local",
-      passwordHash: "dev-only-not-for-production",
+      email: DEV_SEED_USER.email,
+      passwordHash,
       language: "it",
       timezone: "Europe/Rome",
       preferences: {
@@ -46,6 +52,7 @@ async function main() {
   console.log("Seed completato.");
   console.log(`DEV_USER_ID=${DEV_USER_ID}`);
   console.log(`DEV_SUBJECT_ID=${DEV_SUBJECT_ID}`);
+  console.log(`DEV_USER_EMAIL=${DEV_SEED_USER.email}`);
 }
 
 main()

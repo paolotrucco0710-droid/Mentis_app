@@ -22,7 +22,7 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {
-      AUTH_DEV_FALLBACK: process.env.AUTH_DEV_FALLBACK ?? "true",
+      AUTH_DEV_FALLBACK: process.env.AUTH_DEV_FALLBACK ?? "false",
       DEV_USER_ID: process.env.DEV_USER_ID ?? "00000000-0000-4000-8000-000000000001",
       DEV_SUBJECT_ID:
         process.env.DEV_SUBJECT_ID ?? "00000000-0000-4000-8000-000000000002",
