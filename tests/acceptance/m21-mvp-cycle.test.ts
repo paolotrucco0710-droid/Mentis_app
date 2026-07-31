@@ -155,7 +155,13 @@ describe.skipIf(!hasDatabase)("acceptance/m21-mvp-cycle", () => {
       syncBeforeRead: true,
     });
 
-    expect(reviewQueue.items.length).toBeGreaterThan(0);
-    expect(reviewQueue.items.some((item) => item.atomId === atomId)).toBe(true);
+    const scheduledItems = [
+      ...reviewQueue.overdue,
+      ...reviewQueue.due,
+      ...reviewQueue.upcoming,
+    ];
+
+    expect(reviewQueue.totalScheduled).toBeGreaterThan(0);
+    expect(scheduledItems.some((item) => item.atomId === atomId)).toBe(true);
   });
 });
