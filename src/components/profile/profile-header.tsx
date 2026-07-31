@@ -1,7 +1,8 @@
 "use client";
 
 import type { UserProfileView } from "@/profile/types";
-import { Avatar, Badge, Card } from "@/components/ui";
+import { Badge, Card } from "@/components/ui";
+import { StorageAvatar } from "@/components/storage/storage-avatar";
 import { formatPremiumPlan } from "./profile-utils";
 
 export function ProfileHeader({ profile }: { profile: UserProfileView }) {
@@ -10,9 +11,9 @@ export function ProfileHeader({ profile }: { profile: UserProfileView }) {
   return (
     <Card>
       <div className="flex items-center gap-4">
-        <Avatar
+        <StorageAvatar
           name={displayName || profile.email}
-          src={profile.profileImageUrl}
+          imageRef={profile.profileImageUrl}
           className="h-16 w-16 text-lg"
         />
         <div>

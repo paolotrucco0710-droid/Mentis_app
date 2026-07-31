@@ -15,6 +15,7 @@ import {
   PageHeader,
   Section,
 } from "@/components/ui";
+import { AvatarUploadForm } from "./avatar-upload-form";
 import { AccountForm } from "./account-form";
 import { ChangePasswordForm } from "./change-password-form";
 import { DeleteAccountDialog } from "./delete-account-dialog";
@@ -87,7 +88,8 @@ export function SettingsPanel() {
       />
 
       <Section title="Account">
-        <Card>
+        <Card className="space-y-6">
+          <AvatarUploadForm profile={profile} onUpdated={setProfile} />
           <AccountForm profile={profile} onUpdated={setProfile} />
         </Card>
       </Section>

@@ -46,6 +46,22 @@ export const env = {
     60
   ),
   authDevFallback: process.env.AUTH_DEV_FALLBACK === "true",
+  storageProvider:
+    process.env.STORAGE_PROVIDER === "s3" ? ("s3" as const) : ("local" as const),
+  storageBucket: process.env.STORAGE_BUCKET ?? "",
+  storageRegion: process.env.STORAGE_REGION ?? "eu-west-1",
+  storageEndpoint: process.env.STORAGE_ENDPOINT ?? "",
+  awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "",
+  awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",
+  storageSignedUrlTtlSeconds: parsePositiveInt(
+    process.env.STORAGE_SIGNED_URL_TTL_SECONDS,
+    3600
+  ),
+  storageForcePathStyle: process.env.STORAGE_FORCE_PATH_STYLE === "true",
+  storageSigningSecret:
+    process.env.STORAGE_SIGNING_SECRET ??
+    process.env.AUTH_JWT_SECRET ??
+    "dev-only-change-in-production-mentis",
 } as const;
 
 export function getMaxUploadFileSizeBytes(): number {
@@ -57,5 +73,17 @@ export function assertOpenAIConfigured(): void {
     throw new Error(
       "OPENAI_API_KEY non configurato. Aggiungilo nelle variabili ambiente."
     );
+  }
+}
+
+export function assertStorageConfigured(): void {
+  if (env.isProduction && env.storageProvider === "local") {
+    throw new Error(
+      "STORAGE_PROVIDER deve essere impostato su 's3' in produzione."
+    );
+  }
+
+  if (env.storageProvider === "s3" && !env.storageBucket) {
+    throw new Error("STORAGE_BUCKET è obbligatorio con STORAGE_PROVIDER=s3.");
   }
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { UserProfileView } from "@/profile/types";
+import { StorageAvatar } from "@/components/storage/storage-avatar";
 import { Avatar, Button } from "@/components/ui";
 import { ApiError, fetchProfile, logout } from "@/lib/api";
 
@@ -72,11 +73,18 @@ export function UserMenu() {
         Ciao, {displayName}
       </span>
       <Link href="/settings" aria-label="Impostazioni account">
-        <Avatar
-          name={`${profile.firstName} ${profile.lastName}`.trim() || profile.email}
-          src={profile.profileImageUrl}
-          className="h-9 w-9 text-xs"
-        />
+        {profile.profileImageUrl ? (
+          <StorageAvatar
+            name={`${profile.firstName} ${profile.lastName}`.trim() || profile.email}
+            imageRef={profile.profileImageUrl}
+            className="h-9 w-9 text-xs"
+          />
+        ) : (
+          <Avatar
+            name={`${profile.firstName} ${profile.lastName}`.trim() || profile.email}
+            className="h-9 w-9 text-xs"
+          />
+        )}
       </Link>
       <Button
         type="button"

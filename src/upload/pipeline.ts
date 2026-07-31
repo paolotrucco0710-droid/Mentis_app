@@ -23,6 +23,7 @@ import { AuthError, resolveAuthenticatedUserId } from "@/auth";
 import {
   buildPageStorageKey,
   buildPdfStorageKey,
+  deleteStorageKeys,
   getStorageProvider,
   hashBuffer,
   type ChapterUploadInput,
@@ -73,40 +74,47 @@ async function saveImages(
 ): Promise<Image[]> {
   const storage = getStorageProvider();
   const images: Image[] = [];
+  const savedKeys: string[] = [];
 
-  for (let index = 0; index < files.length; index++) {
-    const file = files[index];
-    const processed = await processImage(file.buffer, file.mimeType);
-    const pageNumber = index + 1;
-    const storageKey = buildPageStorageKey(
-      knowledgeSourceId,
-      pageNumber,
-      processed.extension
-    );
-
-    const stored = await storage.save(
-      storageKey,
-      processed.buffer,
-      processed.mimeType
-    );
-
-    images.push(
-      await createImage({
+  try {
+    for (let index = 0; index < files.length; index++) {
+      const file = files[index];
+      const processed = await processImage(file.buffer, file.mimeType);
+      const pageNumber = index + 1;
+      const storageKey = buildPageStorageKey(
         knowledgeSourceId,
-        ownerId,
-        storageKey: stored.storageKey,
-        hash: stored.hash,
-        mimeType: stored.mimeType,
-        sizeBytes: stored.sizeBytes,
-        width: processed.width,
-        height: processed.height,
         pageNumber,
-        caption: file.originalName,
-      })
-    );
-  }
+        processed.extension
+      );
 
-  return images;
+      const stored = await storage.save(
+        storageKey,
+        processed.buffer,
+        processed.mimeType
+      );
+      savedKeys.push(stored.storageKey);
+
+      images.push(
+        await createImage({
+          knowledgeSourceId,
+          ownerId,
+          storageKey: stored.storageKey,
+          hash: stored.hash,
+          mimeType: stored.mimeType,
+          sizeBytes: stored.sizeBytes,
+          width: processed.width,
+          height: processed.height,
+          pageNumber,
+          caption: file.originalName,
+        })
+      );
+    }
+
+    return images;
+  } catch (error) {
+    await deleteStorageKeys(savedKeys);
+    throw error;
+  }
 }
 
 async function savePdf(
@@ -116,20 +124,26 @@ async function savePdf(
 ): Promise<Image[]> {
   const storage = getStorageProvider();
   const storageKey = buildPdfStorageKey(knowledgeSourceId);
-  const stored = await storage.save(storageKey, file.buffer, file.mimeType);
 
-  return [
-    await createImage({
-      knowledgeSourceId,
-      ownerId,
-      storageKey: stored.storageKey,
-      hash: stored.hash,
-      mimeType: stored.mimeType,
-      sizeBytes: stored.sizeBytes,
-      pageNumber: 1,
-      caption: file.originalName,
-    }),
-  ];
+  try {
+    const stored = await storage.save(storageKey, file.buffer, file.mimeType);
+
+    return [
+      await createImage({
+        knowledgeSourceId,
+        ownerId,
+        storageKey: stored.storageKey,
+        hash: stored.hash,
+        mimeType: stored.mimeType,
+        sizeBytes: stored.sizeBytes,
+        pageNumber: 1,
+        caption: file.originalName,
+      }),
+    ];
+  } catch (error) {
+    await deleteStorageKeys([storageKey]);
+    throw error;
+  }
 }
 
 export async function processChapterUpload(

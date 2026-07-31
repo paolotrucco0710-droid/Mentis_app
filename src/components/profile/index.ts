@@ -1,3 +1,4 @@
+export { AvatarUploadForm } from "./avatar-upload-form";
 export { AccountForm } from "./account-form";
 export { ChangePasswordForm } from "./change-password-form";
 export { DeleteAccountDialog } from "./delete-account-dialog";

@@ -22,6 +22,7 @@ import {
   softDeleteSubject,
   updateSubject,
 } from "@/db/repositories/subjects";
+import { deleteKnowledgeSourceFiles } from "@/storage";
 import type {
   ChapterId,
   CourseId,
@@ -210,6 +211,7 @@ export async function deleteKnowledgeSourceForUser(
     );
   }
 
+  await deleteKnowledgeSourceFiles(knowledgeSourceId);
   await softDeleteKnowledgeSource(knowledgeSourceId);
 }
 

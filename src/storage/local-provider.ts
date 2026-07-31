@@ -1,13 +1,13 @@
-import { createHash } from "crypto";
-import { mkdir, readFile, unlink, writeFile } from "fs/promises";
+import { access, mkdir, readFile, unlink, writeFile } from "fs/promises";
 import path from "path";
 import type { StorageProvider } from "./types";
+import { hashBuffer } from "./hash";
+import { buildLocalStorageAccessUrl } from "./signed-url";
 
-export function hashBuffer(buffer: Buffer): string {
-  return createHash("sha256").update(buffer).digest("hex");
-}
-
-export function createLocalStorageProvider(rootPath: string): StorageProvider {
+export function createLocalStorageProvider(
+  rootPath: string,
+  signedUrlTtlSeconds: number
+): StorageProvider {
   const absoluteRoot = path.resolve(rootPath);
 
   async function resolvePath(storageKey: string): Promise<string> {
@@ -45,6 +45,23 @@ export function createLocalStorageProvider(rootPath: string): StorageProvider {
     async delete(storageKey) {
       const filePath = await resolvePath(storageKey);
       await unlink(filePath);
+    },
+
+    async exists(storageKey) {
+      const filePath = await resolvePath(storageKey);
+      try {
+        await access(filePath);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    async getSignedUrl(storageKey, expiresInSeconds) {
+      return buildLocalStorageAccessUrl(
+        storageKey,
+        expiresInSeconds ?? signedUrlTtlSeconds
+      );
     },
   };
 }
