@@ -11,6 +11,11 @@ export interface AIJob {
   maxAttempts: number;
   promptVersion: string | null;
   parserVersion: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCostUsd: number;
+  cacheHits: number;
+  cacheMisses: number;
   errorMessage: string | null;
   queuedAt: Date;
   startedAt: Date | null;

@@ -8,3 +8,8 @@ export {
   scheduleKnowledgeSourceProcessing,
 } from "./pipeline";
 export type { ProcessingResult } from "./pipeline";
+export {
+  getUserAICostSummary,
+  listRecentAIJobCosts,
+} from "./optimization";
+export type { AICostSummary, AIJobCostView } from "./optimization";

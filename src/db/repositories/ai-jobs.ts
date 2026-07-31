@@ -55,3 +55,26 @@ export async function updateAIJobStatus(
   });
   return toAIJob(record);
 }
+
+export async function updateAIJobUsage(
+  id: AIJobId,
+  input: {
+    inputTokens: number;
+    outputTokens: number;
+    estimatedCostUsd: number;
+    cacheHits: number;
+    cacheMisses: number;
+  }
+): Promise<AIJob> {
+  const record = await prisma.aIJob.update({
+    where: { id },
+    data: {
+      inputTokens: input.inputTokens,
+      outputTokens: input.outputTokens,
+      estimatedCostUsd: input.estimatedCostUsd,
+      cacheHits: input.cacheHits,
+      cacheMisses: input.cacheMisses,
+    },
+  });
+  return toAIJob(record);
+}

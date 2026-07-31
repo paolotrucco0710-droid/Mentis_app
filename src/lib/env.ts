@@ -46,6 +46,26 @@ export const env = {
     60
   ),
   authDevFallback: process.env.AUTH_DEV_FALLBACK === "true",
+  aiMaxConcurrentRequests: parsePositiveInt(
+    process.env.AI_MAX_CONCURRENT_REQUESTS,
+    3
+  ),
+  aiMinRequestDelayMs: parsePositiveInt(
+    process.env.AI_MIN_REQUEST_DELAY_MS,
+    200
+  ),
+  aiRetryMaxAttempts: parsePositiveInt(process.env.AI_RETRY_MAX_ATTEMPTS, 3),
+  aiRetryBaseDelayMs: parsePositiveInt(process.env.AI_RETRY_BASE_DELAY_MS, 1000),
+  aiCacheTtlDays: parsePositiveInt(process.env.AI_CACHE_TTL_DAYS, 30),
+  aiCostInputPerMillion: Number(process.env.AI_COST_INPUT_PER_MILLION ?? "0.15"),
+  aiCostOutputPerMillion: Number(process.env.AI_COST_OUTPUT_PER_MILLION ?? "0.60"),
+  aiVisionCostInputPerMillion: Number(
+    process.env.AI_VISION_COST_INPUT_PER_MILLION ?? "0.15"
+  ),
+  aiVisionCostOutputPerMillion: Number(
+    process.env.AI_VISION_COST_OUTPUT_PER_MILLION ?? "0.60"
+  ),
+  aiOcrBatchSize: parsePositiveInt(process.env.AI_OCR_BATCH_SIZE, 3),
   storageProvider:
     process.env.STORAGE_PROVIDER === "s3" ? ("s3" as const) : ("local" as const),
   storageBucket: process.env.STORAGE_BUCKET ?? "",

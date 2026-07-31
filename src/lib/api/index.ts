@@ -55,3 +55,4 @@ export {
   fetchAvatarUrl,
   uploadAvatar,
 } from "./storage";
+export { fetchAICostSummary, fetchAIJobCosts } from "./ai-costs";
