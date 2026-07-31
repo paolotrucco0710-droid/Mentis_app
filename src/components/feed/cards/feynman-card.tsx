@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Button, Card, CardDescription, CardHeader, CardTitle, TextArea } from "@/components/ui";
 import { SessionEventOutcome } from "@/domain/enums";
 import type { FeedCardProps } from "../card-utils";
 import { isFeynmanPayload } from "../card-utils";
 
-export function FeynmanCard({ card, disabled, onContinue }: FeedCardProps) {
+export function FeynmanCardComponent({ card, disabled, onContinue }: FeedCardProps) {
   const payload = isFeynmanPayload(card.payload) ? card.payload : null;
   const [answer, setAnswer] = useState("");
   const [revealed, setRevealed] = useState(false);
@@ -64,3 +64,5 @@ export function FeynmanCard({ card, disabled, onContinue }: FeedCardProps) {
     </Card>
   );
 }
+
+export const FeynmanCard = memo(FeynmanCardComponent);

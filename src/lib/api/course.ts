@@ -1,9 +1,13 @@
 import type { ChapterId, CourseId, SubjectId } from "@/domain/ids";
 import type { ChapterWithSource } from "@/course/types";
 import { apiFetch } from "./client";
+import { invalidateLibraryCache } from "./library";
+import { invalidateQueryPrefix } from "./query-cache";
 
 export async function deleteChapter(chapterId: ChapterId): Promise<void> {
   await apiFetch(`/api/v1/chapters/${chapterId}`, { method: "DELETE" });
+  invalidateLibraryCache();
+  invalidateQueryPrefix("search:");
 }
 
 export async function fetchChapters(input: {
@@ -61,10 +65,13 @@ export async function uploadChapter(input: {
     formData.append("files", file);
   }
 
-  return apiFetch<UploadChapterResult>("/api/v1/upload", {
+  const result = await apiFetch<UploadChapterResult>("/api/v1/upload", {
     method: "POST",
     body: formData,
   });
+  invalidateLibraryCache();
+  invalidateQueryPrefix("search:");
+  return result;
 }
 
 export async function startKnowledgeSourceProcessing(

@@ -2,6 +2,8 @@ import type { Subject } from "@/domain/entities/subject";
 import type { SubjectId } from "@/domain/ids";
 import type { SubjectDetail, SubjectSummary } from "@/course/types";
 import { apiFetch } from "./client";
+import { invalidateLibraryCache } from "./library";
+import { invalidateQueryPrefix } from "./query-cache";
 
 export async function fetchSubjects(): Promise<SubjectSummary[]> {
   const data = await apiFetch<{ subjects: SubjectSummary[] }>("/api/v1/subjects");
@@ -23,6 +25,8 @@ export async function createSubject(input: {
     method: "POST",
     body: JSON.stringify(input),
   });
+  invalidateLibraryCache();
+  invalidateQueryPrefix("search:");
   return data.subject;
 }
 
@@ -34,9 +38,13 @@ export async function updateSubject(
     method: "PATCH",
     body: JSON.stringify(input),
   });
+  invalidateLibraryCache();
+  invalidateQueryPrefix("search:");
   return data.subject;
 }
 
 export async function deleteSubject(subjectId: SubjectId): Promise<void> {
   await apiFetch(`/api/v1/subjects/${subjectId}`, { method: "DELETE" });
+  invalidateLibraryCache();
+  invalidateQueryPrefix("search:");
 }

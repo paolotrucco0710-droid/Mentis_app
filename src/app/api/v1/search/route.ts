@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { resolveDevUserId } from "@/engine/dev";
 import { FeedEngineError } from "@/engine/errors";
 import { CourseManagementError, searchLibrary } from "@/course";
+import { withServerCache } from "@/lib/cache/memory-cache";
+import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
 
@@ -11,7 +13,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q") ?? "";
 
-    const results = await searchLibrary(userId, query);
+    const results = await withServerCache(
+      `search:${userId}:${query.trim().toLowerCase()}`,
+      env.serverQueryCacheTtlSeconds * 1000,
+      () => searchLibrary(userId, query)
+    );
     return NextResponse.json({ results }, { status: 200 });
   } catch (error) {
     if (error instanceof CourseManagementError || error instanceof FeedEngineError) {

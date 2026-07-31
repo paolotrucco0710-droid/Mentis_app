@@ -10,6 +10,8 @@ export { ProgressBar } from "./progress-bar";
 export { Skeleton, Loader } from "./skeleton";
 export { EmptyState, PageHeader, Section } from "./section";
 export { Dialog } from "./dialog";
+export { VirtualList } from "./virtual-list";
+export { OptimizedImage } from "./optimized-image";
 export {
   NavIcon,
   HomeIcon,

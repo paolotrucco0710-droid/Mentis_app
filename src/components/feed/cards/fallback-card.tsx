@@ -1,8 +1,11 @@
+"use client";
+
+import { memo } from "react";
 import { Button, Card, CardDescription, CardHeader, CardTitle } from "@/components/ui";
 import { SessionEventOutcome } from "@/domain/enums";
 import type { FeedCardProps } from "../card-utils";
 
-export function FallbackCard({ card, disabled, onContinue, onSkip }: FeedCardProps) {
+function FallbackCardComponent({ card, disabled, onContinue, onSkip }: FeedCardProps) {
   return (
     <Card className="shadow-md">
       <CardHeader>
@@ -32,3 +35,5 @@ export function FallbackCard({ card, disabled, onContinue, onSkip }: FeedCardPro
     </Card>
   );
 }
+
+export const FallbackCard = memo(FallbackCardComponent);

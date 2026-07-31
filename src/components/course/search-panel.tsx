@@ -16,6 +16,11 @@ import {
   PageHeader,
   Section,
 } from "@/components/ui";
+import { VirtualList } from "@/components/ui/virtual-list";
+
+const VIRTUAL_LIST_THRESHOLD = 20;
+const CHAPTER_ROW_HEIGHT = 96;
+const ATOM_ROW_HEIGHT = 112;
 
 export function SearchPanel() {
   const [query, setQuery] = useState("");
@@ -108,16 +113,37 @@ export function SearchPanel() {
 
       {results?.chapters.length ? (
         <Section title="Capitoli">
-          <div className="space-y-2">
-            {results.chapters.map((chapter) => (
-              <Card key={chapter.id}>
-                <CardHeader>
-                  <CardTitle>{chapter.title}</CardTitle>
-                  <CardDescription>Capitolo {chapter.chapterNumber}</CardDescription>
-                </CardHeader>
-              </Card>
-            ))}
-          </div>
+          {results.chapters.length >= VIRTUAL_LIST_THRESHOLD ? (
+            <VirtualList
+              items={results.chapters}
+              itemHeight={CHAPTER_ROW_HEIGHT}
+              height={Math.min(results.chapters.length * CHAPTER_ROW_HEIGHT, 480)}
+              getItemKey={(chapter) => chapter.id}
+              renderItem={(chapter) => (
+                <Card className="h-full">
+                  <CardHeader>
+                    <CardTitle>{chapter.title}</CardTitle>
+                    <CardDescription>
+                      Capitolo {chapter.chapterNumber}
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              )}
+            />
+          ) : (
+            <div className="space-y-2">
+              {results.chapters.map((chapter) => (
+                <Card key={chapter.id}>
+                  <CardHeader>
+                    <CardTitle>{chapter.title}</CardTitle>
+                    <CardDescription>
+                      Capitolo {chapter.chapterNumber}
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          )}
         </Section>
       ) : null}
 
@@ -135,16 +161,33 @@ export function SearchPanel() {
 
       {results?.atoms.length ? (
         <Section title="Concetti">
-          <div className="space-y-2">
-            {results.atoms.map((atom) => (
-              <Card key={atom.id}>
-                <CardHeader>
-                  <CardTitle>{atom.title}</CardTitle>
-                  <CardDescription>{atom.summary}</CardDescription>
-                </CardHeader>
-              </Card>
-            ))}
-          </div>
+          {results.atoms.length >= VIRTUAL_LIST_THRESHOLD ? (
+            <VirtualList
+              items={results.atoms}
+              itemHeight={ATOM_ROW_HEIGHT}
+              height={Math.min(results.atoms.length * ATOM_ROW_HEIGHT, 560)}
+              getItemKey={(atom) => atom.id}
+              renderItem={(atom) => (
+                <Card className="h-full">
+                  <CardHeader>
+                    <CardTitle>{atom.title}</CardTitle>
+                    <CardDescription>{atom.summary}</CardDescription>
+                  </CardHeader>
+                </Card>
+              )}
+            />
+          ) : (
+            <div className="space-y-2">
+              {results.atoms.map((atom) => (
+                <Card key={atom.id}>
+                  <CardHeader>
+                    <CardTitle>{atom.title}</CardTitle>
+                    <CardDescription>{atom.summary}</CardDescription>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          )}
         </Section>
       ) : null}
     </div>
