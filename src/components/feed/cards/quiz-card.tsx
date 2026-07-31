@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Button, Card, CardDescription, CardHeader, CardTitle } from "@/components/ui";
 import { SessionEventOutcome } from "@/domain/enums";
 import { cn } from "@/lib/utils";
 import type { FeedCardProps } from "../card-utils";
 import { isQuizPayload } from "../card-utils";
 
-export function QuizCard({ card, disabled, onContinue }: FeedCardProps) {
+export function QuizCardComponent({ card, disabled, onContinue }: FeedCardProps) {
   const payload = isQuizPayload(card.payload) ? card.payload : null;
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(false);
@@ -91,3 +91,5 @@ export function QuizCard({ card, disabled, onContinue }: FeedCardProps) {
     </Card>
   );
 }
+
+export const QuizCard = memo(QuizCardComponent);

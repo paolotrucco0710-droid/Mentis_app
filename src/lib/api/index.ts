@@ -1,5 +1,12 @@
 export { ApiError, apiFetch } from "./client";
 export {
+  fetchWithQueryCache,
+  getCachedQuery,
+  invalidateQuery,
+  invalidateQueryPrefix,
+  queryCacheKeys,
+} from "./query-cache";
+export {
   createStudySession,
   fetchNextFeedItem,
   pauseSession,

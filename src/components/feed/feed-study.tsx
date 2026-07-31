@@ -40,10 +40,53 @@ export function FeedStudy() {
   const [state, setState] = useState<FeedState>({ status: "loading" });
   const [submitting, setSubmitting] = useState(false);
   const cardStartedAt = useRef<number>(0);
+  const prefetchedItem = useRef<FeedItem | null>(null);
+  const prefetching = useRef(false);
   const subjectId = clientConfig.devSubjectId as SubjectId;
+
+  const prefetchNext = useCallback(
+    async (sessionId: StudySessionId) => {
+      if (prefetching.current || prefetchedItem.current) {
+        return;
+      }
+
+      prefetching.current = true;
+      try {
+        const feed = await fetchNextFeedItem({ sessionId, subjectId });
+        if (feed.item && !feed.sessionComplete) {
+          prefetchedItem.current = feed.item;
+        }
+      } catch {
+        prefetchedItem.current = null;
+      } finally {
+        prefetching.current = false;
+      }
+    },
+    [subjectId]
+  );
+
+  const applyFeedItem = useCallback(
+    (sessionId: StudySessionId, session: StudySession | undefined, item: FeedItem) => {
+      cardStartedAt.current = Date.now();
+      setState({
+        status: "ready",
+        session: session ?? ({ id: sessionId } as StudySession),
+        item,
+      });
+      void prefetchNext(sessionId);
+    },
+    [prefetchNext]
+  );
 
   const loadNext = useCallback(
     async (sessionId: StudySessionId, session?: StudySession) => {
+      if (prefetchedItem.current) {
+        const item = prefetchedItem.current;
+        prefetchedItem.current = null;
+        applyFeedItem(sessionId, session, item);
+        return;
+      }
+
       const feed = await fetchNextFeedItem({ sessionId, subjectId });
 
       if (!feed.item || feed.sessionComplete) {
@@ -59,14 +102,9 @@ export function FeedStudy() {
         return;
       }
 
-      cardStartedAt.current = Date.now();
-      setState({
-        status: "ready",
-        session: session ?? ({ id: sessionId } as StudySession),
-        item: feed.item,
-      });
+      applyFeedItem(sessionId, session, feed.item);
     },
-    [subjectId]
+    [applyFeedItem, subjectId]
   );
 
   const bootstrap = useCallback(async () => {

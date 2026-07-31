@@ -62,6 +62,21 @@ export function isErrorDetectionPayload(
   );
 }
 
+export function getImageIdFromPayload(
+  payload: CardPayload | null
+): string | null {
+  if (
+    payload !== null &&
+    typeof payload === "object" &&
+    "imageId" in payload &&
+    typeof payload.imageId === "string"
+  ) {
+    return payload.imageId;
+  }
+
+  return null;
+}
+
 export function getCardTypeLabel(type: CardType): string {
   switch (type) {
     case CardType.Explain:

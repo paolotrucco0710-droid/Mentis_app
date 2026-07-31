@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Button, Card, CardDescription, CardHeader, CardTitle } from "@/components/ui";
 import { SessionEventOutcome } from "@/domain/enums";
 import { cn } from "@/lib/utils";
 import type { FeedCardProps } from "../card-utils";
 import { isTrueFalsePayload } from "../card-utils";
 
-export function TrueFalseCard({ card, disabled, onContinue }: FeedCardProps) {
+export function TrueFalseCardComponent({ card, disabled, onContinue }: FeedCardProps) {
   const payload = isTrueFalsePayload(card.payload) ? card.payload : null;
   const [answer, setAnswer] = useState<boolean | null>(null);
   const [revealed, setRevealed] = useState(false);
@@ -89,3 +89,5 @@ export function TrueFalseCard({ card, disabled, onContinue }: FeedCardProps) {
     </Card>
   );
 }
+
+export const TrueFalseCard = memo(TrueFalseCardComponent);

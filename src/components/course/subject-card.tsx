@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { memo } from "react";
 import type { SubjectSummary } from "@/course/types";
 import { Badge, Card, CardDescription, CardHeader, CardTitle } from "@/components/ui";
 
-export function SubjectCard({ subject }: { subject: SubjectSummary }) {
+function SubjectCardComponent({ subject }: { subject: SubjectSummary }) {
   return (
     <Link href={`/library/subjects/${subject.id}`}>
       <Card className="transition-colors hover:border-primary/40">
@@ -25,3 +26,5 @@ export function SubjectCard({ subject }: { subject: SubjectSummary }) {
     </Link>
   );
 }
+
+export const SubjectCard = memo(SubjectCardComponent);

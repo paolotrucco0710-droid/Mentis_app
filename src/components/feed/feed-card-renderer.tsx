@@ -1,18 +1,50 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { memo } from "react";
 import { CardType } from "@/domain/enums";
-import type { CardAnswerResult, FeedCardProps } from "./card-utils";
-import { BlurtingCard } from "./cards/blurting-card";
-import { ErrorDetectionCard } from "./cards/error-detection-card";
-import { ExplainCard } from "./cards/explain-card";
-import { FallbackCard } from "./cards/fallback-card";
-import { FeynmanCard } from "./cards/feynman-card";
-import { ImageExplainCard } from "./cards/image-explain-card";
-import { QuizCard } from "./cards/quiz-card";
-import { TrueFalseCard } from "./cards/true-false-card";
 import type { Card } from "@/domain/entities/card";
+import { Loader } from "@/components/ui";
+import type { CardAnswerResult } from "./card-utils";
 
-export function FeedCardRenderer({
+const ExplainCard = dynamic(
+  () => import("./cards/explain-card").then((module) => module.ExplainCard),
+  { loading: () => <Loader label="Caricamento card..." /> }
+);
+const ImageExplainCard = dynamic(
+  () =>
+    import("./cards/image-explain-card").then((module) => module.ImageExplainCard),
+  { loading: () => <Loader label="Caricamento card..." /> }
+);
+const QuizCard = dynamic(
+  () => import("./cards/quiz-card").then((module) => module.QuizCard),
+  { loading: () => <Loader label="Caricamento card..." /> }
+);
+const TrueFalseCard = dynamic(
+  () => import("./cards/true-false-card").then((module) => module.TrueFalseCard),
+  { loading: () => <Loader label="Caricamento card..." /> }
+);
+const BlurtingCard = dynamic(
+  () => import("./cards/blurting-card").then((module) => module.BlurtingCard),
+  { loading: () => <Loader label="Caricamento card..." /> }
+);
+const FeynmanCard = dynamic(
+  () => import("./cards/feynman-card").then((module) => module.FeynmanCard),
+  { loading: () => <Loader label="Caricamento card..." /> }
+);
+const ErrorDetectionCard = dynamic(
+  () =>
+    import("./cards/error-detection-card").then(
+      (module) => module.ErrorDetectionCard
+    ),
+  { loading: () => <Loader label="Caricamento card..." /> }
+);
+const FallbackCard = dynamic(
+  () => import("./cards/fallback-card").then((module) => module.FallbackCard),
+  { loading: () => <Loader label="Caricamento card..." /> }
+);
+
+function FeedCardRendererComponent({
   card,
   disabled,
   onAnswer,
@@ -23,7 +55,7 @@ export function FeedCardRenderer({
   onAnswer: (result: CardAnswerResult) => void;
   onSkip: () => void;
 }) {
-  const props: FeedCardProps = {
+  const props = {
     card,
     disabled,
     onContinue: onAnswer,
@@ -50,3 +82,5 @@ export function FeedCardRenderer({
       return <FallbackCard {...props} />;
   }
 }
+
+export const FeedCardRenderer = memo(FeedCardRendererComponent);

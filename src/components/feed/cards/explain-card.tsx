@@ -1,8 +1,9 @@
+import { memo } from "react";
 import { Button, Card, CardDescription, CardHeader, CardTitle } from "@/components/ui";
 import type { FeedCardProps } from "../card-utils";
 import { SessionEventOutcome } from "@/domain/enums";
 
-export function ExplainCard({ card, disabled, onContinue }: FeedCardProps) {
+function ExplainCardComponent({ card, disabled, onContinue }: FeedCardProps) {
   return (
     <Card className="shadow-md">
       <CardHeader>
@@ -30,3 +31,5 @@ export function ExplainCard({ card, disabled, onContinue }: FeedCardProps) {
     </Card>
   );
 }
+
+export const ExplainCard = memo(ExplainCardComponent);

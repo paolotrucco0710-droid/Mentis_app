@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Button, Card, CardDescription, CardHeader, CardTitle } from "@/components/ui";
 import { SessionEventOutcome } from "@/domain/enums";
 import type { FeedCardProps } from "../card-utils";
 import { isErrorDetectionPayload } from "../card-utils";
 
-export function ErrorDetectionCard({ card, disabled, onContinue }: FeedCardProps) {
+export function ErrorDetectionCardComponent({ card, disabled, onContinue }: FeedCardProps) {
   const payload = isErrorDetectionPayload(card.payload) ? card.payload : null;
   const [revealed, setRevealed] = useState(false);
   const [foundError, setFoundError] = useState<boolean | null>(null);
@@ -76,3 +76,5 @@ export function ErrorDetectionCard({ card, disabled, onContinue }: FeedCardProps
     </Card>
   );
 }
+
+export const ErrorDetectionCard = memo(ErrorDetectionCardComponent);

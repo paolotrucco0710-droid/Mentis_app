@@ -82,6 +82,14 @@ export const env = {
     process.env.STORAGE_SIGNING_SECRET ??
     process.env.AUTH_JWT_SECRET ??
     "dev-only-change-in-production-mentis",
+  queryCacheTtlSeconds: parsePositiveInt(
+    process.env.QUERY_CACHE_TTL_SECONDS,
+    60
+  ),
+  serverQueryCacheTtlSeconds: parsePositiveInt(
+    process.env.SERVER_QUERY_CACHE_TTL_SECONDS,
+    30
+  ),
 } as const;
 
 export function getMaxUploadFileSizeBytes(): number {

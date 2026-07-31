@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import type { ChapterWithSource } from "@/course/types";
 import type { ChapterId } from "@/domain/ids";
 import { KnowledgeSourceProcessingStatus } from "@/domain/enums";
@@ -8,7 +8,7 @@ import { Badge, Button, Card, CardDescription, CardHeader, CardTitle, Dialog } f
 import { deleteChapter } from "@/lib/api";
 import { formatProcessingStatus } from "./course-utils";
 
-export function ChapterRow({
+function ChapterRowComponent({
   chapter,
   onDeleted,
 }: {
@@ -95,3 +95,5 @@ export function ChapterRow({
     </>
   );
 }
+
+export const ChapterRow = memo(ChapterRowComponent);
