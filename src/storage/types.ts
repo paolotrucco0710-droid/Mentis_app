@@ -1,4 +1,5 @@
 import type { CourseId, SubjectId, UserId } from "@/domain/ids";
+import type { Chapter } from "@/domain/entities/chapter";
 import type { Image, KnowledgeSource, Upload } from "@/domain/entities";
 
 export interface StoredFile {
@@ -38,4 +39,5 @@ export interface ChapterUploadResult {
   images: Image[];
   combinedHash: string;
   totalSizeBytes: number;
+  chapter: Chapter;
 }

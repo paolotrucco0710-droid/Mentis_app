@@ -8,6 +8,7 @@ export { Avatar } from "./avatar";
 export { ProgressBar } from "./progress-bar";
 export { Skeleton, Loader } from "./skeleton";
 export { EmptyState, PageHeader, Section } from "./section";
+export { Dialog } from "./dialog";
 export {
   NavIcon,
   HomeIcon,
