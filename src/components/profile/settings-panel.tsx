@@ -143,7 +143,7 @@ export function SettingsPanel() {
         <Card>
           <CardHeader>
             <CardTitle>Versione</CardTitle>
-            <CardDescription>Mentis MVP · Milestone 14</CardDescription>
+            <CardDescription>Mentis MVP · v1.0.0</CardDescription>
           </CardHeader>
         </Card>
       </Section>

@@ -46,7 +46,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AUTH_JWT_SECRET: test-secret-for-ci-only-mentis-32chars
+      AUTH_DEV_FALLBACK: "true"
       DEV_USER_ID: 00000000-0000-4000-8000-000000000001
+      DEV_SUBJECT_ID: 00000000-0000-4000-8000-000000000002
+      NEXT_PUBLIC_DEV_SUBJECT_ID: 00000000-0000-4000-8000-000000000002
       DATABASE_URL: postgresql://mentis:mentis@localhost:5432/mentis_test
     services:
       postgres:
@@ -71,4 +74,5 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run db:migrate
+      - run: npm run db:seed
       - run: npm run test:e2e

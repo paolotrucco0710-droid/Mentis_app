@@ -1,9 +1,11 @@
 import { PrismaClient } from "@prisma/client";
+import type { SubjectId, UserId } from "../src/domain/ids";
+import { seedMvpDemo } from "./seed-mvp-demo";
 
 const prisma = new PrismaClient();
 
-const DEV_USER_ID = "00000000-0000-4000-8000-000000000001";
-const DEV_SUBJECT_ID = "00000000-0000-4000-8000-000000000002";
+const DEV_USER_ID = "00000000-0000-4000-8000-000000000001" as UserId;
+const DEV_SUBJECT_ID = "00000000-0000-4000-8000-000000000002" as SubjectId;
 
 async function main() {
   await prisma.user.upsert({
@@ -38,6 +40,8 @@ async function main() {
       displayOrder: 0,
     },
   });
+
+  await seedMvpDemo(prisma, DEV_USER_ID, DEV_SUBJECT_ID);
 
   console.log("Seed completato.");
   console.log(`DEV_USER_ID=${DEV_USER_ID}`);
