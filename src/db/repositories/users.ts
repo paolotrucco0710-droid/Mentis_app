@@ -17,6 +17,20 @@ export interface CreateUserInput {
   accountStatus?: AccountStatus;
 }
 
+export interface UpdateUserInput {
+  firstName?: string;
+  lastName?: string;
+  language?: string;
+  timezone?: string;
+  schoolGrade?: string | null;
+  schoolYear?: string | null;
+  personalGoals?: string[];
+  preferences?: UserPreferences;
+  profileImageUrl?: string | null;
+  accountStatus?: AccountStatus;
+  deletedAt?: Date | null;
+}
+
 export async function findUserById(id: UserId): Promise<User | null> {
   const record = await prisma.user.findFirst({
     where: { id, deletedAt: null },
@@ -63,4 +77,37 @@ export async function updateUserPasswordHash(
     where: { id },
     data: { passwordHash },
   });
+}
+
+export async function updateUser(
+  id: UserId,
+  input: UpdateUserInput
+): Promise<User> {
+  const record = await prisma.user.update({
+    where: { id },
+    data: {
+      ...(input.firstName !== undefined ? { firstName: input.firstName } : {}),
+      ...(input.lastName !== undefined ? { lastName: input.lastName } : {}),
+      ...(input.language !== undefined ? { language: input.language } : {}),
+      ...(input.timezone !== undefined ? { timezone: input.timezone } : {}),
+      ...(input.schoolGrade !== undefined ? { schoolGrade: input.schoolGrade } : {}),
+      ...(input.schoolYear !== undefined ? { schoolYear: input.schoolYear } : {}),
+      ...(input.personalGoals !== undefined
+        ? { personalGoals: input.personalGoals as Prisma.InputJsonValue }
+        : {}),
+      ...(input.preferences !== undefined
+        ? {
+            preferences: input.preferences as unknown as Prisma.InputJsonValue,
+          }
+        : {}),
+      ...(input.profileImageUrl !== undefined
+        ? { profileImageUrl: input.profileImageUrl }
+        : {}),
+      ...(input.accountStatus !== undefined
+        ? { accountStatus: input.accountStatus }
+        : {}),
+      ...(input.deletedAt !== undefined ? { deletedAt: input.deletedAt } : {}),
+    },
+  });
+  return toUser(record);
 }

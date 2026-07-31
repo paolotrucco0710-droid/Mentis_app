@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { PublicUser } from "@/auth/types";
+import type { UserProfileView } from "@/profile/types";
 import { Avatar, Button } from "@/components/ui";
-import { ApiError, fetchCurrentUser, logout } from "@/lib/api";
+import { ApiError, fetchProfile, logout } from "@/lib/api";
 
 export function UserMenu() {
   const router = useRouter();
-  const [user, setUser] = useState<PublicUser | null>(null);
+  const [profile, setProfile] = useState<UserProfileView | null>(null);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -18,13 +18,13 @@ export function UserMenu() {
 
     void (async () => {
       try {
-        const result = await fetchCurrentUser();
+        const data = await fetchProfile();
         if (!cancelled) {
-          setUser(result.user);
+          setProfile(data);
         }
       } catch (err) {
         if (!cancelled && !(err instanceof ApiError && err.status === 401)) {
-          setUser(null);
+          setProfile(null);
         }
       } finally {
         if (!cancelled) {
@@ -56,7 +56,7 @@ export function UserMenu() {
     return <span className="hidden text-sm text-muted sm:inline">...</span>;
   }
 
-  if (!user) {
+  if (!profile) {
     return (
       <Link href="/login" className="text-sm font-medium text-primary">
         Accedi
@@ -64,7 +64,7 @@ export function UserMenu() {
     );
   }
 
-  const displayName = user.firstName || user.email;
+  const displayName = profile.firstName || profile.email;
 
   return (
     <div className="flex items-center gap-2 sm:gap-3">
@@ -73,7 +73,8 @@ export function UserMenu() {
       </span>
       <Link href="/settings" aria-label="Impostazioni account">
         <Avatar
-          name={`${user.firstName} ${user.lastName}`.trim() || user.email}
+          name={`${profile.firstName} ${profile.lastName}`.trim() || profile.email}
+          src={profile.profileImageUrl}
           className="h-9 w-9 text-xs"
         />
       </Link>
