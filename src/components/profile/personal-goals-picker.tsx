@@ -1,16 +1,22 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { PERSONAL_GOALS } from "@/components/profile/profile-utils";
-import { Button, Card, CardDescription, CardHeader, CardTitle, Chip } from "@/components/ui";
+import type { UserProfileView } from "@/profile/types";
+import { Button, Chip } from "@/components/ui";
 import { ApiError, updateProfile } from "@/lib/api";
+import { PERSONAL_GOALS } from "./profile-utils";
 
-export default function OnboardingPage() {
-  const router = useRouter();
-  const [selected, setSelected] = useState<string[]>([]);
+export function PersonalGoalsPicker({
+  profile,
+  onUpdated,
+}: {
+  profile: UserProfileView;
+  onUpdated: (profile: UserProfileView) => void;
+}) {
+  const [selected, setSelected] = useState<string[]>(profile.personalGoals);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   function toggleGoal(goal: string) {
     setSelected((current) =>
@@ -21,13 +27,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <Card className="shadow-md">
-      <CardHeader>
-        <CardTitle>Personalizza Mentis</CardTitle>
-        <CardDescription>
-          Scegli il tuo obiettivo principale. Potrai modificarlo in seguito.
-        </CardDescription>
-      </CardHeader>
+    <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         {PERSONAL_GOALS.map((goal) => (
           <button key={goal} type="button" onClick={() => toggleGoal(goal)}>
@@ -43,27 +43,25 @@ export default function OnboardingPage() {
           </button>
         ))}
       </div>
-      {error ? <p className="mt-4 text-sm text-danger">{error}</p> : null}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {message ? <p className="text-sm text-muted">{message}</p> : null}
       <Button
-        fullWidth
-        className="mt-6"
+        type="button"
         disabled={loading}
         onClick={() => {
           void (async () => {
             try {
               setLoading(true);
               setError(null);
-              await updateProfile({
-                personalGoals: selected,
-                preferences: { dailyGoalMinutes: 30 },
-              });
-              router.push("/upload");
-              router.refresh();
+              setMessage(null);
+              const updated = await updateProfile({ personalGoals: selected });
+              onUpdated(updated);
+              setMessage("Obiettivi aggiornati.");
             } catch (err) {
               setError(
                 err instanceof ApiError
                   ? err.message
-                  : "Impossibile salvare le preferenze."
+                  : "Impossibile salvare gli obiettivi."
               );
             } finally {
               setLoading(false);
@@ -71,8 +69,8 @@ export default function OnboardingPage() {
           })();
         }}
       >
-        {loading ? "Salvataggio..." : "Inizia"}
+        {loading ? "Salvataggio..." : "Salva obiettivi"}
       </Button>
-    </Card>
+    </div>
   );
 }

@@ -15,7 +15,7 @@ import {
   findUserCardState,
   upsertUserCardState,
 } from "@/db/repositories/user-card-states";
-import { findDailyStatistics } from "@/db/repositories/notifications";
+import { findDailyStatistics } from "@/db/repositories/daily-statistics";
 import { ProgressScopeType } from "@/domain/entities/progress";
 import { SessionEventOutcome, SessionEventType } from "@/domain/enums";
 import { UserAtomLearningState } from "@/domain/enums";

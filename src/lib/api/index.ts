@@ -36,4 +36,17 @@ export {
   fetchProcessingJob,
   fetchChapterByKnowledgeSource,
 } from "./course";
-export type { UploadChapterResult } from "./course";
+export {
+  fetchProfile,
+  updateProfile,
+  fetchProfileStatistics,
+  fetchDailyStatisticsHistory,
+  changePassword,
+  deleteAccount,
+} from "./profile";
+export type {
+  UserProfileView,
+  UserStatisticsView,
+  DailyStatisticsView,
+  UpdateProfileInput,
+} from "@/profile";

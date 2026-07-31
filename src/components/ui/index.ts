@@ -2,6 +2,7 @@ export { Button } from "./button";
 export { IconButton } from "./icon-button";
 export { Card, CardHeader, CardTitle, CardDescription } from "./card";
 export { Input } from "./input";
+export { Switch } from "./switch";
 export { TextArea } from "./textarea";
 export { Badge, Chip } from "./badge";
 export { Avatar } from "./avatar";
