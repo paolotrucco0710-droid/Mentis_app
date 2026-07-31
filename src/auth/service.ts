@@ -24,6 +24,10 @@ import {
 import { AccountStatus } from "@/domain/enums";
 import type { UserId } from "@/domain/ids";
 import { env } from "@/lib/env";
+import {
+  AnalyticsEvents,
+  trackAnalyticsEvent,
+} from "@/analytics";
 import { AuthError } from "./errors";
 import { toPublicUser } from "./mappers";
 import {
@@ -135,6 +139,13 @@ export async function registerUser(
 
   const tokens = await issueTokens(user.id, meta);
 
+  trackAnalyticsEvent({
+    userId: user.id,
+    name: AnalyticsEvents.AuthRegistered,
+    category: "auth",
+    source: "api",
+  });
+
   return {
     user: toPublicUser(user),
     tokens,
@@ -158,6 +169,13 @@ export async function loginUser(
 
   const valid = await verifyPassword(input.password, user.passwordHash);
   if (!valid) {
+    trackAnalyticsEvent({
+      userId: user.id,
+      name: AnalyticsEvents.AuthLoginFailed,
+      category: "auth",
+      source: "api",
+      properties: { reason: "invalid_password" },
+    });
     throw new AuthError(
       "Email o password non corretti.",
       "INVALID_CREDENTIALS",
@@ -166,6 +184,13 @@ export async function loginUser(
   }
 
   const tokens = await issueTokens(user.id, meta);
+
+  trackAnalyticsEvent({
+    userId: user.id,
+    name: AnalyticsEvents.AuthLoggedIn,
+    category: "auth",
+    source: "api",
+  });
 
   return {
     user: toPublicUser(user),
@@ -216,8 +241,16 @@ export async function refreshAuthTokens(
   };
 }
 
-export async function logoutSession(sessionId: string): Promise<void> {
+export async function logoutSession(sessionId: string, userId?: UserId): Promise<void> {
   await revokeAuthSession(sessionId);
+  if (userId) {
+    trackAnalyticsEvent({
+      userId,
+      name: AnalyticsEvents.AuthLoggedOut,
+      category: "auth",
+      source: "api",
+    });
+  }
 }
 
 export async function logoutAllSessions(userId: UserId): Promise<void> {

@@ -34,3 +34,4 @@ export type {
 export type { DailyStatistics } from "./daily-statistics";
 export type { Achievement, UserAchievement } from "./achievement";
 export type { Notification } from "./notification";
+export type { AnalyticsEvent } from "./analytics-event";

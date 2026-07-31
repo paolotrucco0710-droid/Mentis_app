@@ -2,29 +2,36 @@
 
 App di apprendimento attivo per studenti delle superiori.
 
-## Milestone 17 — Performance Optimization
+## Milestone 18 — Analytics
 
-Ottimizzazioni frontend e backend per un'esperienza fluida anche con grandi quantità di contenuti.
+Sistema di analytics osservazionale: ogni azione significativa è misurabile senza influenzare il motore cognitivo.
 
-### Ottimizzazioni
+### Comprende
 
-| Tecnica | Descrizione |
-| ------- | ----------- |
-| Query caching | Cache client-side con deduplicazione richieste per libreria, ricerca, profilo e URL immagini |
-| Server cache | Cache in-memory su API libreria e ricerca con TTL configurabile |
-| Code splitting | `next/dynamic` su pagine pesanti (feed, profilo, libreria, ricerca, upload, elaborazione) |
-| Lazy loading card | Ogni tipo di card del feed caricato on-demand |
-| Feed prefetch | Prefetch della prossima card mentre l'utente studia quella corrente |
-| Virtualizzazione | Liste virtualizzate per risultati ricerca (capitoli e concetti oltre 20 elementi) |
-| Memoizzazione | `React.memo` su card feed, renderer, `SubjectCard` e `ChapterRow` |
-| Immagini ottimizzate | `next/image` con placeholder e supporto URL firmati (S3, locale) |
+| Area | Descrizione |
+| ---- | ----------- |
+| Eventi | Log append-only `analytics_events` con categorie auth, upload, AI, studio, apprendimento, feature, funnel, errori |
+| Funnel | Onboarding da registrazione a prima elaborazione AI |
+| Errori | Tracciamento errori API e pipeline |
+| Tempo studio | Aggregati da `daily_statistics` e sessioni |
+| Utilizzo AI | Job, token, costi e cache hit rate |
+| Metriche apprendimento | Mastery, accuratezza, review, sessioni completate |
 
-### Env performance
+### API
 
-| Variabile | Default | Descrizione |
-| --------- | ------- | ----------- |
-| `QUERY_CACHE_TTL_SECONDS` | 60 | TTL cache query client (secondi) |
-| `SERVER_QUERY_CACHE_TTL_SECONDS` | 30 | TTL cache server libreria/ricerca (secondi) |
+- `POST /api/v1/analytics/events` — ingest eventi client (es. page view)
+- `GET /api/v1/analytics/summary?view=overview` — panoramica
+- `GET /api/v1/analytics/summary?view=funnel` — funnel onboarding
+- `GET /api/v1/analytics/summary?view=learning` — metriche apprendimento
+- `GET /api/v1/analytics/summary?view=study-time` — tempo di studio
+- `GET /api/v1/analytics/summary?view=ai-usage` — utilizzo AI
+- `GET /api/v1/analytics/summary?view=errors` — errori recenti
+- `GET /api/v1/analytics/summary?view=features&days=30` — utilizzo funzionalità
+
+### UI
+
+- Pagina `/analytics` con dashboard completa
+- Tracker automatico page view nel layout principale
 
 ### Script
 
@@ -32,4 +39,4 @@ Ottimizzazioni frontend e backend per un'esperienza fluida anche con grandi quan
 | ------- | ----------- |
 | `npm run dev` | Server di sviluppo |
 | `npm run build` | Build di produzione |
-| `npm run lint` | ESLint |
+| `npm run db:migrate` | Applica migration (include `analytics_events`) |

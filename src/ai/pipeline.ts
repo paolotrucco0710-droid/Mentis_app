@@ -1,3 +1,9 @@
+import {
+  AnalyticsEvents,
+  trackAnalyticsEvent,
+  trackFunnelMilestoneAsync,
+  trackPipelineError,
+} from "@/analytics";
 import { prisma } from "@/db/client";
 import {
   createAIJob,
@@ -138,6 +144,14 @@ export async function processKnowledgeSource(
     parserVersion: env.knowledgeJsonVersion,
   });
 
+  trackAnalyticsEvent({
+    userId,
+    name: AnalyticsEvents.AIJobQueued,
+    category: "ai",
+    source: "pipeline",
+    properties: { jobId: job.id, knowledgeSourceId },
+  });
+
   const tracker = new UsageTracker();
 
   try {
@@ -202,6 +216,29 @@ export async function processKnowledgeSource(
 
     const usage = tracker.snapshot();
 
+    trackAnalyticsEvent({
+      userId,
+      name: AnalyticsEvents.AIJobCompleted,
+      category: "ai",
+      source: "pipeline",
+      properties: {
+        jobId: job.id,
+        knowledgeSourceId,
+        atomCount,
+        cardCount,
+        estimatedCostUsd: usage.estimatedCostUsd,
+        cacheHits: usage.cacheHits,
+        cacheMisses: usage.cacheMisses,
+      },
+    });
+    trackFunnelMilestoneAsync({
+      userId,
+      name: AnalyticsEvents.FunnelFirstAICompleted,
+      category: "funnel",
+      source: "pipeline",
+      properties: { jobId: job.id },
+    });
+
     return {
       jobId: job.id,
       knowledgeSourceId,
@@ -224,6 +261,20 @@ export async function processKnowledgeSource(
 
     await persistJobUsage(job.id, tracker);
     await updateAIJobStatus(job.id, AIJobStatus.Failed, null, message);
+
+    trackPipelineError({
+      userId,
+      pipeline: "ai",
+      code: error instanceof AIProcessingError ? error.code : "PROCESSING_FAILED",
+      message,
+    });
+    trackAnalyticsEvent({
+      userId,
+      name: AnalyticsEvents.AIJobFailed,
+      category: "ai",
+      source: "pipeline",
+      properties: { jobId: job.id, knowledgeSourceId, message },
+    });
 
     throw error instanceof AIProcessingError
       ? error

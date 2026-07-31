@@ -1,3 +1,8 @@
+import {
+  AnalyticsEvents,
+  trackAnalyticsEvent,
+  trackFunnelMilestoneAsync,
+} from "@/analytics";
 import { findAtomById, findAtomsBySubjectId } from "@/db/repositories/atoms";
 import { findCardById } from "@/db/repositories/cards";
 import { upsertDailyStatistics } from "@/db/repositories/daily-statistics";
@@ -217,6 +222,28 @@ export async function recordCardResponse(
     atomId: input.atomId,
     atomState,
     now,
+  });
+
+  trackAnalyticsEvent({
+    userId: input.userId,
+    name: AnalyticsEvents.StudyCardAnswered,
+    category: "learning",
+    source: "engine",
+    properties: {
+      sessionId: input.sessionId,
+      cardId: input.cardId,
+      atomId: input.atomId,
+      outcome: input.outcome,
+      isCorrect: input.isCorrect,
+      masteryDelta: atomState.mastery - masteryBefore,
+    },
+  });
+  trackFunnelMilestoneAsync({
+    userId: input.userId,
+    name: AnalyticsEvents.FunnelFirstCardAnswered,
+    category: "funnel",
+    source: "engine",
+    properties: { cardId: input.cardId },
   });
 
   const subjectProgress = await getProgress({
