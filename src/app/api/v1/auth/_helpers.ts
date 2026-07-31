@@ -1,17 +1,8 @@
-import { NextResponse } from "next/server";
-import { AuthError } from "@/auth";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 
-export function handleAuthRouteError(error: unknown) {
-  if (error instanceof AuthError) {
-    return NextResponse.json(
-      { error: error.message, code: error.code },
-      { status: error.statusCode }
-    );
-  }
-
-  console.error("Auth route failed:", error);
-  return NextResponse.json(
-    { error: "Errore interno.", code: "INTERNAL_ERROR" },
-    { status: 500 }
-  );
+export function handleAuthRouteError(
+  error: unknown,
+  context: { route: string; request?: Request } = { route: "/api/v1/auth" }
+) {
+  return handleApiRouteError(error, context);
 }

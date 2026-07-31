@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import { AnalyticsEvents, trackAnalyticsEvent } from "@/analytics";
 import { resolveDevUserId } from "@/engine/dev";
-import { FeedEngineError } from "@/engine/errors";
-import { CourseManagementError, getLibraryOverview } from "@/course";
+import { getLibraryOverview } from "@/course";
 import { withServerCache } from "@/lib/cache/memory-cache";
 import { env } from "@/lib/env";
 
@@ -24,17 +24,6 @@ export async function GET(request: Request) {
     });
     return NextResponse.json({ overview }, { status: 200 });
   } catch (error) {
-    if (error instanceof CourseManagementError || error instanceof FeedEngineError) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.statusCode }
-      );
-    }
-
-    console.error("Library API failed:", error);
-    return NextResponse.json(
-      { error: "Errore interno.", code: "INTERNAL_ERROR" },
-      { status: 500 }
-    );
+    return handleApiRouteError(error, { route: "/api/v1/library", request });
   }
 }

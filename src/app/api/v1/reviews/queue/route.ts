@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import type { SubjectId } from "@/domain/ids";
 import { resolveDevSubjectId, resolveDevUserId } from "@/engine/dev";
-import { FeedEngineError } from "@/engine/errors";
-import { getReviewQueue, ReviewEngineError } from "@/review";
+import { getReviewQueue } from "@/review";
 
 export const runtime = "nodejs";
 
@@ -19,20 +19,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json(queue, { status: 200 });
   } catch (error) {
-    if (error instanceof ReviewEngineError || error instanceof FeedEngineError) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.statusCode }
-      );
-    }
-
-    console.error("Review queue failed:", error);
-    return NextResponse.json(
-      {
-        error: "Errore interno durante il recupero della coda revisioni.",
-        code: "INTERNAL_ERROR",
-      },
-      { status: 500 }
-    );
+    return handleApiRouteError(error, { route: "/api/v1/reviews/queue", request });
   }
 }

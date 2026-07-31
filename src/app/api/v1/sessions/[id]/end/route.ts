@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import type { StudySessionId } from "@/domain/ids";
 import { resolveDevUserId } from "@/engine/dev";
-import { FeedEngineError } from "@/engine/errors";
-import { endSession, SessionEngineError } from "@/session";
+import { endSession } from "@/session";
 
 export const runtime = "nodejs";
 
@@ -28,20 +28,6 @@ export async function POST(request: Request, context: RouteContext) {
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    if (error instanceof SessionEngineError || error instanceof FeedEngineError) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.statusCode }
-      );
-    }
-
-    console.error("Session end failed:", error);
-    return NextResponse.json(
-      {
-        error: "Errore interno durante la chiusura della sessione.",
-        code: "INTERNAL_ERROR",
-      },
-      { status: 500 }
-    );
+    return handleApiRouteError(error, { route: "/api/v1/sessions/[id]/end", request });
   }
 }

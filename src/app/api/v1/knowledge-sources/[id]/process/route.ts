@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import type { KnowledgeSourceId } from "@/domain/ids";
-import { AIProcessingError, processKnowledgeSource } from "@/ai";
+import { processKnowledgeSource } from "@/ai";
 import { resolveDevUserId } from "@/upload";
 
 export const runtime = "nodejs";
@@ -21,20 +22,6 @@ export async function POST(request: Request, context: RouteContext) {
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    if (error instanceof AIProcessingError) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.statusCode }
-      );
-    }
-
-    console.error("AI processing failed:", error);
-    return NextResponse.json(
-      {
-        error: "Errore interno durante l'elaborazione AI.",
-        code: "INTERNAL_ERROR",
-      },
-      { status: 500 }
-    );
+    return handleApiRouteError(error, { route: "/api/v1/knowledge-sources/[id]/process", request });
   }
 }

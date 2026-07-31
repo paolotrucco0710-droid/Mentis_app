@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import type { AIJobId } from "@/domain/ids";
-import { AIProcessingError, getProcessingJob } from "@/ai";
+import { getProcessingJob } from "@/ai";
 import { resolveDevUserId } from "@/upload";
 
 export const runtime = "nodejs";
@@ -24,16 +25,6 @@ export async function GET(request: Request, context: RouteContext) {
 
     return NextResponse.json({ job });
   } catch (error) {
-    if (error instanceof AIProcessingError) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.statusCode }
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Errore interno.", code: "INTERNAL_ERROR" },
-      { status: 500 }
-    );
+    return handleApiRouteError(error, { route: "/api/v1/ai-jobs/[id]", request });
   }
 }

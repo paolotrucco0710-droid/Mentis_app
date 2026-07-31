@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import type { CourseId, SubjectId } from "@/domain/ids";
 import { resolveDevUserId } from "@/engine/dev";
-import { FeedEngineError } from "@/engine/errors";
-import { CourseManagementError } from "@/course";
 import { assertSubjectOwned } from "@/course/helpers";
 import { findChaptersByCourseId, findChaptersBySubjectId } from "@/db/repositories/chapters";
 import { countAtomsByKnowledgeSourceId } from "@/db/repositories/atoms";
@@ -63,21 +62,7 @@ export async function GET(request: Request) {
       { status: 200 }
     );
   } catch (error) {
-    return handleError(error);
+    return handleApiRouteError(error, { route: "/api/v1/chapters", request });
   }
 }
 
-function handleError(error: unknown) {
-  if (error instanceof CourseManagementError || error instanceof FeedEngineError) {
-    return NextResponse.json(
-      { error: error.message, code: error.code },
-      { status: error.statusCode }
-    );
-  }
-
-  console.error("Chapters API failed:", error);
-  return NextResponse.json(
-    { error: "Errore interno.", code: "INTERNAL_ERROR" },
-    { status: 500 }
-  );
-}

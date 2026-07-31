@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import { resolveDevUserId } from "@/engine/dev";
-import { FeedEngineError } from "@/engine/errors";
 import {
-  CourseManagementError,
   createSubjectForUser,
-  listSubjectSummaries,
+  listSubjectSummaries
 } from "@/course";
 
 export const runtime = "nodejs";
@@ -15,7 +14,7 @@ export async function GET(request: Request) {
     const subjects = await listSubjectSummaries(userId);
     return NextResponse.json({ subjects }, { status: 200 });
   } catch (error) {
-    return handleError(error);
+    return handleApiRouteError(error, { route: "/api/v1/subjects", request });
   }
 }
 
@@ -43,21 +42,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ subject }, { status: 201 });
   } catch (error) {
-    return handleError(error);
+    return handleApiRouteError(error, { route: "/api/v1/subjects", request });
   }
 }
 
-function handleError(error: unknown) {
-  if (error instanceof CourseManagementError || error instanceof FeedEngineError) {
-    return NextResponse.json(
-      { error: error.message, code: error.code },
-      { status: error.statusCode }
-    );
-  }
-
-  console.error("Subjects API failed:", error);
-  return NextResponse.json(
-    { error: "Errore interno.", code: "INTERNAL_ERROR" },
-    { status: 500 }
-  );
-}

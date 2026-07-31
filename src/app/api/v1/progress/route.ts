@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import { ProgressScopeType } from "@/domain/entities/progress";
 import type { ChapterId, CourseId, SubjectId } from "@/domain/ids";
 import { resolveDevSubjectId, resolveDevUserId } from "@/engine/dev";
-import { FeedEngineError } from "@/engine/errors";
-import { getProgress, ProgressEngineError } from "@/progress";
+import { getProgress } from "@/progress";
 
 export const runtime = "nodejs";
 
@@ -49,20 +49,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ progress }, { status: 200 });
   } catch (error) {
-    if (error instanceof ProgressEngineError || error instanceof FeedEngineError) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.statusCode }
-      );
-    }
-
-    console.error("Progress query failed:", error);
-    return NextResponse.json(
-      {
-        error: "Errore interno durante il recupero del progresso.",
-        code: "INTERNAL_ERROR",
-      },
-      { status: 500 }
-    );
+    return handleApiRouteError(error, { route: "/api/v1/progress", request });
   }
 }

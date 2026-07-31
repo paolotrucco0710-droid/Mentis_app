@@ -10,7 +10,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
-      include: ["src/engine/**", "src/progress/**", "src/ai/**", "src/review/**"],
+      include: [
+        "src/engine/**",
+        "src/progress/**",
+        "src/ai/**",
+        "src/review/**",
+        "src/lib/**",
+      ],
     },
   },
 });

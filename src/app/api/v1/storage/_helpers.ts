@@ -1,18 +1,8 @@
-import { NextResponse } from "next/server";
-import { FeedEngineError } from "@/engine/errors";
-import { StorageError } from "@/storage/errors";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 
-export function handleStorageRouteError(error: unknown) {
-  if (error instanceof StorageError || error instanceof FeedEngineError) {
-    return NextResponse.json(
-      { error: error.message, code: error.code },
-      { status: error.statusCode }
-    );
-  }
-
-  console.error("Storage API failed:", error);
-  return NextResponse.json(
-    { error: "Errore interno.", code: "INTERNAL_ERROR" },
-    { status: 500 }
-  );
+export function handleStorageRouteError(
+  error: unknown,
+  context: { route: string; request?: Request } = { route: "/api/v1/storage" }
+) {
+  return handleApiRouteError(error, context);
 }

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import type { SubjectId } from "@/domain/ids";
 import { scheduleKnowledgeSourceProcessing } from "@/ai";
 import { env } from "@/lib/env";
 import {
-  UploadPipelineError,
   formDataToUploadFiles,
   parseCourseId,
   processChapterUpload,
@@ -62,17 +62,6 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
-    if (error instanceof UploadPipelineError) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.statusCode }
-      );
-    }
-
-    console.error("Upload failed:", error);
-    return NextResponse.json(
-      { error: "Errore interno durante l'upload.", code: "INTERNAL_ERROR" },
-      { status: 500 }
-    );
+    return handleApiRouteError(error, { route: "/api/v1/upload", request });
   }
 }
