@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import type { SubjectId } from "@/domain/ids";
 import { resolveDevUserId } from "@/engine/dev";
-import { FeedEngineError } from "@/engine/errors";
 import {
-  CourseManagementError,
   deleteSubjectForUser,
   getSubjectDetail,
-  updateSubjectForUser,
+  updateSubjectForUser
 } from "@/course";
 
 export const runtime = "nodejs";
@@ -22,7 +21,7 @@ export async function GET(request: Request, context: RouteContext) {
     const detail = await getSubjectDetail(userId, id as SubjectId);
     return NextResponse.json(detail, { status: 200 });
   } catch (error) {
-    return handleError(error);
+    return handleApiRouteError(error, { route: "/api/v1/subjects/[id]", request });
   }
 }
 
@@ -39,7 +38,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const subject = await updateSubjectForUser(userId, id as SubjectId, body);
     return NextResponse.json({ subject }, { status: 200 });
   } catch (error) {
-    return handleError(error);
+    return handleApiRouteError(error, { route: "/api/v1/subjects/[id]", request });
   }
 }
 
@@ -50,21 +49,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     await deleteSubjectForUser(userId, id as SubjectId);
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error) {
-    return handleError(error);
+    return handleApiRouteError(error, { route: "/api/v1/subjects/[id]", request });
   }
 }
 
-function handleError(error: unknown) {
-  if (error instanceof CourseManagementError || error instanceof FeedEngineError) {
-    return NextResponse.json(
-      { error: error.message, code: error.code },
-      { status: error.statusCode }
-    );
-  }
-
-  console.error("Subject API failed:", error);
-  return NextResponse.json(
-    { error: "Errore interno.", code: "INTERNAL_ERROR" },
-    { status: 500 }
-  );
-}

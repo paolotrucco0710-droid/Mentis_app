@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import { SessionEventOutcome } from "@/domain/enums";
 import type {
   AtomId,
@@ -6,8 +7,7 @@ import type {
   StudySessionId,
 } from "@/domain/ids";
 import { resolveDevUserId } from "@/engine/dev";
-import { ProgressEngineError, recordCardResponse } from "@/progress";
-import { SessionEngineError } from "@/session";
+import { recordCardResponse } from "@/progress";
 
 export const runtime = "nodejs";
 
@@ -63,23 +63,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    if (
-      error instanceof ProgressEngineError ||
-      error instanceof SessionEngineError
-    ) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.statusCode }
-      );
-    }
-
-    console.error("Progress response failed:", error);
-    return NextResponse.json(
-      {
-        error: "Errore interno durante l'aggiornamento del progresso.",
-        code: "INTERNAL_ERROR",
-      },
-      { status: 500 }
-    );
+    return handleApiRouteError(error, { route: "/api/v1/progress/responses", request });
   }
 }

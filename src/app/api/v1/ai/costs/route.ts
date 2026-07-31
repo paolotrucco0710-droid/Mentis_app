@@ -1,24 +1,10 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import { getUserAICostSummary, listRecentAIJobCosts } from "@/ai";
 import { resolveDevUserId } from "@/engine/dev";
-import { FeedEngineError } from "@/engine/errors";
 
 export const runtime = "nodejs";
 
-function handleError(error: unknown) {
-  if (error instanceof FeedEngineError) {
-    return NextResponse.json(
-      { error: error.message, code: error.code },
-      { status: error.statusCode }
-    );
-  }
-
-  console.error("AI costs API failed:", error);
-  return NextResponse.json(
-    { error: "Errore interno.", code: "INTERNAL_ERROR" },
-    { status: 500 }
-  );
-}
 
 export async function GET(request: Request) {
   try {
@@ -34,6 +20,6 @@ export async function GET(request: Request) {
     const summary = await getUserAICostSummary(userId);
     return NextResponse.json({ summary }, { status: 200 });
   } catch (error) {
-    return handleError(error);
+    return handleApiRouteError(error, { route: "/api/v1/ai/costs", request });
   }
 }

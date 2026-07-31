@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import type { StudySessionId } from "@/domain/ids";
 import {
-  FeedEngineError,
   getNextFeedItem,
   resolveDevSubjectId,
   resolveDevUserId,
 } from "@/engine";
-import { SessionEngineError } from "@/session";
 
 export const runtime = "nodejs";
 
@@ -35,20 +34,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json(feed, { status: 200 });
   } catch (error) {
-    if (error instanceof FeedEngineError || error instanceof SessionEngineError) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.statusCode }
-      );
-    }
-
-    console.error("Feed next item failed:", error);
-    return NextResponse.json(
-      {
-        error: "Errore interno durante la generazione del feed.",
-        code: "INTERNAL_ERROR",
-      },
-      { status: 500 }
-    );
+    return handleApiRouteError(error, { route: "/api/v1/feed/next", request });
   }
 }

@@ -1,18 +1,8 @@
-import { NextResponse } from "next/server";
-import { AnalyticsError } from "@/analytics";
-import { FeedEngineError } from "@/engine/errors";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 
-export function handleAnalyticsRouteError(error: unknown) {
-  if (error instanceof AnalyticsError || error instanceof FeedEngineError) {
-    return NextResponse.json(
-      { error: error.message, code: error.code },
-      { status: error.statusCode }
-    );
-  }
-
-  console.error("Analytics API failed:", error);
-  return NextResponse.json(
-    { error: "Errore interno.", code: "INTERNAL_ERROR" },
-    { status: 500 }
-  );
+export function handleAnalyticsRouteError(
+  error: unknown,
+  context: { route: string; request?: Request } = { route: "/api/v1/analytics" }
+) {
+  return handleApiRouteError(error, context);
 }

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import type { ChapterId } from "@/domain/ids";
 import { resolveDevUserId } from "@/engine/dev";
-import { FeedEngineError } from "@/engine/errors";
-import { CourseManagementError, deleteChapterForUser } from "@/course";
+import { deleteChapterForUser } from "@/course";
 
 export const runtime = "nodejs";
 
@@ -17,21 +17,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     await deleteChapterForUser(userId, id as ChapterId);
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error) {
-    return handleError(error);
+    return handleApiRouteError(error, { route: "/api/v1/chapters/[id]", request });
   }
 }
 
-function handleError(error: unknown) {
-  if (error instanceof CourseManagementError || error instanceof FeedEngineError) {
-    return NextResponse.json(
-      { error: error.message, code: error.code },
-      { status: error.statusCode }
-    );
-  }
-
-  console.error("Chapter API failed:", error);
-  return NextResponse.json(
-    { error: "Errore interno.", code: "INTERNAL_ERROR" },
-    { status: 500 }
-  );
-}

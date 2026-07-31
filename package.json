@@ -21,7 +21,11 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "storage:manifest": "npx tsx scripts/storage-backup-manifest.ts",
-    "storage:migrate-to-s3": "npx tsx scripts/migrate-local-to-s3.ts"
+    "storage:migrate-to-s3": "npx tsx scripts/migrate-local-to-s3.ts",
+    "backup:db": "bash scripts/backup/db-dump.sh",
+    "backup:storage": "bash scripts/backup/storage-sync.sh",
+    "backup:verify": "npx tsx scripts/backup/verify-backup.ts",
+    "start:production": "bash scripts/start-production.sh"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import type { SubjectId } from "@/domain/ids";
 import { resolveDevUserId } from "@/engine/dev";
-import { FeedEngineError } from "@/engine/errors";
 import {
-  CourseManagementError,
-  listKnowledgeSourcesForSubject,
+  listKnowledgeSourcesForSubject
 } from "@/course";
 
 export const runtime = "nodejs";
@@ -29,21 +28,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ knowledgeSources }, { status: 200 });
   } catch (error) {
-    return handleError(error);
+    return handleApiRouteError(error, { route: "/api/v1/knowledge-sources", request });
   }
 }
 
-function handleError(error: unknown) {
-  if (error instanceof CourseManagementError || error instanceof FeedEngineError) {
-    return NextResponse.json(
-      { error: error.message, code: error.code },
-      { status: error.statusCode }
-    );
-  }
-
-  console.error("Knowledge sources API failed:", error);
-  return NextResponse.json(
-    { error: "Errore interno.", code: "INTERNAL_ERROR" },
-    { status: 500 }
-  );
-}

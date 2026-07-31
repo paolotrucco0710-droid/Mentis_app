@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import type { StudySessionId } from "@/domain/ids";
 import { resolveDevUserId } from "@/engine/dev";
-import { FeedEngineError } from "@/engine/errors";
-import { getSessionDetail, SessionEngineError } from "@/session";
+import { getSessionDetail } from "@/session";
 
 export const runtime = "nodejs";
 
@@ -18,20 +18,6 @@ export async function GET(request: Request, context: RouteContext) {
 
     return NextResponse.json(detail, { status: 200 });
   } catch (error) {
-    if (error instanceof SessionEngineError || error instanceof FeedEngineError) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.statusCode }
-      );
-    }
-
-    console.error("Session fetch failed:", error);
-    return NextResponse.json(
-      {
-        error: "Errore interno durante il recupero della sessione.",
-        code: "INTERNAL_ERROR",
-      },
-      { status: 500 }
-    );
+    return handleApiRouteError(error, { route: "/api/v1/sessions/[id]", request });
   }
 }

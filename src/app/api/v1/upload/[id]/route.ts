@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import type { UploadId } from "@/domain/ids";
 import {
-  UploadPipelineError,
   getUploadResult,
   resolveDevUserId,
 } from "@/upload";
@@ -30,16 +30,6 @@ export async function GET(request: Request, context: RouteContext) {
       knowledgeSource: result.knowledgeSource,
     });
   } catch (error) {
-    if (error instanceof UploadPipelineError) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.statusCode }
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Errore interno.", code: "INTERNAL_ERROR" },
-      { status: 500 }
-    );
+    return handleApiRouteError(error, { route: "/api/v1/upload/[id]", request });
   }
 }

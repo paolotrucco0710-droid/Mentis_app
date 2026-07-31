@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import { ReviewOutcome } from "@/domain/enums";
 import type { ReviewId } from "@/domain/ids";
 import { resolveDevUserId } from "@/engine/dev";
-import { FeedEngineError } from "@/engine/errors";
-import { completeReviewForUser, ReviewEngineError } from "@/review";
+import { completeReviewForUser } from "@/review";
 
 export const runtime = "nodejs";
 
@@ -37,20 +37,6 @@ export async function POST(request: Request, context: RouteContext) {
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    if (error instanceof ReviewEngineError || error instanceof FeedEngineError) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.statusCode }
-      );
-    }
-
-    console.error("Review completion failed:", error);
-    return NextResponse.json(
-      {
-        error: "Errore interno durante il completamento della revisione.",
-        code: "INTERNAL_ERROR",
-      },
-      { status: 500 }
-    );
+    return handleApiRouteError(error, { route: "/api/v1/reviews/[id]/complete", request });
   }
 }

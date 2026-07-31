@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
+import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import {
-  FeedEngineError,
   createFeedSession,
   resolveDevSubjectId,
   resolveDevUserId,
 } from "@/engine";
-import { SessionEngineError } from "@/session";
 
 export const runtime = "nodejs";
 
@@ -20,20 +19,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ session }, { status: 201 });
   } catch (error) {
-    if (error instanceof FeedEngineError || error instanceof SessionEngineError) {
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.statusCode }
-      );
-    }
-
-    console.error("Feed session creation failed:", error);
-    return NextResponse.json(
-      {
-        error: "Errore interno durante la creazione della sessione.",
-        code: "INTERNAL_ERROR",
-      },
-      { status: 500 }
-    );
+    return handleApiRouteError(error, { route: "/api/v1/feed/sessions", request });
   }
 }
