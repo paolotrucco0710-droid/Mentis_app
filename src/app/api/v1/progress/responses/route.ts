@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { handleApiRouteError } from "@/lib/api/handle-route-error";
+import { parseJsonBody } from "@/lib/api/parse-json-body";
 import { SessionEventOutcome } from "@/domain/enums";
 import type {
   AtomId,
@@ -16,7 +17,7 @@ const VALID_OUTCOMES = new Set<string>(Object.values(SessionEventOutcome));
 export async function POST(request: Request) {
   try {
     const userId = await resolveDevUserId(request);
-    const body = (await request.json()) as {
+    const parsedBody = await parseJsonBody<{
       sessionId?: string;
       cardId?: string;
       atomId?: string;
@@ -26,7 +27,13 @@ export async function POST(request: Request) {
       durationMs?: number;
       declaredConfidence?: number;
       feedPosition?: number;
-    };
+    }>(request);
+
+    if (!parsedBody.ok) {
+      return parsedBody.response;
+    }
+
+    const body = parsedBody.data;
 
     if (!body.sessionId || !body.cardId || !body.atomId || !body.outcome) {
       return NextResponse.json(

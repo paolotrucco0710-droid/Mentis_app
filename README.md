@@ -2,6 +2,48 @@
 
 App di apprendimento attivo per studenti delle superiori.
 
+**Versione MVP: 1.0.0**
+
+## Milestone 21 — MVP Release
+
+L'MVP implementa il ciclo fondamentale:
+
+```text
+Upload → Elaborazione AI → Costruzione conoscenza → Studio → Valutazione → Progresso → Revisione
+```
+
+### Criteri di completamento
+
+| Criterio | Stato |
+| -------- | ----- |
+| Registrazione e autenticazione | Implementato |
+| Creazione materia e capitolo | Implementato |
+| Upload immagini/PDF | Implementato |
+| Pipeline AI → atomi e card MVP | Implementato (7 tipologie feed) |
+| Feed Engine personalizzato | Implementato |
+| Sessione di studio completabile | Implementato |
+| Progress Engine (mastery) | Implementato |
+| Review Engine (revisioni) | Implementato |
+| Persistenza DB + storage | Implementato |
+| Test automatici | `npm run test:all` |
+
+### Verifica MVP
+
+```bash
+npm run db:migrate
+npm run db:seed
+npm run test:all
+```
+
+- **Acceptance test:** `tests/acceptance/m21-mvp-cycle.test.ts` (richiede `DATABASE_URL`)
+- **E2E studio:** `e2e/mvp-cycle.spec.ts` (usa seed demo + `AUTH_DEV_FALLBACK`)
+- **Checklist release:** `docs/M21_RELEASE_CHECKLIST.md`
+- **Changelog:** `CHANGELOG.md`
+
+### Card generate dalla pipeline AI
+
+Learn, Quiz, Blurting, Feynman, Vero/Falso, Trova l'errore, Immagine (se presente un'immagine nel capitolo).
+
 ## Milestone 20 — Production Hardening
 
 Infrastruttura operativa per utenti reali: logging strutturato, gestione errori centralizzata, sicurezza HTTP, rate limiting, health checks, backup/recovery e deploy con migrazioni automatiche.

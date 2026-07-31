@@ -21,5 +21,19 @@ export default defineConfig({
     url: "http://127.0.0.1:3000/login",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    env: {
+      AUTH_DEV_FALLBACK: process.env.AUTH_DEV_FALLBACK ?? "false",
+      DEV_USER_ID: process.env.DEV_USER_ID ?? "00000000-0000-4000-8000-000000000001",
+      DEV_SUBJECT_ID:
+        process.env.DEV_SUBJECT_ID ?? "00000000-0000-4000-8000-000000000002",
+      NEXT_PUBLIC_DEV_SUBJECT_ID:
+        process.env.NEXT_PUBLIC_DEV_SUBJECT_ID ??
+        "00000000-0000-4000-8000-000000000002",
+      DATABASE_URL:
+        process.env.DATABASE_URL ??
+        "postgresql://mentis:mentis@localhost:5432/mentis_test",
+      AUTH_JWT_SECRET:
+        process.env.AUTH_JWT_SECRET ?? "test-secret-for-ci-only-mentis-32chars",
+    },
   },
 });
