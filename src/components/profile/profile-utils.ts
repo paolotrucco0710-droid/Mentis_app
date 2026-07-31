@@ -29,3 +29,11 @@ export function formatStudyMinutes(ms: number): string {
 export function formatPremiumPlan(plan: string): string {
   return plan === "premium" ? "Mentis Premium" : "Mentis Free";
 }
+
+export function isStorageKey(value: string): boolean {
+  return (
+    !value.startsWith("http://") &&
+    !value.startsWith("https://") &&
+    !value.startsWith("data:")
+  );
+}

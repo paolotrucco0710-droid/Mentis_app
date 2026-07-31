@@ -6,6 +6,7 @@ export {
   getUserProfile,
   getUserStatistics,
   updateUserProfile,
+  uploadUserAvatar,
 } from "./service";
 export type {
   DailyStatisticsView,

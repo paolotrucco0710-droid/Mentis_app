@@ -1,4 +1,4 @@
-import type { KnowledgeSourceId, UploadId, UserId } from "@/domain/ids";
+import type { ImageId, KnowledgeSourceId, UploadId, UserId } from "@/domain/ids";
 import type { Image, Upload } from "@/domain/entities";
 import type { UploadStatus } from "@/domain/enums";
 import { prisma } from "../client";
@@ -55,6 +55,13 @@ export interface CreateImageInput {
   height?: number | null;
   pageNumber?: number | null;
   caption?: string | null;
+}
+
+export async function findImageById(id: ImageId): Promise<Image | null> {
+  const record = await prisma.image.findFirst({
+    where: { id, deletedAt: null },
+  });
+  return record ? toImage(record) : null;
 }
 
 export async function findImagesByKnowledgeSourceId(

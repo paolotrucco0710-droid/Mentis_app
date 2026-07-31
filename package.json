@@ -14,12 +14,16 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "storage:manifest": "npx tsx scripts/storage-backup-manifest.ts",
+    "storage:migrate-to-s3": "npx tsx scripts/migrate-local-to-s3.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1100.0",
+    "@aws-sdk/s3-request-presigner": "^3.1100.0",
     "@prisma/client": "^6.19.3",
     "jose": "^6.2.5",
     "next": "16.2.12",

@@ -2,6 +2,8 @@ import type { CourseId, SubjectId, UserId } from "@/domain/ids";
 import type { Chapter } from "@/domain/entities/chapter";
 import type { Image, KnowledgeSource, Upload } from "@/domain/entities";
 
+export type StorageProviderType = "local" | "s3";
+
 export interface StoredFile {
   storageKey: string;
   mimeType: string;
@@ -15,6 +17,8 @@ export interface StorageProvider {
   save(storageKey: string, data: Buffer, mimeType: string): Promise<StoredFile>;
   read(storageKey: string): Promise<Buffer>;
   delete(storageKey: string): Promise<void>;
+  exists(storageKey: string): Promise<boolean>;
+  getSignedUrl(storageKey: string, expiresInSeconds?: number): Promise<string>;
 }
 
 export interface ChapterUploadInput {

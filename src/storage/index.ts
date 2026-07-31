@@ -1,17 +1,21 @@
 import path from "path";
-import { env } from "@/lib/env";
-import { createLocalStorageProvider } from "./local-provider";
+import { createStorageProvider } from "./create-provider";
 
 export type { StorageProvider, StoredFile } from "./types";
-export { hashBuffer } from "./local-provider";
+export { StorageError } from "./errors";
+export { hashBuffer } from "./hash";
+export { deleteKnowledgeSourceFiles, deleteStorageKeys } from "./cleanup";
+export {
+  buildLocalStorageAccessUrl,
+  verifyStorageAccessSignature,
+} from "./signed-url";
 export * from "./types";
 
-let storageInstance: ReturnType<typeof createLocalStorageProvider> | null =
-  null;
+let storageInstance: ReturnType<typeof createStorageProvider> | null = null;
 
 export function getStorageProvider() {
   if (!storageInstance) {
-    storageInstance = createLocalStorageProvider(env.uploadStoragePath);
+    storageInstance = createStorageProvider();
   }
   return storageInstance;
 }
@@ -27,4 +31,24 @@ export function buildPageStorageKey(
 
 export function buildPdfStorageKey(knowledgeSourceId: string): string {
   return path.posix.join(knowledgeSourceId, "document.pdf");
+}
+
+export function buildAvatarStorageKey(userId: string, extension: string): string {
+  return path.posix.join("users", userId, `avatar.${extension}`);
+}
+
+export function isStorageKey(value: string): boolean {
+  return (
+    !value.startsWith("http://") &&
+    !value.startsWith("https://") &&
+    !value.startsWith("data:")
+  );
+}
+
+export async function getStorageSignedUrl(
+  storageKey: string,
+  expiresInSeconds?: number
+): Promise<string> {
+  const storage = getStorageProvider();
+  return storage.getSignedUrl(storageKey, expiresInSeconds);
 }

@@ -19,6 +19,13 @@ import type { UserId } from "@/domain/ids";
 import { prisma } from "@/db/client";
 import { MASTERY_STABLE_THRESHOLD } from "@/engine/constants";
 import { previousDay, startOfDay } from "@/progress/statistics";
+import {
+  buildAvatarStorageKey,
+  deleteStorageKeys,
+  getStorageProvider,
+  isStorageKey,
+} from "@/storage";
+import { processImage } from "@/upload/image-processing";
 import { ProfileError } from "./errors";
 import { toUserProfileView } from "./mappers";
 import type {
@@ -325,4 +332,46 @@ export async function getDailyStatisticsHistory(
       dailyStreak: record.dailyStreak,
     }))
     .sort((left, right) => left.date.localeCompare(right.date));
+}
+
+export async function uploadUserAvatar(
+  userId: UserId,
+  file: { buffer: Buffer; mimeType: string }
+): Promise<UserProfileView> {
+  const user = await findUserById(userId);
+  if (!user) {
+    throw new ProfileError("Utente non trovato.", "USER_NOT_FOUND", 404);
+  }
+
+  if (!file.mimeType.startsWith("image/")) {
+    throw new ProfileError(
+      "Il file deve essere un'immagine.",
+      "INVALID_FILE_TYPE",
+      400
+    );
+  }
+
+  const processed = await processImage(file.buffer, file.mimeType);
+  const storageKey = buildAvatarStorageKey(userId, processed.extension);
+  const storage = getStorageProvider();
+  const previousKey =
+    user.profileImageUrl && isStorageKey(user.profileImageUrl)
+      ? user.profileImageUrl
+      : null;
+
+  try {
+    await storage.save(storageKey, processed.buffer, processed.mimeType);
+    const updated = await updateUser(userId, {
+      profileImageUrl: storageKey,
+    });
+
+    if (previousKey && previousKey !== storageKey) {
+      await deleteStorageKeys([previousKey]);
+    }
+
+    return toUserProfileView(updated);
+  } catch (error) {
+    await deleteStorageKeys([storageKey]);
+    throw error;
+  }
 }

@@ -50,3 +50,8 @@ export type {
   DailyStatisticsView,
   UpdateProfileInput,
 } from "@/profile";
+export {
+  fetchImageUrl,
+  fetchAvatarUrl,
+  uploadAvatar,
+} from "./storage";
