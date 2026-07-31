@@ -1,10 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { getGeneratedCardTypes } from "@/ai/persist";
+import { deterministicShuffle, getGeneratedCardTypes } from "@/ai/persist";
 import { CardType } from "@/domain/enums";
 import { makeMvpKnowledgeJson } from "../../helpers/mvp-knowledge";
 
 describe("ai/persist MVP card generation", () => {
+  it("shuffles quiz options deterministically for the same atom", () => {
+    const items = ["A", "B", "C", "D"];
+    const first = deterministicShuffle(items, "atom-seed");
+    const second = deterministicShuffle(items, "atom-seed");
+
+    expect(first).toEqual(second);
+    expect(new Set(first)).toEqual(new Set(items));
+  });
+
   it("generates all feed card types when an image reference exists", () => {
     const atom = makeMvpKnowledgeJson({
       imageId: "00000000-0000-4000-8000-000000000301",

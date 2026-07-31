@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { handleApiRouteError } from "@/lib/api/handle-route-error";
-import type { SubjectId } from "@/domain/ids";
-import { resolveDevSubjectId, resolveDevUserId } from "@/engine/dev";
+import { resolveDevUserId, resolveRequestedSubjectId } from "@/engine/dev";
 import { generateDailyReview } from "@/review";
 
 export const runtime = "nodejs";
@@ -12,7 +11,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const subjectIdParam = searchParams.get("subjectId");
     const subjectId = subjectIdParam
-      ? (resolveDevSubjectId(subjectIdParam) as SubjectId)
+      ? await resolveRequestedSubjectId(userId, subjectIdParam)
       : null;
 
     const plan = await generateDailyReview({ userId, subjectId });

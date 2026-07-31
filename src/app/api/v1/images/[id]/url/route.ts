@@ -17,6 +17,9 @@ export async function GET(request: Request, context: RouteContext) {
     const result = await getImageSignedUrlForUser(userId, id as ImageId);
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
-    return handleStorageRouteError(error);
+    return handleStorageRouteError(error, {
+      route: "/api/v1/images/[id]/url",
+      request,
+    });
   }
 }

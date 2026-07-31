@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { handleApiRouteError } from "@/lib/api/handle-route-error";
 import {
   createFeedSession,
-  resolveDevSubjectId,
   resolveDevUserId,
+  resolveRequestedSubjectId,
 } from "@/engine";
 
 export const runtime = "nodejs";
@@ -14,7 +14,10 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => ({}))) as {
       subjectId?: string;
     };
-    const subjectId = resolveDevSubjectId(body.subjectId ?? null);
+    const subjectId = await resolveRequestedSubjectId(
+      userId,
+      body.subjectId ?? null
+    );
     const session = await createFeedSession({ userId, subjectId });
 
     return NextResponse.json({ session }, { status: 201 });

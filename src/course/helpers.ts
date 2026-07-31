@@ -91,6 +91,18 @@ export async function assertSubjectOwned(
   return subject;
 }
 
+export async function assertCourseOwned(userId: UserId, courseId: CourseId) {
+  const course = await findCourseById(courseId);
+  if (!course || course.userId !== userId) {
+    throw new CourseManagementError(
+      "Corso non trovato.",
+      "COURSE_NOT_FOUND",
+      404
+    );
+  }
+  return course;
+}
+
 export async function getSubjectChapterCount(subjectId: SubjectId) {
   const courses = await findCoursesBySubjectId(subjectId);
   let total = 0;

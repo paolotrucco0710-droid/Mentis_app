@@ -1,14 +1,8 @@
 import type { SubjectId, UserId } from "@/domain/ids";
 import { AuthError, resolveAuthenticatedUserId } from "@/auth";
-import {
-  DevAuthError,
-  resolveDevSubjectId as resolveDevSubjectIdBase,
-} from "@/lib/dev-auth";
+import { assertSubjectOwned } from "@/course/helpers";
+import { env } from "@/lib/env";
 import { FeedEngineError } from "./errors";
-
-function toFeedEngineError(error: DevAuthError): FeedEngineError {
-  return new FeedEngineError(error.message, error.code, error.statusCode);
-}
 
 export async function resolveDevUserId(request: Request): Promise<UserId> {
   try {
@@ -21,15 +15,23 @@ export async function resolveDevUserId(request: Request): Promise<UserId> {
   }
 }
 
-export function resolveDevSubjectId(
+export async function resolveRequestedSubjectId(
+  userId: UserId,
   requestedSubjectId: string | null
-): SubjectId {
-  try {
-    return resolveDevSubjectIdBase(requestedSubjectId);
-  } catch (error) {
-    if (error instanceof DevAuthError) {
-      throw toFeedEngineError(error);
-    }
-    throw error;
+): Promise<SubjectId> {
+  if (requestedSubjectId) {
+    await assertSubjectOwned(userId, requestedSubjectId as SubjectId);
+    return requestedSubjectId as SubjectId;
   }
+
+  if (env.authDevFallback && env.devSubjectId) {
+    await assertSubjectOwned(userId, env.devSubjectId as SubjectId);
+    return env.devSubjectId as SubjectId;
+  }
+
+  throw new FeedEngineError(
+    "subjectId è obbligatorio.",
+    "SUBJECT_REQUIRED",
+    400
+  );
 }

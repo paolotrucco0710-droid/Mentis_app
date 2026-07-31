@@ -31,9 +31,10 @@ export async function createAnalyticsEvent(
 
 export async function countAnalyticsEventsByName(
   userId: UserId,
-  name: string
+  name: string,
+  tx?: DbTx
 ): Promise<number> {
-  return prisma.analyticsEvent.count({
+  return getDb(tx).analyticsEvent.count({
     where: { userId, name },
   });
 }

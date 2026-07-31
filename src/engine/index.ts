@@ -19,5 +19,5 @@ export { selectCardForAtom } from "./card-selector";
 export { estimateNextReviewAt, isReviewDue } from "./scheduler";
 export { getNextFeedItem, countSubjectAtoms } from "./feed-engine";
 export { createFeedSession } from "./session";
-export { resolveDevUserId, resolveDevSubjectId } from "./dev";
+export { resolveDevUserId, resolveRequestedSubjectId } from "./dev";
 export type { FeedEngineContext, ScoredAtomCandidate } from "./types";

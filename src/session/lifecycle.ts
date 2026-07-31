@@ -6,7 +6,9 @@ import {
 import {
   createSessionEvent,
   findSessionEventsBySessionId,
+  type CreateSessionEventInput,
 } from "@/db/repositories/session-events";
+import { prisma } from "@/db/client";
 import { findSubjectById } from "@/db/repositories/subjects";
 import {
   AnalyticsEvents,
@@ -95,28 +97,23 @@ export async function pauseSession(
   userId: UserId,
   sessionId: StudySessionId
 ): Promise<SessionDetail> {
-  const session = await requireOwnedSession(userId, sessionId);
-  const events = await findSessionEventsBySessionId(sessionId);
-  const status = resolveSessionStatus(session, events);
+  await appendLifecycleEvent(userId, sessionId, (status) => {
+    if (status === SessionStatus.Ended) {
+      throw new SessionEngineError(
+        "La sessione è già terminata.",
+        "SESSION_ENDED",
+        409
+      );
+    }
 
-  if (status === SessionStatus.Ended) {
-    throw new SessionEngineError(
-      "La sessione è già terminata.",
-      "SESSION_ENDED",
-      409
-    );
-  }
-
-  if (status === SessionStatus.Paused) {
-    throw new SessionEngineError(
-      "La sessione è già in pausa.",
-      "SESSION_ALREADY_PAUSED",
-      409
-    );
-  }
-
-  await createSessionEvent({
-    sessionId,
+    if (status === SessionStatus.Paused) {
+      throw new SessionEngineError(
+        "La sessione è già in pausa.",
+        "SESSION_ALREADY_PAUSED",
+        409
+      );
+    }
+  }, {
     type: SessionEventType.Pause,
     outcome: SessionEventOutcome.Neutral,
   });
@@ -136,28 +133,23 @@ export async function resumeSession(
   userId: UserId,
   sessionId: StudySessionId
 ): Promise<SessionDetail> {
-  const session = await requireOwnedSession(userId, sessionId);
-  const events = await findSessionEventsBySessionId(sessionId);
-  const status = resolveSessionStatus(session, events);
+  await appendLifecycleEvent(userId, sessionId, (status) => {
+    if (status === SessionStatus.Ended) {
+      throw new SessionEngineError(
+        "La sessione è già terminata.",
+        "SESSION_ENDED",
+        409
+      );
+    }
 
-  if (status === SessionStatus.Ended) {
-    throw new SessionEngineError(
-      "La sessione è già terminata.",
-      "SESSION_ENDED",
-      409
-    );
-  }
-
-  if (status === SessionStatus.Active) {
-    throw new SessionEngineError(
-      "La sessione non è in pausa.",
-      "SESSION_NOT_PAUSED",
-      409
-    );
-  }
-
-  await createSessionEvent({
-    sessionId,
+    if (status === SessionStatus.Active) {
+      throw new SessionEngineError(
+        "La sessione non è in pausa.",
+        "SESSION_NOT_PAUSED",
+        409
+      );
+    }
+  }, {
     type: SessionEventType.Resume,
     outcome: SessionEventOutcome.Neutral,
   });
@@ -273,4 +265,34 @@ async function requireOwnedSession(
   }
 
   return session;
+}
+
+async function appendLifecycleEvent(
+  userId: UserId,
+  sessionId: StudySessionId,
+  validate: (status: SessionStatus) => void,
+  event: Omit<CreateSessionEventInput, "sessionId">
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const session = await findStudySessionById(sessionId, tx);
+    if (!session || session.userId !== userId) {
+      throw new SessionEngineError(
+        "Sessione di studio non trovata.",
+        "SESSION_NOT_FOUND",
+        404
+      );
+    }
+
+    const events = await findSessionEventsBySessionId(sessionId, tx);
+    const status = resolveSessionStatus(session, events);
+    validate(status);
+
+    await createSessionEvent(
+      {
+        sessionId,
+        ...event,
+      },
+      tx
+    );
+  });
 }

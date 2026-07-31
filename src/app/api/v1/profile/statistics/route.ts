@@ -11,6 +11,9 @@ export async function GET(request: Request) {
     const statistics = await getUserStatistics(userId);
     return NextResponse.json({ statistics }, { status: 200 });
   } catch (error) {
-    return handleProfileRouteError(error);
+    return handleProfileRouteError(error, {
+      route: "/api/v1/profile/statistics",
+      request,
+    });
   }
 }
