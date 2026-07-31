@@ -1,3 +1,4 @@
+import { ensureChapterForUpload } from "@/course";
 import { prisma } from "@/db/client";
 import { createKnowledgeSource } from "@/db/repositories/knowledge-sources";
 import { findSubjectById } from "@/db/repositories/subjects";
@@ -194,12 +195,28 @@ export async function processChapterUpload(
       UploadStatus.Completed
     );
 
+    const { courseId, chapter } = await ensureChapterForUpload({
+      userId: input.userId,
+      subjectId: input.subjectId,
+      courseId: input.courseId ?? null,
+      knowledgeSourceId: knowledgeSource.id,
+      title: input.title,
+    });
+
+    if (!upload.courseId) {
+      await prisma.upload.update({
+        where: { id: upload.id },
+        data: { courseId },
+      });
+    }
+
     return {
-      upload: { ...completedUpload, imageIds: images.map((image) => image.id) },
+      upload: { ...completedUpload, imageIds: images.map((image) => image.id), courseId },
       knowledgeSource,
       images,
       combinedHash,
       totalSizeBytes,
+      chapter,
     };
   } catch (error) {
     await updateUploadStatus(

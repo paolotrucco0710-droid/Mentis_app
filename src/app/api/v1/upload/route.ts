@@ -50,6 +50,8 @@ export async function POST(request: Request) {
       {
         uploadId: result.upload.id,
         knowledgeSourceId: result.knowledgeSource.id,
+        chapterId: result.chapter.id,
+        courseId: result.upload.courseId,
         status: result.upload.status,
         pageCount: result.knowledgeSource.pageCount,
         sourceType: result.knowledgeSource.sourceType,

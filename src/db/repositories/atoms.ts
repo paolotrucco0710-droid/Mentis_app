@@ -1,4 +1,4 @@
-import type { AtomId, KnowledgeSourceId, SubjectId } from "@/domain/ids";
+import type { AtomId, KnowledgeSourceId, SubjectId, UserId } from "@/domain/ids";
 import type { Atom } from "@/domain/entities";
 import { prisma } from "../client";
 import { toAtom } from "../mappers";
@@ -59,4 +59,24 @@ export async function countAtomsBySubjectId(
   subjectId: SubjectId
 ): Promise<number> {
   return prisma.atom.count({ where: { subjectId } });
+}
+
+export async function searchAtomsByQuery(
+  userId: UserId,
+  query: string,
+  limit = 15
+): Promise<Atom[]> {
+  const records = await prisma.atom.findMany({
+    where: {
+      OR: [
+        { title: { contains: query, mode: "insensitive" } },
+        { summary: { contains: query, mode: "insensitive" } },
+      ],
+      subject: { userId, deletedAt: null },
+    },
+    include: atomInclude,
+    orderBy: { logicalOrder: "asc" },
+    take: limit,
+  });
+  return records.map(toAtom);
 }

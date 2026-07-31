@@ -1,4 +1,4 @@
-import type { KnowledgeSourceId, UserId } from "@/domain/ids";
+import type { KnowledgeSourceId, SubjectId, UserId } from "@/domain/ids";
 import type { KnowledgeSource } from "@/domain/entities";
 import type {
   KnowledgeSourceProcessingStatus,
@@ -49,6 +49,16 @@ export async function createKnowledgeSource(
   return toKnowledgeSource(record);
 }
 
+export async function findKnowledgeSourcesBySubjectId(
+  subjectId: SubjectId
+): Promise<KnowledgeSource[]> {
+  const records = await prisma.knowledgeSource.findMany({
+    where: { subjectId, deletedAt: null },
+    orderBy: { uploadedAt: "desc" },
+  });
+  return records.map(toKnowledgeSource);
+}
+
 export async function updateKnowledgeSourceStatus(
   id: KnowledgeSourceId,
   status: KnowledgeSourceProcessingStatus,
@@ -62,4 +72,20 @@ export async function updateKnowledgeSourceStatus(
     },
   });
   return toKnowledgeSource(record);
+}
+
+export async function softDeleteKnowledgeSource(
+  id: KnowledgeSourceId
+): Promise<void> {
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.knowledgeSource.update({
+      where: { id },
+      data: { deletedAt: now },
+    }),
+    prisma.chapter.updateMany({
+      where: { knowledgeSourceId: id, deletedAt: null },
+      data: { deletedAt: now },
+    }),
+  ]);
 }

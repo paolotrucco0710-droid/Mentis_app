@@ -9,9 +9,19 @@ export function TopBar() {
           Mentis
         </Link>
         <div className="flex items-center gap-3">
-          <span className="hidden text-sm text-muted sm:inline">
-            Ciao, Paolo
-          </span>
+          <Link
+            href="/library"
+            className="hidden text-sm text-muted hover:text-foreground sm:inline"
+          >
+            Libreria
+          </Link>
+          <Link
+            href="/search"
+            className="hidden text-sm text-muted hover:text-foreground sm:inline"
+          >
+            Cerca
+          </Link>
+          <span className="hidden text-sm text-muted sm:inline">Ciao, Paolo</span>
           <Avatar name="Paolo Dev" className="h-9 w-9 text-xs" />
         </div>
       </div>

@@ -7,7 +7,6 @@ import {
   CardHeader,
   CardTitle,
   FlameIcon,
-  ProgressBar,
   Section,
 } from "@/components/ui";
 
@@ -20,7 +19,8 @@ export default function HomePage() {
           Cosa devi fare adesso?
         </h1>
         <p className="max-w-2xl text-muted">
-          Continua da dove hai lasciato e mantieni vivo lo streak di studio.
+          Continua da dove hai lasciato, gestisci il materiale o avvia una nuova
+          sessione di studio.
         </p>
       </section>
 
@@ -30,21 +30,22 @@ export default function HomePage() {
             <CardTitle>Continua a studiare</CardTitle>
             <Badge variant="success">
               <span className="inline-flex items-center gap-1">
-                <FlameIcon className="h-3.5 w-3.5" />3 giorni
+                <FlameIcon className="h-3.5 w-3.5" />
+                Studio attivo
               </span>
             </Badge>
           </div>
           <CardDescription>
-            Materia consigliata: Generale. Ultima sessione ieri sera.
+            Riprendi il feed o organizza capitoli e materie nella libreria.
           </CardDescription>
         </CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row">
           <Link href="/feed" className="sm:flex-1">
             <Button fullWidth>Riprendi sessione</Button>
           </Link>
-          <Link href="/upload" className="sm:flex-1">
+          <Link href="/library" className="sm:flex-1">
             <Button fullWidth variant="secondary">
-              Carica materiale
+              Apri libreria
             </Button>
           </Link>
         </div>
@@ -53,27 +54,37 @@ export default function HomePage() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Progresso giornaliero</CardTitle>
-            <CardDescription>12 minuti su 30 minuti</CardDescription>
+            <CardTitle>La tua libreria</CardTitle>
+            <CardDescription>
+              Materie, capitoli, upload ed eliminazione materiale.
+            </CardDescription>
           </CardHeader>
-          <ProgressBar value={40} />
+          <Link href="/library">
+            <Button variant="secondary">Gestisci materiale</Button>
+          </Link>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Livello attuale</CardTitle>
-            <CardDescription>XP 1.240 · Prossimo livello a 1.500</CardDescription>
+            <CardTitle>Carica un capitolo</CardTitle>
+            <CardDescription>
+              PDF o immagini: Mentis crea atoms e card automaticamente.
+            </CardDescription>
           </CardHeader>
-          <ProgressBar value={62} />
+          <Link href="/upload">
+            <Button variant="secondary">Vai all&apos;upload</Button>
+          </Link>
         </Card>
       </div>
 
-      <Section title="Attività recenti">
-        <Card>
-          <CardDescription>
-            Nessuna attività recente. Avvia una sessione per vedere qui i tuoi
-            progressi.
-          </CardDescription>
-        </Card>
+      <Section title="Accesso rapido">
+        <div className="flex flex-wrap gap-3">
+          <Link href="/search">
+            <Button variant="ghost">Cerca nella libreria</Button>
+          </Link>
+          <Link href="/upload">
+            <Button variant="ghost">Upload</Button>
+          </Link>
+        </div>
       </Section>
     </div>
   );
