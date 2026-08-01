@@ -57,7 +57,11 @@ export function resolveCognitiveStage(
 
   if (
     state.currentStage === UserAtomLearningState.Practicing ||
-    (state.mastery >= 45 && state.comprehensionLevel >= 50)
+    (state.mastery >= 45 && state.comprehensionLevel >= 50) ||
+    (state.correctAnswerCount >= 1 &&
+      state.exposureCount >= 1 &&
+      state.mastery >= 20 &&
+      state.comprehensionLevel >= 15)
   ) {
     return CognitiveAtomStage.Consolidating;
   }

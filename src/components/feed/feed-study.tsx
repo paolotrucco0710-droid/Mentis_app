@@ -67,16 +67,15 @@ export function FeedStudy() {
   );
 
   const applyFeedItem = useCallback(
-    (sessionId: StudySessionId, session: StudySession | undefined, item: FeedItem) => {
+    (session: StudySession | undefined, item: FeedItem) => {
       cardStartedAt.current = Date.now();
       setState({
         status: "ready",
-        session: session ?? ({ id: sessionId } as StudySession),
+        session: session ?? ({ id: item.sessionId } as StudySession),
         item,
       });
-      void prefetchNext(sessionId);
     },
-    [prefetchNext]
+    []
   );
 
   const loadNext = useCallback(
@@ -88,7 +87,7 @@ export function FeedStudy() {
       if (prefetchedItem.current) {
         const item = prefetchedItem.current;
         prefetchedItem.current = null;
-        applyFeedItem(sessionId, session, item);
+        applyFeedItem(session, item);
         return;
       }
 
@@ -107,7 +106,7 @@ export function FeedStudy() {
         return;
       }
 
-      applyFeedItem(sessionId, session, feed.item);
+      applyFeedItem(session, feed.item);
     },
     [applyFeedItem, subjectId]
   );
@@ -190,6 +189,9 @@ export function FeedStudy() {
         durationMs,
         feedPosition: item.position,
       });
+
+      prefetchedItem.current = null;
+      await prefetchNext(session.id);
 
       try {
         await loadNext(session.id, session);
