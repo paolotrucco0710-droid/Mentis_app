@@ -22,8 +22,8 @@ import { countAtomsByKnowledgeSourceId } from "@/db/repositories/atoms";
 import { KnowledgeSourceProcessingStatus } from "@/domain/enums";
 import { AIJobStep, AIJobStatus } from "@/domain/enums";
 import type { AIJobId, KnowledgeSourceId, UserId } from "@/domain/ids";
-import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { toUserFacingAIError } from "./errors";
 import { extractKnowledgeJson } from "./extract";
 import { extractDocumentText } from "./ocr";
 import { normalizeKnowledgeJson } from "./normalize";
@@ -253,8 +253,8 @@ export async function processKnowledgeSource(
       deduplicatedFrom: duplicateSource,
     };
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Elaborazione AI fallita.";
+    const userError = toUserFacingAIError(error);
+    const message = userError.message;
 
     await updateKnowledgeSourceStatus(
       knowledgeSourceId,
@@ -264,10 +264,16 @@ export async function processKnowledgeSource(
     await persistJobUsage(job.id, tracker);
     await updateAIJobStatus(job.id, AIJobStatus.Failed, null, message);
 
+    logger.error("AI processing failed", userError, {
+      knowledgeSourceId,
+      userId,
+      code: userError.code,
+    });
+
     trackPipelineError({
       userId,
       pipeline: "ai",
-      code: error instanceof AIProcessingError ? error.code : "PROCESSING_FAILED",
+      code: userError.code,
       message,
     });
     trackAnalyticsEvent({
@@ -278,9 +284,7 @@ export async function processKnowledgeSource(
       properties: { jobId: job.id, knowledgeSourceId, message },
     });
 
-    throw error instanceof AIProcessingError
-      ? error
-      : new AIProcessingError(message, "PROCESSING_FAILED", 500);
+    throw userError;
   }
 }
 
