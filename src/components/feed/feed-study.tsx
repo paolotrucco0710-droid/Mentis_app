@@ -191,11 +191,18 @@ export function FeedStudy() {
         feedPosition: item.position,
       });
 
-      await loadNext(session.id, session);
+      try {
+        await loadNext(session.id, session);
+      } catch {
+        await new Promise((resolve) => window.setTimeout(resolve, 1500));
+        await loadNext(session.id, session);
+      }
     } catch (error) {
       const message =
         error instanceof ApiError
-          ? error.message
+          ? error.message === "Errore interno."
+            ? "Connessione lenta al server. Il progresso potrebbe essere salvato: premi Riprova."
+            : error.message
           : "Errore durante l'invio della risposta.";
       setState({ status: "error", message });
     } finally {

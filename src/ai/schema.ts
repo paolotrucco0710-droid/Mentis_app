@@ -54,6 +54,7 @@ export const knowledgeJsonAtomSchema = z.object({
   citations: z.array(z.string()),
   pageReferences: z.array(z.number().int().positive()),
   confidence: z.number().min(0).max(1),
+  quizDistractors: z.array(z.string().min(1)).max(3).optional(),
 });
 
 export const knowledgeJsonSchema = z.object({

@@ -46,7 +46,12 @@ const KNOWLEDGE_JSON_TEMPLATE = `{
       "equations": [],
       "citations": [],
       "pageReferences": [1],
-      "confidence": 0.9
+      "confidence": 0.9,
+      "quizDistractors": [
+        "La Reconquista fu una singola campagna militare pianificata fin dall'inizio.",
+        "Il termine Reconquista fu usato già nel IX secolo dai regni cristiani.",
+        "La Reconquista riguardò solo la Catalogna e non altre regioni della penisola."
+      ]
     }
   ]
 }`;
@@ -91,8 +96,14 @@ EXAMPLES
 COMMONMISTAKES e MISCONCEPTIONS
 - 1-2 errori reali che uno studente potrebbe fare, formulati come credenza falsa.
 - Devono essere DISTINTI tra Atom diversi: non copiare la stessa frase su più Atom.
-- commonMistakes: errore tipico in forma diretta ("Pensare che...", "Confondere X con Y").
+- commonMistakes: errore tipico in forma diretta ("Pensare che...", "Confondere X con Y") — NON usarli come opzioni quiz.
 - misconceptions: falsa credenza da correggere (usata per vero/falso).
+
+QUIZDISTRACTORS (OBBLIGATORIO: esattamente 3)
+- Tre affermazioni FALSE ma plausibili sullo stesso concetto.
+- Devono essere frasi dichiarative complete, non meta-frasi ("Pensare che...", "Affermazione non corretta...").
+- Devono essere diverse dal summary e tra loro.
+- Servono per le opzioni sbagliate del quiz a scelta multipla.
 
 KEYWORDS
 - 2-5 termini rilevanti per questo Atom specifico.
@@ -134,7 +145,7 @@ Lingua: ${language}
 ISTRUZIONI FINALI:
 1. Scomponi il capitolo in Atom piccoli (una idea ciascuno), non in sezioni del libro.
 2. Ogni Atom: title corto, summary 1 frase, explanation max 3 frasi, definitions con almeno 1 voce.
-3. Compila examples e commonMistakes/misconceptions per alimentare quiz e card interattive.
+3. Compila examples, quizDistractors (3 opzioni false) e commonMistakes/misconceptions.
 4. Evita titoli "Contesto di..." o "Ruolo di...".
 
 TESTO DEL CAPITOLO:
