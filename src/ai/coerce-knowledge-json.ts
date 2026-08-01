@@ -189,6 +189,7 @@ function coerceAtom(value: unknown, index: number) {
       .map((page) => asPositiveInt(page, 0))
       .filter((page) => page > 0),
     confidence: asConfidence(record.confidence),
+    quizDistractors: asStringArray(record.quizDistractors).slice(0, 3),
   };
 }
 

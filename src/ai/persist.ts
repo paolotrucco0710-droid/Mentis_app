@@ -4,6 +4,7 @@ import type { AtomId, KnowledgeSourceId, SubjectId } from "@/domain/ids";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { env } from "@/lib/env";
+import { buildQuizOptions } from "./quiz-options";
 
 export interface PersistResult {
   atomCount: number;
@@ -108,41 +109,34 @@ function buildCardsForAtom(
     },
   ];
 
-  const correctAnswer =
-    atom.definitions[0] ?? atom.examples[0] ?? atom.summary;
-  const distractors = [
-    atom.counterExamples[0],
-    atom.commonMistakes[0],
-    atom.misconceptions[0],
-  ].filter((value): value is string =>
-    Boolean(value && value !== correctAnswer)
+  const quiz = buildQuizOptions(
+    {
+      id: atomId,
+      title: atom.title,
+      summary: atom.summary,
+      quizDistractors: atom.quizDistractors,
+      misconceptions: atom.misconceptions,
+      counterExamples: atom.counterExamples,
+      commonMistakes: atom.commonMistakes,
+    },
+    deterministicShuffle
   );
-
-  while (distractors.length < 3) {
-    distractors.push(`Affermazione non corretta su ${atom.title}`);
-  }
-
-  const options = deterministicShuffle(
-    [correctAnswer, ...distractors.slice(0, 3)],
-    atomId
-  );
-  const correctIndex = options.indexOf(correctAnswer);
 
   cards.push({
     atomId,
     type: CardType.Quiz,
     order: 1,
     cognitiveObjective: CognitiveObjective.Retrieval,
-    prompt: `Cosa descrive meglio "${atom.title}"?`,
-    text: `Cosa descrive meglio "${atom.title}"?`,
+    prompt: quiz.question,
+    text: quiz.question,
     explanation: atom.explanation,
     correctFeedback: "Risposta corretta.",
-    incorrectFeedback: atom.explanation,
+    incorrectFeedback: atom.summary,
     estimatedDurationSeconds: 30,
     payload: {
-      question: `Cosa descrive meglio "${atom.title}"?`,
-      options,
-      correctOptionIndex: correctIndex,
+      question: quiz.question,
+      options: quiz.options,
+      correctOptionIndex: quiz.correctOptionIndex,
     } as Prisma.InputJsonValue,
     aiVersion: env.aiPromptVersion,
   });

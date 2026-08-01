@@ -9,6 +9,8 @@ import {
 const EXPLAIN_TYPES = new Set<string>(EXPLANATION_CARD_TYPES);
 const RETRIEVAL_TYPES = new Set<string>(RETRIEVAL_CARD_TYPES);
 
+const SUPPRESSED_EXPLANATION_SCORE = -1000;
+
 export function selectCardForAtom(input: {
   cards: Card[];
   atomState: UserAtomState;
@@ -22,16 +24,23 @@ export function selectCardForAtom(input: {
     return null;
   }
 
+  const scoringStage = resolveScoringStage({
+    stage,
+    atomState,
+    cards,
+    userCardStates,
+  });
+
   const ranked = [...cards].sort((left, right) => {
     const leftScore = scoreCard(left, {
       atomState,
-      stage,
+      stage: scoringStage,
       userCardStates,
       lastCardType,
     });
     const rightScore = scoreCard(right, {
       atomState,
-      stage,
+      stage: scoringStage,
       userCardStates,
       lastCardType,
     });
@@ -44,6 +53,54 @@ export function selectCardForAtom(input: {
   });
 
   return ranked[0] ?? null;
+}
+
+function resolveScoringStage(input: {
+  stage: CognitiveAtomStage;
+  atomState: UserAtomState;
+  cards: Card[];
+  userCardStates: Map<string, UserCardState>;
+}): CognitiveAtomStage {
+  const { stage, atomState, cards, userCardStates } = input;
+
+  if (
+    stage === CognitiveAtomStage.Forgotten ||
+    stage === CognitiveAtomStage.Locked
+  ) {
+    return stage;
+  }
+
+  if (!introductionSeen(cards, userCardStates, atomState)) {
+    return stage;
+  }
+
+  if (
+    stage === CognitiveAtomStage.Learning ||
+    stage === CognitiveAtomStage.Learnable
+  ) {
+    return CognitiveAtomStage.Consolidating;
+  }
+
+  return stage;
+}
+
+function introductionSeen(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>,
+  atomState: UserAtomState
+): boolean {
+  const explainViewed = cards.some((card) => {
+    if (!EXPLAIN_TYPES.has(card.type)) {
+      return false;
+    }
+
+    return (userCardStates.get(card.id)?.viewCount ?? 0) > 0;
+  });
+
+  return (
+    explainViewed ||
+    (atomState.exposureCount > 0 && atomState.correctAnswerCount > 0)
+  );
 }
 
 function scoreCard(
@@ -61,6 +118,10 @@ function scoreCard(
 
   const viewCount = cardState?.viewCount ?? 0;
   const wrongAnswers = cardState?.wrongAnswerCount ?? 0;
+
+  if (shouldSuppressExplanation(card, atomState, stage, viewCount)) {
+    return SUPPRESSED_EXPLANATION_SCORE;
+  }
 
   score += Math.max(0, 30 - viewCount * 8);
 
@@ -114,6 +175,27 @@ function scoreCard(
   }
 
   return score;
+}
+
+function shouldSuppressExplanation(
+  card: Card,
+  atomState: UserAtomState,
+  stage: CognitiveAtomStage,
+  viewCount: number
+): boolean {
+  if (!EXPLAIN_TYPES.has(card.type) || viewCount === 0) {
+    return false;
+  }
+
+  if (stage === CognitiveAtomStage.Forgotten) {
+    return false;
+  }
+
+  if (atomState.wrongAnswerCount > 0) {
+    return false;
+  }
+
+  return true;
 }
 
 function isSameCategory(previous: CardType, current: CardType): boolean {

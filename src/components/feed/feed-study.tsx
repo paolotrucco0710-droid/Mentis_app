@@ -67,16 +67,15 @@ export function FeedStudy() {
   );
 
   const applyFeedItem = useCallback(
-    (sessionId: StudySessionId, session: StudySession | undefined, item: FeedItem) => {
+    (session: StudySession | undefined, item: FeedItem) => {
       cardStartedAt.current = Date.now();
       setState({
         status: "ready",
-        session: session ?? ({ id: sessionId } as StudySession),
+        session: session ?? ({ id: item.sessionId } as StudySession),
         item,
       });
-      void prefetchNext(sessionId);
     },
-    [prefetchNext]
+    []
   );
 
   const loadNext = useCallback(
@@ -88,7 +87,7 @@ export function FeedStudy() {
       if (prefetchedItem.current) {
         const item = prefetchedItem.current;
         prefetchedItem.current = null;
-        applyFeedItem(sessionId, session, item);
+        applyFeedItem(session, item);
         return;
       }
 
@@ -107,7 +106,7 @@ export function FeedStudy() {
         return;
       }
 
-      applyFeedItem(sessionId, session, feed.item);
+      applyFeedItem(session, feed.item);
     },
     [applyFeedItem, subjectId]
   );
@@ -191,11 +190,21 @@ export function FeedStudy() {
         feedPosition: item.position,
       });
 
-      await loadNext(session.id, session);
+      prefetchedItem.current = null;
+      await prefetchNext(session.id);
+
+      try {
+        await loadNext(session.id, session);
+      } catch {
+        await new Promise((resolve) => window.setTimeout(resolve, 1500));
+        await loadNext(session.id, session);
+      }
     } catch (error) {
       const message =
         error instanceof ApiError
-          ? error.message
+          ? error.message === "Errore interno."
+            ? "Connessione lenta al server. Il progresso potrebbe essere salvato: premi Riprova."
+            : error.message
           : "Errore durante l'invio della risposta.";
       setState({ status: "error", message });
     } finally {

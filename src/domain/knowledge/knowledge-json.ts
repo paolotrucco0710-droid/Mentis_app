@@ -57,6 +57,7 @@ export interface KnowledgeJsonAtom {
   citations: string[];
   pageReferences: number[];
   confidence: Score0To1;
+  quizDistractors?: string[];
 }
 
 export interface KnowledgeJson {

@@ -64,6 +64,22 @@ describe("engine/stages", () => {
     );
   });
 
+  it("moves to consolidating sooner after a correct retrieval answer", () => {
+    const now = new Date("2026-07-31T10:00:00.000Z");
+    const state = makeUserAtomState({
+      mastery: 24,
+      comprehensionLevel: 18,
+      exposureCount: 1,
+      correctAnswerCount: 1,
+      wrongAnswerCount: 0,
+      estimatedDecay: 0.2,
+    });
+
+    expect(resolveCognitiveStage(state, true, now)).toBe(
+      CognitiveAtomStage.Consolidating
+    );
+  });
+
   it("returns locked initial stage when prerequisites are not satisfied", () => {
     expect(initialLearningStage(false)).toBe(UserAtomLearningState.Locked);
     expect(initialLearningStage(true)).toBe(UserAtomLearningState.Available);
