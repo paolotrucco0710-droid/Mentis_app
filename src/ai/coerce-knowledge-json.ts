@@ -190,6 +190,12 @@ function coerceAtom(value: unknown, index: number) {
       .filter((page) => page > 0),
     confidence: asConfidence(record.confidence),
     quizDistractors: asStringArray(record.quizDistractors).slice(0, 3),
+    errorDetectionStatement: asNullableString(
+      record.errorDetectionStatement ?? record.error_detection_statement
+    ) ?? undefined,
+    errorDetectionCorrection: asNullableString(
+      record.errorDetectionCorrection ?? record.error_detection_correction
+    ) ?? undefined,
   };
 }
 

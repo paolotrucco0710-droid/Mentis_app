@@ -8,6 +8,7 @@ describe("buildExtractionSystemPrompt", () => {
     expect(prompt).toContain("UNA sola idea");
     expect(prompt).toContain("Contesto di...");
     expect(prompt).toContain("definitions");
+    expect(prompt).toContain("errorDetectionStatement");
     expect(prompt).toContain("20-60 secondi");
     expect(prompt).toContain("8-15 Atom");
   });

@@ -51,7 +51,9 @@ const KNOWLEDGE_JSON_TEMPLATE = `{
         "La Reconquista fu una singola campagna militare pianificata fin dall'inizio.",
         "Il termine Reconquista fu usato già nel IX secolo dai regni cristiani.",
         "La Reconquista riguardò solo la Catalogna e non altre regioni della penisola."
-      ]
+      ],
+      "errorDetectionStatement": "Il termine Reconquista fu usato già nel IX secolo dalle campagne cristiane.",
+      "errorDetectionCorrection": "Il termine Reconquista fu promosso nel XVI secolo dalla monarchia spagnola per fini propagandistici."
     }
   ]
 }`;
@@ -105,6 +107,13 @@ QUIZDISTRACTORS (OBBLIGATORIO: esattamente 3)
 - Devono essere diverse dal summary e tra loro.
 - Servono per le opzioni sbagliate del quiz a scelta multipla.
 
+ERRORDETECTIONSTATEMENT e ERRORDETECTIONCORRECTION (OBBLIGATORI)
+- errorDetectionStatement: UNA frase dichiarativa che sembra un fatto storico ma è FALSA.
+  Deve essere chiara da leggere nel feed ("Trova l'errore"). VIETATO iniziare con "Pensare che...", "Credere che...", "Confondere...".
+  Esempio BUONO: "Il termine Reconquista fu usato già nel IX secolo dalle campagne cristiane."
+  Esempio CATTIVO: "Pensare che il termine Reconquista fosse usato fin dall'inizio delle campagne."
+- errorDetectionCorrection: la versione corretta in 1-2 frasi brevi (definizione o fatto giusto).
+
 KEYWORDS
 - 2-5 termini rilevanti per questo Atom specifico.
 
@@ -145,7 +154,7 @@ Lingua: ${language}
 ISTRUZIONI FINALI:
 1. Scomponi il capitolo in Atom piccoli (una idea ciascuno), non in sezioni del libro.
 2. Ogni Atom: title corto, summary 1 frase, explanation max 3 frasi, definitions con almeno 1 voce.
-3. Compila examples, quizDistractors (3 opzioni false) e commonMistakes/misconceptions.
+3. Compila examples, quizDistractors (3 opzioni false), errorDetectionStatement/errorDetectionCorrection e commonMistakes/misconceptions.
 4. Evita titoli "Contesto di..." o "Ruolo di...".
 
 TESTO DEL CAPITOLO:

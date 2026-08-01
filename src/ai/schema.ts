@@ -55,6 +55,8 @@ export const knowledgeJsonAtomSchema = z.object({
   pageReferences: z.array(z.number().int().positive()),
   confidence: z.number().min(0).max(1),
   quizDistractors: z.array(z.string().min(1)).max(3).optional(),
+  errorDetectionStatement: z.string().min(12).max(220).optional(),
+  errorDetectionCorrection: z.string().min(12).max(300).optional(),
 });
 
 export const knowledgeJsonSchema = z.object({

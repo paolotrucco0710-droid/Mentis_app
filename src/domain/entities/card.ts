@@ -30,6 +30,7 @@ export interface FeynmanCardPayload {
 
 export interface ErrorDetectionCardPayload {
   text: string;
+  hasError?: boolean;
   errorIndices: number[];
   correction: string;
 }

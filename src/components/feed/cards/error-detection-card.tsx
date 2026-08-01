@@ -3,48 +3,72 @@
 import { memo, useState } from "react";
 import { Button, Card, CardDescription, CardHeader, CardTitle } from "@/components/ui";
 import { SessionEventOutcome } from "@/domain/enums";
+import { normalizeErrorDetectionStatement } from "@/ai/error-detection-options";
 import type { FeedCardProps } from "../card-utils";
 import { isErrorDetectionPayload } from "../card-utils";
 
 export function ErrorDetectionCardComponent({ card, disabled, onContinue }: FeedCardProps) {
   const payload = isErrorDetectionPayload(card.payload) ? card.payload : null;
-  const [revealed, setRevealed] = useState(false);
   const [foundError, setFoundError] = useState<boolean | null>(null);
 
   if (!payload) {
     return null;
   }
 
-  const isCorrect = foundError === (payload.errorIndices.length > 0);
+  const displayText = normalizeErrorDetectionStatement(payload.text);
+  const expectsError = payload.hasError ?? payload.errorIndices.length > 0;
+  const revealed = foundError !== null;
+  const isCorrect = revealed && foundError === expectsError;
+
+  function handleChoice(choice: boolean) {
+    if (disabled || revealed) {
+      return;
+    }
+
+    setFoundError(choice);
+  }
 
   return (
     <Card className="shadow-md">
       <CardHeader>
         <CardTitle>Trova l&apos;errore</CardTitle>
-        <CardDescription>Individua cosa non va nel testo seguente.</CardDescription>
+        <CardDescription>
+          Leggi l&apos;affermazione: contiene un errore fattuale o è corretta?
+        </CardDescription>
       </CardHeader>
       <p className="rounded-xl border border-border bg-surface p-4 text-sm leading-7">
-        {payload.text}
+        {displayText}
       </p>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <Button
           variant={foundError === true ? "primary" : "secondary"}
           disabled={disabled || revealed}
-          onClick={() => setFoundError(true)}
+          onClick={() => handleChoice(true)}
         >
-          Ho trovato un errore
+          C&apos;è un errore
         </Button>
         <Button
           variant={foundError === false ? "primary" : "secondary"}
           disabled={disabled || revealed}
-          onClick={() => setFoundError(false)}
+          onClick={() => handleChoice(false)}
         >
-          Sembra corretto
+          È corretta
         </Button>
       </div>
       {revealed ? (
         <div className="mt-4 space-y-3">
-          <p className="text-sm font-medium">Correzione:</p>
+          <p
+            className={`text-sm font-medium ${
+              isCorrect ? "text-emerald-700" : "text-amber-700"
+            }`}
+          >
+            {isCorrect
+              ? "Risposta corretta."
+              : expectsError
+                ? "In questo testo c'è un errore: la risposta giusta era «C'è un errore»."
+                : "Il testo era corretto: la risposta giusta era «È corretta»."}
+          </p>
+          <p className="text-sm font-medium">Spiegazione:</p>
           <p className="rounded-xl bg-accent/60 p-4 text-sm text-muted">
             {payload.correction}
           </p>
@@ -63,16 +87,7 @@ export function ErrorDetectionCardComponent({ card, disabled, onContinue }: Feed
             Continua
           </Button>
         </div>
-      ) : (
-        <Button
-          className="mt-6"
-          fullWidth
-          disabled={disabled || foundError === null}
-          onClick={() => setRevealed(true)}
-        >
-          Mostra correzione
-        </Button>
-      )}
+      ) : null}
     </Card>
   );
 }

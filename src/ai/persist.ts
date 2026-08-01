@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { env } from "@/lib/env";
 import { buildQuizOptions } from "./quiz-options";
+import { buildErrorDetectionContent } from "./error-detection-options";
 
 export interface PersistResult {
   atomCount: number;
@@ -216,10 +217,18 @@ function buildCardsForAtom(
     aiVersion: env.aiPromptVersion,
   });
 
-  const flawedText =
-    atom.commonMistakes[0] ??
-    `${atom.title} si definisce come: ${atom.counterExamples[0] ?? "concetto non correlato"}.`;
-  const correction = atom.definitions[0] ?? atom.explanation;
+  const errorDetection = buildErrorDetectionContent({
+    id: atomId,
+    title: atom.title,
+    summary: atom.summary,
+    explanation: atom.explanation,
+    definitions: atom.definitions,
+    errorDetectionStatement: atom.errorDetectionStatement,
+    errorDetectionCorrection: atom.errorDetectionCorrection,
+    quizDistractors: atom.quizDistractors,
+    misconceptions: atom.misconceptions,
+    commonMistakes: atom.commonMistakes,
+  });
 
   cards.push({
     atomId,
@@ -227,15 +236,16 @@ function buildCardsForAtom(
     order: 5,
     cognitiveObjective: CognitiveObjective.Connection,
     prompt: "Trova l'errore nel testo.",
-    text: flawedText,
+    text: errorDetection.text,
     explanation: atom.explanation,
     correctFeedback: "Hai individuato l'errore.",
-    incorrectFeedback: correction,
+    incorrectFeedback: errorDetection.correction,
     estimatedDurationSeconds: 45,
     payload: {
-      text: flawedText,
-      errorIndices: flawedText.length > 0 ? [0] : [],
-      correction,
+      text: errorDetection.text,
+      hasError: errorDetection.hasError,
+      errorIndices: errorDetection.hasError ? [0] : [],
+      correction: errorDetection.correction,
     } as Prisma.InputJsonValue,
     aiVersion: env.aiPromptVersion,
   });
