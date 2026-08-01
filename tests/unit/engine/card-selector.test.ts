@@ -1,9 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { CardType } from "@/domain/enums";
 import { CognitiveAtomStage } from "@/domain/enums/cognitive";
-import { selectCardForAtom } from "@/engine/card-selector";
+import {
+  needsPrimaryIntroduction,
+  selectCardForAtom,
+} from "@/engine/card-selector";
 import { makeCard, makeUserAtomState } from "../../helpers/fixtures";
 import type { CardId } from "@/domain/ids";
+
+function makeCardState(cardId: CardId, viewCount: number) {
+  return {
+    userId: cardId,
+    cardId,
+    viewCount,
+    correctAnswerCount: 0,
+    wrongAnswerCount: 0,
+    averageResponseTimeMs: null,
+    lastAnsweredAt: null,
+    confidence: 0.5,
+    perceivedDifficulty: 0.5,
+    skipped: false,
+    liked: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
 
 describe("engine/card-selector", () => {
   it("returns null when no cards are available", () => {
@@ -41,6 +62,43 @@ describe("engine/card-selector", () => {
     expect(selected?.type).toBe(CardType.Explain);
   });
 
+  it("requires explain before retrieval even when atom progress already exists", () => {
+    const explain = makeCard({
+      id: "00000000-0000-4000-8000-000000000201" as CardId,
+      type: CardType.Explain,
+      order: 0,
+    });
+    const quiz = makeCard({
+      id: "00000000-0000-4000-8000-000000000202" as CardId,
+      type: CardType.Quiz,
+      order: 1,
+    });
+    const blurting = makeCard({
+      id: "00000000-0000-4000-8000-000000000203" as CardId,
+      type: CardType.Blurting,
+      order: 2,
+    });
+
+    expect(
+      needsPrimaryIntroduction([explain, quiz, blurting], new Map())
+    ).toBe(true);
+
+    const selected = selectCardForAtom({
+      cards: [quiz, blurting, explain],
+      atomState: makeUserAtomState({
+        exposureCount: 4,
+        correctAnswerCount: 3,
+        mastery: 35,
+        comprehensionLevel: 28,
+      }),
+      stage: CognitiveAtomStage.Consolidating,
+      userCardStates: new Map(),
+      lastCardType: CardType.Quiz,
+    });
+
+    expect(selected?.type).toBe(CardType.Explain);
+  });
+
   it("suppresses explanation cards after they have already been viewed", () => {
     const explain = makeCard({
       id: "00000000-0000-4000-8000-000000000201" as CardId,
@@ -67,24 +125,7 @@ describe("engine/card-selector", () => {
       }),
       stage: CognitiveAtomStage.Learning,
       userCardStates: new Map([
-        [
-          explain.id,
-          {
-            userId: explain.id,
-            cardId: explain.id,
-            viewCount: 1,
-            correctAnswerCount: 0,
-            wrongAnswerCount: 0,
-            averageResponseTimeMs: null,
-            lastAnsweredAt: null,
-            confidence: 0.5,
-            perceivedDifficulty: 0.5,
-            skipped: false,
-            liked: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ],
+        [explain.id, makeCardState(explain.id, 1)],
       ]),
       lastCardType: CardType.Explain,
     });
@@ -112,29 +153,41 @@ describe("engine/card-selector", () => {
       }),
       stage: CognitiveAtomStage.Learning,
       userCardStates: new Map([
-        [
-          explain.id,
-          {
-            userId: explain.id,
-            cardId: explain.id,
-            viewCount: 1,
-            correctAnswerCount: 0,
-            wrongAnswerCount: 0,
-            averageResponseTimeMs: null,
-            lastAnsweredAt: null,
-            confidence: 0.5,
-            perceivedDifficulty: 0.5,
-            skipped: false,
-            liked: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ],
+        [explain.id, makeCardState(explain.id, 1)],
       ]),
       lastCardType: CardType.Quiz,
     });
 
     expect(selected?.type).toBe(CardType.Explain);
+  });
+
+  it("never repeats the primary explain card after it was completed", () => {
+    const explain = makeCard({
+      id: "00000000-0000-4000-8000-000000000201" as CardId,
+      type: CardType.Explain,
+      order: 0,
+    });
+    const quiz = makeCard({
+      id: "00000000-0000-4000-8000-000000000202" as CardId,
+      type: CardType.Quiz,
+      order: 1,
+    });
+
+    const selected = selectCardForAtom({
+      cards: [explain, quiz],
+      atomState: makeUserAtomState({
+        exposureCount: 1,
+        correctAnswerCount: 1,
+        wrongAnswerCount: 0,
+      }),
+      stage: CognitiveAtomStage.Learning,
+      userCardStates: new Map([
+        [explain.id, makeCardState(explain.id, 1)],
+      ]),
+      lastCardType: CardType.Explain,
+    });
+
+    expect(selected?.id).toBe(quiz.id);
   });
 
   it("avoids repeating the same card type consecutively", () => {

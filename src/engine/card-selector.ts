@@ -9,7 +9,40 @@ import {
 const EXPLAIN_TYPES = new Set<string>(EXPLANATION_CARD_TYPES);
 const RETRIEVAL_TYPES = new Set<string>(RETRIEVAL_CARD_TYPES);
 
-const SUPPRESSED_EXPLANATION_SCORE = -1000;
+const SUPPRESSED_CARD_SCORE = -1000;
+
+export function getPrimaryExplainCard(cards: Card[]): Card | null {
+  const explainCards = cards.filter((card) => card.type === CardType.Explain);
+  if (explainCards.length === 0) {
+    return null;
+  }
+
+  return [...explainCards].sort((left, right) => left.order - right.order)[0];
+}
+
+export function needsPrimaryIntroduction(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  const explainCard = getPrimaryExplainCard(cards);
+  if (!explainCard) {
+    return false;
+  }
+
+  return (userCardStates.get(explainCard.id)?.viewCount ?? 0) === 0;
+}
+
+export function introductionSeen(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  const explainCard = getPrimaryExplainCard(cards);
+  if (!explainCard) {
+    return true;
+  }
+
+  return (userCardStates.get(explainCard.id)?.viewCount ?? 0) > 0;
+}
 
 export function selectCardForAtom(input: {
   cards: Card[];
@@ -24,9 +57,12 @@ export function selectCardForAtom(input: {
     return null;
   }
 
+  if (needsPrimaryIntroduction(cards, userCardStates)) {
+    return getPrimaryExplainCard(cards);
+  }
+
   const scoringStage = resolveScoringStage({
     stage,
-    atomState,
     cards,
     userCardStates,
   });
@@ -57,11 +93,10 @@ export function selectCardForAtom(input: {
 
 function resolveScoringStage(input: {
   stage: CognitiveAtomStage;
-  atomState: UserAtomState;
   cards: Card[];
   userCardStates: Map<string, UserCardState>;
 }): CognitiveAtomStage {
-  const { stage, atomState, cards, userCardStates } = input;
+  const { stage, cards, userCardStates } = input;
 
   if (
     stage === CognitiveAtomStage.Forgotten ||
@@ -70,7 +105,7 @@ function resolveScoringStage(input: {
     return stage;
   }
 
-  if (!introductionSeen(cards, userCardStates, atomState)) {
+  if (!introductionSeen(cards, userCardStates)) {
     return stage;
   }
 
@@ -82,25 +117,6 @@ function resolveScoringStage(input: {
   }
 
   return stage;
-}
-
-function introductionSeen(
-  cards: Card[],
-  userCardStates: Map<string, UserCardState>,
-  atomState: UserAtomState
-): boolean {
-  const explainViewed = cards.some((card) => {
-    if (!EXPLAIN_TYPES.has(card.type)) {
-      return false;
-    }
-
-    return (userCardStates.get(card.id)?.viewCount ?? 0) > 0;
-  });
-
-  return (
-    explainViewed ||
-    (atomState.exposureCount > 0 && atomState.correctAnswerCount > 0)
-  );
 }
 
 function scoreCard(
@@ -120,7 +136,7 @@ function scoreCard(
   const wrongAnswers = cardState?.wrongAnswerCount ?? 0;
 
   if (shouldSuppressExplanation(card, atomState, stage, viewCount)) {
-    return SUPPRESSED_EXPLANATION_SCORE;
+    return SUPPRESSED_CARD_SCORE;
   }
 
   score += Math.max(0, 30 - viewCount * 8);
