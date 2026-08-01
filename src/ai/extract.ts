@@ -14,6 +14,8 @@ import {
 import { knowledgeJsonSchema, type ParsedKnowledgeJson } from "./schema";
 import { estimateModelCost } from "./optimization/cost";
 
+const MAX_EXTRACTION_ATTEMPTS = 3;
+
 export async function extractKnowledgeJson(
   input: {
     title: string;
@@ -55,36 +57,100 @@ export async function extractKnowledgeJson(
 
   tracker.recordCacheMiss();
 
-  const response = await runChatCompletion(
-    {
-      model: env.aiReasoningModel,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: buildExtractionSystemPrompt() },
-        {
-          role: "user",
-          content: buildExtractionUserPrompt(
-            input.title,
-            input.subject,
-            input.language,
-            input.cleanedText
-          ),
-        },
-      ],
-      temperature: 0,
-    },
-    tracker
-  );
+  let lastInvalidContent: string | null = null;
+  let lastValidationError: string | null = null;
 
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error("Il modello non ha restituito alcun contenuto.");
+  for (let attempt = 1; attempt <= MAX_EXTRACTION_ATTEMPTS; attempt++) {
+    const response = await runChatCompletion(
+      {
+        model: env.aiReasoningModel,
+        response_format: { type: "json_object" },
+        messages:
+          attempt === 1
+            ? [
+                { role: "system", content: buildExtractionSystemPrompt() },
+                {
+                  role: "user",
+                  content: buildExtractionUserPrompt(
+                    input.title,
+                    input.subject,
+                    input.language,
+                    input.cleanedText
+                  ),
+                },
+              ]
+            : [
+                { role: "system", content: buildExtractionSystemPrompt() },
+                {
+                  role: "user",
+                  content: buildExtractionRepairPrompt(
+                    lastInvalidContent ?? "",
+                    lastValidationError ?? "JSON non valido."
+                  ),
+                },
+              ],
+        temperature: 0,
+        max_tokens: 16384,
+      },
+      tracker
+    );
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("Il modello non ha restituito alcun contenuto.");
+    }
+
+    const parsed = tryParseKnowledgeJson(content);
+    if (parsed.ok) {
+      await cacheExtractionResult({
+        cacheKey,
+        textHash,
+        fileHash: input.fileHash,
+        content,
+        usage: response.usage,
+        tracker,
+      });
+      return parsed.data;
+    }
+
+    lastInvalidContent = content;
+    lastValidationError = parsed.error;
   }
 
-  const parsed = parseKnowledgeJson(content);
-  const usage = response.usage;
-  const inputTokens = usage?.prompt_tokens ?? 0;
-  const outputTokens = usage?.completion_tokens ?? 0;
+  throw new Error(
+    `JSON non valido dopo ${MAX_EXTRACTION_ATTEMPTS} tentativi: ${lastValidationError}`
+  );
+}
+
+function buildExtractionRepairPrompt(
+  invalidJson: string,
+  validationError: string
+): string {
+  return `Il JSON precedente non rispetta lo schema richiesto.
+
+Errori di validazione:
+${validationError}
+
+JSON da correggere:
+---
+${invalidJson}
+---
+
+Correggi il JSON mantenendo tutti i campi obbligatori per metadata e ogni atom.
+Usa array vuoti [] per campi senza contenuto e null per historicalContext/notes quando assenti.
+Rispondi SOLO con il JSON corretto.`;
+}
+
+async function cacheExtractionResult(input: {
+  cacheKey: string;
+  textHash: string;
+  fileHash?: string;
+  content: string;
+  usage?: { prompt_tokens?: number; completion_tokens?: number };
+  tracker: UsageTracker;
+}): Promise<void> {
+  const inputTokens = input.usage?.prompt_tokens ?? 0;
+  const outputTokens = input.usage?.completion_tokens ?? 0;
   const estimatedCostUsd = estimateModelCost(
     env.aiReasoningModel,
     inputTokens,
@@ -92,13 +158,13 @@ export async function extractKnowledgeJson(
   );
 
   await writeCacheResult({
-    cacheKey,
+    cacheKey: input.cacheKey,
     kind: "extraction",
-    contentHash: textHash,
+    contentHash: input.textHash,
     model: env.aiReasoningModel,
     promptVersion: env.aiPromptVersion,
     parserVersion: env.knowledgeJsonVersion,
-    result: content,
+    result: input.content,
     inputTokens,
     outputTokens,
     estimatedCostUsd,
@@ -117,30 +183,43 @@ export async function extractKnowledgeJson(
       model: env.aiReasoningModel,
       promptVersion: env.aiPromptVersion,
       parserVersion: env.knowledgeJsonVersion,
-      result: content,
+      result: input.content,
       inputTokens: 0,
       outputTokens: 0,
       estimatedCostUsd: 0,
     });
   }
-
-  return parsed;
 }
 
-function parseKnowledgeJson(content: string): ParsedKnowledgeJson {
+function tryParseKnowledgeJson(
+  content: string
+): { ok: true; data: ParsedKnowledgeJson } | { ok: false; error: string } {
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
   } catch {
-    throw new Error("Output LLM non è JSON valido.");
+    return { ok: false, error: "Output LLM non è JSON valido." };
   }
 
   const result = knowledgeJsonSchema.safeParse(parsed);
   if (!result.success) {
-    throw new Error(
-      `JSON non valido: ${result.error.issues.map((issue) => issue.message).join("; ")}`
-    );
+    const issues = result.error.issues
+      .slice(0, 8)
+      .map((issue) => issue.message)
+      .join("; ");
+    return {
+      ok: false,
+      error: `JSON non valido: ${issues}`,
+    };
   }
 
+  return { ok: true, data: result.data };
+}
+
+function parseKnowledgeJson(content: string): ParsedKnowledgeJson {
+  const result = tryParseKnowledgeJson(content);
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
   return result.data;
 }

@@ -41,6 +41,7 @@ export {
   uploadChapter,
   startKnowledgeSourceProcessing,
   fetchProcessingJob,
+  fetchLatestProcessingJob,
   fetchChapterByKnowledgeSource,
 } from "./course";
 export {

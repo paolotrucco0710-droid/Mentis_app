@@ -7,6 +7,7 @@ import { KnowledgeSourceProcessingStatus } from "@/domain/enums";
 import {
   ApiError,
   fetchChapterByKnowledgeSource,
+  fetchLatestProcessingJob,
   fetchProcessingJob,
   startKnowledgeSourceProcessing,
 } from "@/lib/api";
@@ -38,6 +39,19 @@ const PIPELINE_STEPS = [
   "Persistenza",
   "Completato",
 ];
+
+function simplifyProcessingError(message: string): string {
+  if (message.includes("No endpoints found for")) {
+    return "Modello AI non disponibile su OpenRouter. Controlla AI_VISION_MODEL e AI_REASONING_MODEL nel file .env.";
+  }
+  if (message.includes("JSON non valido")) {
+    return "Il modello AI non ha prodotto un JSON valido. Prova AI_REASONING_MODEL=google/gemini-2.5-flash nel file .env.";
+  }
+  if (message.length > 240) {
+    return `${message.slice(0, 240)}…`;
+  }
+  return message;
+}
 
 export function ProcessingPanel() {
   const searchParams = useSearchParams();
@@ -71,6 +85,19 @@ export function ProcessingPanel() {
         }
         if (job.status === "completed") {
           setStatus(KnowledgeSourceProcessingStatus.Completed);
+        }
+      } else if (
+        chapter.knowledgeSource.processingStatus ===
+        KnowledgeSourceProcessingStatus.Failed
+      ) {
+        try {
+          const { job } = await fetchLatestProcessingJob(knowledgeSourceId);
+          setCurrentStep(job.currentStep);
+          if (job.errorMessage) {
+            setError(simplifyProcessingError(job.errorMessage));
+          }
+        } catch {
+          setError("Elaborazione fallita.");
         }
       }
     } catch (err) {

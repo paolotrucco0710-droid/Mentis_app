@@ -92,6 +92,16 @@ export async function fetchProcessingJob(jobId: string) {
   } }>(`/api/v1/ai-jobs/${jobId}`);
 }
 
+export async function fetchLatestProcessingJob(knowledgeSourceId: string) {
+  return apiFetch<{ job: {
+    id: string;
+    status: string;
+    currentStep: string | null;
+    errorMessage: string | null;
+    knowledgeSourceId: string;
+  } }>(`/api/v1/knowledge-sources/${knowledgeSourceId}/latest-job`);
+}
+
 export async function fetchChapterByKnowledgeSource(
   knowledgeSourceId: string
 ): Promise<ChapterWithSource> {

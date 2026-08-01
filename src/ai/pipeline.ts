@@ -8,6 +8,7 @@ import { prisma } from "@/db/client";
 import {
   createAIJob,
   findAIJobById,
+  findAIJobsByKnowledgeSourceId,
   updateAIJobStatus,
   updateAIJobUsage,
 } from "@/db/repositories/ai-jobs";
@@ -285,6 +286,18 @@ export async function processKnowledgeSource(
 
 export async function getProcessingJob(jobId: AIJobId, userId: UserId) {
   const job = await findAIJobById(jobId);
+  if (!job || job.userId !== userId) {
+    return null;
+  }
+  return job;
+}
+
+export async function getLatestProcessingJob(
+  knowledgeSourceId: KnowledgeSourceId,
+  userId: UserId
+) {
+  const jobs = await findAIJobsByKnowledgeSourceId(knowledgeSourceId);
+  const job = jobs[0];
   if (!job || job.userId !== userId) {
     return null;
   }

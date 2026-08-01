@@ -5,6 +5,7 @@ export {
   AIProcessingError,
   processKnowledgeSource,
   getProcessingJob,
+  getLatestProcessingJob,
   scheduleKnowledgeSourceProcessing,
 } from "./pipeline";
 export type { ProcessingResult } from "./pipeline";
