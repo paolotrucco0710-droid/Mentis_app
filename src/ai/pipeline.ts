@@ -22,6 +22,7 @@ import { countAtomsByKnowledgeSourceId } from "@/db/repositories/atoms";
 import { KnowledgeSourceProcessingStatus } from "@/domain/enums";
 import { AIJobStep, AIJobStatus } from "@/domain/enums";
 import type { AIJobId, KnowledgeSourceId, UserId } from "@/domain/ids";
+import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { toUserFacingAIError } from "./errors";
 import { extractKnowledgeJson } from "./extract";
