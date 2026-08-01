@@ -168,10 +168,13 @@ export function ProcessingPanel() {
         </CardHeader>
         <ProgressBar value={progress} label="Progresso pipeline" />
         {isActive ? <Loader label="Elaborazione attiva..." /> : null}
-        {status === KnowledgeSourceProcessingStatus.Uploaded ? (
+        {status === KnowledgeSourceProcessingStatus.Uploaded ||
+        status === KnowledgeSourceProcessingStatus.Failed ? (
           <div className="mt-4">
             <Button onClick={() => void handleStart()} disabled={starting}>
-              Avvia elaborazione
+              {status === KnowledgeSourceProcessingStatus.Failed
+                ? "Riprova elaborazione"
+                : "Avvia elaborazione"}
             </Button>
           </div>
         ) : null}
