@@ -24,6 +24,10 @@ export const env = {
   ),
   maxUploadFiles: parsePositiveInt(process.env.MAX_UPLOAD_FILES, 50),
   openaiApiKey: process.env.OPENAI_API_KEY ?? "",
+  openaiBaseUrl: process.env.OPENAI_BASE_URL ?? "",
+  openaiAppName: process.env.OPENAI_APP_NAME ?? "Mentis",
+  openaiHttpReferer:
+    process.env.OPENAI_HTTP_REFERER ?? process.env.NEXT_PUBLIC_APP_URL ?? "",
   aiVisionModel: process.env.AI_VISION_MODEL ?? "gpt-4o-mini",
   aiReasoningModel: process.env.AI_REASONING_MODEL ?? "gpt-4o-mini",
   knowledgeJsonVersion: process.env.KNOWLEDGE_JSON_VERSION ?? "1.0.0",
