@@ -12,6 +12,7 @@ import {
   buildExtractionUserPrompt,
 } from "./prompts";
 import { knowledgeJsonSchema, type ParsedKnowledgeJson } from "./schema";
+import { coerceKnowledgeJson, extractJsonPayload } from "./coerce-knowledge-json";
 import { estimateModelCost } from "./optimization/cost";
 
 const MAX_EXTRACTION_ATTEMPTS = 3;
@@ -196,12 +197,13 @@ function tryParseKnowledgeJson(
 ): { ok: true; data: ParsedKnowledgeJson } | { ok: false; error: string } {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(content);
+    parsed = JSON.parse(extractJsonPayload(content));
   } catch {
     return { ok: false, error: "Output LLM non è JSON valido." };
   }
 
-  const result = knowledgeJsonSchema.safeParse(parsed);
+  const coerced = coerceKnowledgeJson(parsed);
+  const result = knowledgeJsonSchema.safeParse(coerced);
   if (!result.success) {
     const issues = result.error.issues
       .slice(0, 8)
