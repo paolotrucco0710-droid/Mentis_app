@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { memo } from "react";
 import { CardType } from "@/domain/enums";
+import type { AtomId } from "@/domain/ids";
 import type { Card } from "@/domain/entities/card";
 import { Loader } from "@/components/ui";
 import type { CardAnswerResult } from "./card-utils";
@@ -46,12 +47,14 @@ const FallbackCard = dynamic(
 
 function FeedCardRendererComponent({
   card,
+  atomId,
   atomTitle,
   disabled,
   onAnswer,
   onSkip,
 }: {
   card: Card;
+  atomId?: AtomId;
   atomTitle?: string;
   disabled?: boolean;
   onAnswer: (result: CardAnswerResult) => void;
@@ -59,6 +62,7 @@ function FeedCardRendererComponent({
 }) {
   const props = {
     card,
+    atomId,
     atomTitle,
     disabled,
     onContinue: onAnswer,

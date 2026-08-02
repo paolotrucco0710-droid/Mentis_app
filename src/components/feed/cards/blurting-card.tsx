@@ -1,18 +1,53 @@
 "use client";
 
 import { memo, useState } from "react";
-import { Button, Card, CardDescription, CardHeader, CardTitle, TextArea } from "@/components/ui";
+import type { RetrievalFeedback } from "@/ai/retrieval-feedback";
+import { Button, Card, CardDescription, CardHeader, CardTitle, Loader, TextArea } from "@/components/ui";
 import { SessionEventOutcome } from "@/domain/enums";
+import { ApiError, evaluateRetrievalResponse } from "@/lib/api";
 import type { FeedCardProps } from "../card-utils";
 import { isBlurtingPayload } from "../card-utils";
+import { RetrievalFeedbackPanel } from "./retrieval-feedback-panel";
 
-export function BlurtingCardComponent({ card, disabled, onContinue }: FeedCardProps) {
+export function BlurtingCardComponent({
+  card,
+  atomId,
+  disabled,
+  onContinue,
+}: FeedCardProps) {
   const payload = isBlurtingPayload(card.payload) ? card.payload : null;
   const [answer, setAnswer] = useState("");
-  const [revealed, setRevealed] = useState(false);
+  const [feedback, setFeedback] = useState<RetrievalFeedback | null>(null);
+  const [evaluating, setEvaluating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!payload) {
     return null;
+  }
+
+  async function handleEvaluate() {
+    if (!atomId) {
+      setError("Contesto del concetto mancante. Ricarica la pagina.");
+      return;
+    }
+
+    setEvaluating(true);
+    setError(null);
+
+    try {
+      const result = await evaluateRetrievalResponse({
+        atomId,
+        cardId: card.id,
+        userAnswer: answer,
+      });
+      setFeedback(result);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Valutazione non riuscita. Riprova."
+      );
+    } finally {
+      setEvaluating(false);
+    }
   }
 
   return (
@@ -28,23 +63,34 @@ export function BlurtingCardComponent({ card, disabled, onContinue }: FeedCardPr
         value={answer}
         onChange={(event) => setAnswer(event.target.value)}
         placeholder="Scrivi liberamente..."
-        disabled={disabled || revealed}
+        disabled={disabled || evaluating || feedback !== null}
       />
-      {revealed ? (
-        <div className="mt-4 space-y-3">
-          <p className="text-sm font-medium">Punti chiave da ricordare:</p>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
-            {payload.keyPoints.map((point) => (
-              <li key={point}>{point}</li>
-            ))}
-          </ul>
+      {evaluating ? (
+        <div className="mt-4">
+          <Loader label="Valutazione in corso..." />
+        </div>
+      ) : null}
+      {error ? (
+        <p className="mt-4 text-sm text-danger">{error}</p>
+      ) : null}
+      {feedback ? (
+        <div className="mt-4 space-y-4">
+          <RetrievalFeedbackPanel feedback={feedback} />
+          <div>
+            <p className="text-sm font-medium">Punti chiave da ricordare:</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted">
+              {payload.keyPoints.map((point) => (
+                <li key={point}>{point}</li>
+              ))}
+            </ul>
+          </div>
           <Button
             fullWidth
             disabled={disabled}
             onClick={() =>
               onContinue({
                 outcome: SessionEventOutcome.Success,
-                isCorrect: answer.trim().length > 20,
+                isCorrect: feedback.isCorrect,
               })
             }
           >
@@ -55,10 +101,10 @@ export function BlurtingCardComponent({ card, disabled, onContinue }: FeedCardPr
         <Button
           className="mt-4"
           fullWidth
-          disabled={disabled || answer.trim().length < 5}
-          onClick={() => setRevealed(true)}
+          disabled={disabled || evaluating || answer.trim().length < 5}
+          onClick={() => void handleEvaluate()}
         >
-          Mostra punti chiave
+          Valuta risposta
         </Button>
       )}
     </Card>

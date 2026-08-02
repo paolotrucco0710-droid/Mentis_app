@@ -41,6 +41,9 @@ function ChapterRowComponent({
               <CardDescription>
                 Capitolo {chapter.chapterNumber ?? "—"} · {chapter.atomCount}{" "}
                 concetti · {chapter.knowledgeSource.pageCount} pagine
+                {status === KnowledgeSourceProcessingStatus.Completed
+                  ? " · Materiale pronto per lo studio"
+                  : ""}
               </CardDescription>
             </div>
             <Badge

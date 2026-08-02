@@ -1,7 +1,7 @@
 import type { Atom, Card, StudySession, UserAtomState, UserCardState } from "@/domain/entities";
 import type { CardType } from "@/domain/enums";
 import type { CognitiveAtomStage } from "@/domain/enums/cognitive";
-import type { SubjectId, UserId } from "@/domain/ids";
+import type { AtomId, SubjectId, UserId } from "@/domain/ids";
 
 export interface FeedEngineContext {
   userId: UserId;
@@ -13,6 +13,8 @@ export interface FeedEngineContext {
   userCardStates: Map<string, UserCardState>;
   cardsById: Map<string, Card>;
   lastCardType: CardType | null;
+  recentAtomIds: AtomId[];
+  knowledgeSourceExposure: Map<string, number>;
   now: Date;
 }
 

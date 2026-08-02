@@ -217,4 +217,42 @@ describe("engine/card-selector", () => {
 
     expect(selected?.type).toBe(CardType.TrueFalse);
   });
+
+  it("prefers quick retrieval cards over blurting after blurting", () => {
+    const explain = makeCard({
+      id: "00000000-0000-4000-8000-000000000201" as CardId,
+      type: CardType.Explain,
+      order: 0,
+    });
+    const quiz = makeCard({
+      id: "00000000-0000-4000-8000-000000000202" as CardId,
+      type: CardType.Quiz,
+      order: 1,
+    });
+    const blurting = makeCard({
+      id: "00000000-0000-4000-8000-000000000203" as CardId,
+      type: CardType.Blurting,
+      order: 2,
+    });
+    const feynman = makeCard({
+      id: "00000000-0000-4000-8000-000000000204" as CardId,
+      type: CardType.Feynman,
+      order: 3,
+    });
+
+    const selected = selectCardForAtom({
+      cards: [explain, quiz, blurting, feynman],
+      atomState: makeUserAtomState({
+        exposureCount: 2,
+        correctAnswerCount: 2,
+      }),
+      stage: CognitiveAtomStage.Consolidating,
+      userCardStates: new Map([
+        [explain.id, makeCardState(explain.id, 1)],
+      ]),
+      lastCardType: CardType.Blurting,
+    });
+
+    expect(selected?.type).toBe(CardType.Quiz);
+  });
 });

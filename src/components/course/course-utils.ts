@@ -29,7 +29,7 @@ export function formatProcessingStatus(
     case KnowledgeSourceProcessingStatus.Processing:
       return "Elaborazione";
     case KnowledgeSourceProcessingStatus.Completed:
-      return "Completato";
+      return "Pronto allo studio";
     case KnowledgeSourceProcessingStatus.Failed:
       return "Errore";
     default:
