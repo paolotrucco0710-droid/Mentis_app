@@ -158,6 +158,7 @@ async function loadFeedContext(
   const lastCardType = resolveLastCardType(sessionEvents, cardsById);
   const recentCardTypes = resolveRecentCardTypes(sessionEvents, cardsById);
   const recentAtomIds = resolveRecentAtomIds(sessionEvents);
+  const recentAtomCounts = resolveRecentAtomCounts(sessionEvents);
   const knowledgeSourceExposure = buildKnowledgeSourceExposure(
     scopedAtoms,
     userAtomStates
@@ -175,6 +176,7 @@ async function loadFeedContext(
     lastCardType,
     recentCardTypes,
     recentAtomIds,
+    recentAtomCounts,
     knowledgeSourceExposure,
     now: new Date(),
   };
@@ -258,6 +260,7 @@ function selectNextItem(context: FeedEngineContext) {
         ),
         now: context.now,
         recentAtomIds: context.recentAtomIds,
+        recentAtomCounts: context.recentAtomCounts,
         knowledgeSourceExposure: context.knowledgeSourceExposure,
       });
     })
@@ -265,7 +268,7 @@ function selectNextItem(context: FeedEngineContext) {
       Boolean(candidate)
     );
 
-  const bestCandidate = selectBestCandidate(candidates);
+  const bestCandidate = selectBestCandidate(candidates, context.recentAtomIds);
   if (!bestCandidate) {
     return null;
   }
@@ -382,6 +385,22 @@ function resolveRecentCardTypes(
   }
 
   return recent.reverse();
+}
+
+function resolveRecentAtomCounts(
+  events: Awaited<ReturnType<typeof findSessionEventsBySessionId>>
+): Map<string, number> {
+  const counts = new Map<string, number>();
+
+  for (const event of events) {
+    if (event.type !== SessionEventType.OpenCard || !event.atomId) {
+      continue;
+    }
+
+    counts.set(event.atomId, (counts.get(event.atomId) ?? 0) + 1);
+  }
+
+  return counts;
 }
 
 function resolveRecentAtomIds(

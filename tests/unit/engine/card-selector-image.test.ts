@@ -24,7 +24,7 @@ function makeCardState(cardId: CardId, viewCount: number) {
 }
 
 describe("image explain selection", () => {
-  it("does not force image cards immediately after explain", () => {
+  it("prefers retrieval cards over image cards right after explain", () => {
     const explain = makeCard({
       id: "00000000-0000-4000-8000-000000000201" as CardId,
       type: CardType.Explain,
@@ -34,12 +34,22 @@ describe("image explain selection", () => {
       id: "00000000-0000-4000-8000-000000000204" as CardId,
       type: CardType.ImageExplain,
       order: 6,
-      payload: { imageId: "00000000-0000-4000-8000-000000000301" },
+      payload: {
+        imageId: "00000000-0000-4000-8000-000000000301",
+        question: "Quale affermazione descrive meglio ciò che vedi?",
+        options: ["A", "B", "C", "D"],
+        correctOptionIndex: 0,
+      },
     });
     const quiz = makeCard({
       id: "00000000-0000-4000-8000-000000000202" as CardId,
       type: CardType.Quiz,
       order: 1,
+      payload: {
+        question: "Domanda",
+        options: ["A", "B", "C", "D"],
+        correctOptionIndex: 0,
+      },
     });
 
     const selected = selectCardForAtom({

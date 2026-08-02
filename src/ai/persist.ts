@@ -6,6 +6,8 @@ import { prisma } from "@/db/client";
 import { env } from "@/lib/env";
 import { shouldCreateImageExplainCard } from "./image-study";
 import { buildErrorDetectionContent, buildTrueFalseContent } from "./error-detection-options";
+import { buildImageExplainCardCreateInput } from "./image-explain-card-builder";
+import { deterministicShuffle } from "./deterministic-shuffle";
 import { buildQuizOptions } from "./quiz-options";
 
 export interface PersistResult {
@@ -278,21 +280,9 @@ function buildCardsForAtom(
       imageReference
     )
   ) {
-    cards.push({
-      atomId,
-      type: CardType.ImageExplain,
-      order: 6,
-      cognitiveObjective: CognitiveObjective.Comprehension,
-      prompt: imageReference.caption ?? `Concetto visivo: ${atom.title}`,
-      text: imageReference.description ?? atom.summary,
-      explanation: atom.explanation,
-      correctFeedback: "Ottima osservazione.",
-      estimatedDurationSeconds: 40,
-      payload: {
-        imageId: imageReference.imageId,
-      } as Prisma.InputJsonValue,
-      aiVersion: env.aiPromptVersion,
-    });
+    cards.push(
+      buildImageExplainCardCreateInput(atomId, atom, imageReference)
+    );
   }
 
   return cards;
@@ -316,22 +306,4 @@ export function getGeneratedCardTypes(
     : MVP_FEED_CARD_TYPES.filter((type) => type !== CardType.ImageExplain);
 
   return [...withImage];
-}
-
-export function deterministicShuffle<T>(items: T[], seed: string): T[] {
-  const copy = [...items];
-  let hash = 2166136261;
-
-  for (let index = 0; index < seed.length; index += 1) {
-    hash ^= seed.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-
-  for (let index = copy.length - 1; index > 0; index -= 1) {
-    hash = Math.imul(hash ^ (hash >>> 13), 1274126177);
-    const swapIndex = (hash >>> 0) % (index + 1);
-    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
-  }
-
-  return copy;
 }

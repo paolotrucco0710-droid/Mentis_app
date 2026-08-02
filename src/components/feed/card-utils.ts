@@ -78,6 +78,43 @@ export function getImageIdFromPayload(
   return null;
 }
 
+export function getImageQuestionFromPayload(
+  payload: CardPayload | null
+): string | null {
+  if (
+    payload !== null &&
+    typeof payload === "object" &&
+    "question" in payload &&
+    typeof payload.question === "string"
+  ) {
+    return payload.question;
+  }
+
+  return null;
+}
+
+export function getImageQuizOptionsFromPayload(
+  payload: CardPayload | null
+): { options: string[]; correctOptionIndex: number } | null {
+  if (
+    payload !== null &&
+    typeof payload === "object" &&
+    "options" in payload &&
+    Array.isArray(payload.options) &&
+    "correctOptionIndex" in payload &&
+    typeof payload.correctOptionIndex === "number"
+  ) {
+    return {
+      options: payload.options.filter(
+        (option): option is string => typeof option === "string"
+      ),
+      correctOptionIndex: payload.correctOptionIndex,
+    };
+  }
+
+  return null;
+}
+
 export function getCardTypeLabel(type: CardType): string {
   switch (type) {
     case CardType.Explain:

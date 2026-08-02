@@ -14,6 +14,7 @@ export function scoreAtomCandidate(input: {
   unlocksCount: number;
   now: Date;
   recentAtomIds?: AtomId[];
+  recentAtomCounts?: Map<string, number>;
   knowledgeSourceExposure?: Map<string, number>;
 }): ScoredAtomCandidate | null {
   const {
@@ -23,6 +24,7 @@ export function scoreAtomCandidate(input: {
     unlocksCount,
     now,
     recentAtomIds = [],
+    recentAtomCounts = new Map(),
     knowledgeSourceExposure = new Map(),
   } = input;
   const prerequisitesSatisfied = prerequisitesMet(
@@ -44,6 +46,7 @@ export function scoreAtomCandidate(input: {
     unlocksCount,
     now,
     recentAtomIds,
+    recentAtomCounts,
     knowledgeSourceExposure,
   });
 
@@ -66,6 +69,7 @@ function computePriority(input: {
   unlocksCount: number;
   now: Date;
   recentAtomIds: AtomId[];
+  recentAtomCounts: Map<string, number>;
   knowledgeSourceExposure: Map<string, number>;
 }): number {
   const {
@@ -76,6 +80,7 @@ function computePriority(input: {
     unlocksCount,
     now,
     recentAtomIds,
+    recentAtomCounts,
     knowledgeSourceExposure,
   } = input;
 
@@ -91,7 +96,7 @@ function computePriority(input: {
     score += 50 + Math.min(overdueHours, 48);
   }
 
-  score += unlocksCount * 35;
+  score += Math.min(unlocksCount * 35, 70);
 
   score += atom.importance * 8;
 
@@ -137,7 +142,12 @@ function computePriority(input: {
 
   const recentIndex = recentAtomIds.indexOf(atom.id);
   if (recentIndex >= 0) {
-    score -= 70 - recentIndex * 12;
+    score -= 85 - recentIndex * 10;
+  }
+
+  const recentSessionCount = recentAtomCounts.get(atom.id) ?? 0;
+  if (recentSessionCount > 0) {
+    score -= recentSessionCount * 60;
   }
 
   const chapterExposure = knowledgeSourceExposure.get(atom.knowledgeSourceId) ?? 0;
@@ -150,7 +160,7 @@ function computePriority(input: {
   }
 
   if (chapterExposure === 0) {
-    score += 90;
+    score += 45;
   }
 
   if (state.exposureCount === 0) {
@@ -207,7 +217,8 @@ export function countUnlocks(
 }
 
 export function selectBestCandidate(
-  candidates: ScoredAtomCandidate[]
+  candidates: ScoredAtomCandidate[],
+  recentAtomIds: AtomId[] = []
 ): ScoredAtomCandidate | null {
   if (candidates.length === 0) {
     return null;
@@ -216,6 +227,22 @@ export function selectBestCandidate(
   return [...candidates].sort((left, right) => {
     if (right.priority !== left.priority) {
       return right.priority - left.priority;
+    }
+
+    const leftRecent = recentAtomIds.indexOf(left.atom.id);
+    const rightRecent = recentAtomIds.indexOf(right.atom.id);
+    if (leftRecent !== rightRecent) {
+      if (leftRecent === -1) {
+        return -1;
+      }
+      if (rightRecent === -1) {
+        return 1;
+      }
+      return rightRecent - leftRecent;
+    }
+
+    if (left.state.exposureCount !== right.state.exposureCount) {
+      return left.state.exposureCount - right.state.exposureCount;
     }
 
     if (right.forgetProbability !== left.forgetProbability) {

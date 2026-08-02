@@ -20,10 +20,14 @@ export const IMAGE_EXPLAIN_CARD_TYPES = new Set([
   "image_explain",
 ]);
 
-/** Passive learning cards (explain + image) — avoid long streaks in the feed. */
+/** Passive learning cards — avoid long streaks in the feed. */
 export const LEARN_CARD_TYPES = new Set([
   ...EXPLANATION_CARD_TYPES,
-  ...IMAGE_EXPLAIN_CARD_TYPES,
+]);
+
+/** Image cards behave like visual retrieval, not passive learn cards. */
+export const VISUAL_RETRIEVAL_CARD_TYPES = new Set([
+  "image_explain",
 ]);
 
 /** Card types treated as retrieval-heavy (variety rules). */
@@ -50,4 +54,5 @@ export const QUICK_RETRIEVAL_CARD_TYPES = new Set([
   "multiple_choice",
   "true_false",
   "error_detection",
+  "image_explain",
 ]);

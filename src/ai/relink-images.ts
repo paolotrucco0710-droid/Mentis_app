@@ -4,6 +4,7 @@ import {
   mergeKnowledgeSourceImages,
 } from "@/ai/extract-figures";
 import { shouldCreateImageExplainCard } from "@/ai/image-study";
+import { buildImageExplainCardFields } from "@/ai/image-explain-card-builder";
 import { getImageIdFromPayload } from "@/components/feed/card-utils";
 import { findAtomsByKnowledgeSourceId } from "@/db/repositories/atoms";
 import { findCardsByAtomIds } from "@/db/repositories/cards";
@@ -147,20 +148,17 @@ export async function relinkImagesForKnowledgeSource(
     );
 
     if (!hasCard) {
+      const imageCard = buildImageExplainCardFields(
+        atom.id as AtomId,
+        atom,
+        imageReference
+      );
       await prisma.card.create({
         data: {
           atomId: atom.id as AtomId,
           type: CardType.ImageExplain,
           order: 6,
-          cognitiveObjective: CognitiveObjective.Comprehension,
-          prompt: imageReference.caption ?? `Concetto visivo: ${atom.title}`,
-          text: imageReference.description ?? atom.summary,
-          explanation: atom.explanation,
-          correctFeedback: "Ottima osservazione.",
-          estimatedDurationSeconds: 40,
-          payload: {
-            imageId: imageReference.imageId,
-          } as Prisma.InputJsonValue,
+          ...imageCard,
           aiVersion: env.aiPromptVersion,
         },
       });

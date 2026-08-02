@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { deterministicShuffle, getGeneratedCardTypes } from "@/ai/persist";
+import { getGeneratedCardTypes } from "@/ai/persist";
+import { deterministicShuffle } from "@/ai/deterministic-shuffle";
 import { CardType } from "@/domain/enums";
 import { makeMvpKnowledgeJson } from "../../helpers/mvp-knowledge";
 
