@@ -4,7 +4,8 @@ import type { AtomId, KnowledgeSourceId, SubjectId } from "@/domain/ids";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { env } from "@/lib/env";
-import { buildErrorDetectionContent } from "./error-detection-options";
+import { shouldCreateImageExplainCard } from "./image-study";
+import { buildErrorDetectionContent, buildTrueFalseContent } from "./error-detection-options";
 import { buildQuizOptions } from "./quiz-options";
 
 export interface PersistResult {
@@ -193,11 +194,15 @@ function buildCardsForAtom(
     aiVersion: env.aiPromptVersion,
   });
 
-  const trueFalseStatement =
-    atom.misconceptions[0] ??
-    atom.definitions[0] ??
-    `${atom.title}: ${atom.summary}`;
-  const trueFalseAnswer = atom.misconceptions.length === 0;
+  const trueFalse = buildTrueFalseContent({
+    title: atom.title,
+    summary: atom.summary,
+    explanation: atom.explanation,
+    misconceptions: atom.misconceptions,
+    commonMistakes: atom.commonMistakes,
+    definitions: atom.definitions,
+    counterExamples: atom.counterExamples,
+  });
 
   cards.push({
     atomId,
@@ -205,14 +210,14 @@ function buildCardsForAtom(
     order: 4,
     cognitiveObjective: CognitiveObjective.Connection,
     prompt: "Vero o falso?",
-    text: trueFalseStatement,
+    text: trueFalse.statement,
     explanation: atom.explanation,
     correctFeedback: "Esatto.",
     incorrectFeedback: atom.explanation,
     estimatedDurationSeconds: 20,
     payload: {
-      statement: trueFalseStatement,
-      correctAnswer: trueFalseAnswer,
+      statement: trueFalse.statement,
+      correctAnswer: trueFalse.correctAnswer,
     } as Prisma.InputJsonValue,
     aiVersion: env.aiPromptVersion,
   });
@@ -247,7 +252,13 @@ function buildCardsForAtom(
   });
 
   const imageReference = atom.images[0];
-  if (imageReference?.imageId) {
+  if (
+    imageReference?.imageId &&
+    shouldCreateImageExplainCard(
+      { caption: imageReference.caption },
+      imageReference
+    )
+  ) {
     cards.push({
       atomId,
       type: CardType.ImageExplain,

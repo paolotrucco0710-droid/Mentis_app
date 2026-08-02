@@ -1,0 +1,52 @@
+import type { Image } from "@/domain/entities/image";
+import type { KnowledgeJsonAtomImage } from "@/domain/knowledge/knowledge-json";
+
+const CAMERA_FILENAME_PATTERN = /^(IMG_|DSC_|PXL_|MVIMG_|WA\d+)/i;
+const IMAGE_FILENAME_PATTERN = /\.(jpe?g|png|heic|webp)$/i;
+
+/**
+ * Upload page photos are OCR input — not study illustrations for the feed.
+ */
+export function isUploadSourcePageImage(image: Pick<Image, "caption">): boolean {
+  const caption = image.caption?.trim() ?? "";
+  if (!caption) {
+    return true;
+  }
+
+  if (CAMERA_FILENAME_PATTERN.test(caption)) {
+    return true;
+  }
+
+  if (IMAGE_FILENAME_PATTERN.test(caption) && !caption.includes(" ")) {
+    return true;
+  }
+
+  return false;
+}
+
+export function isStudyIllustrationImage(
+  image: Pick<Image, "caption">
+): boolean {
+  return !isUploadSourcePageImage(image);
+}
+
+export function shouldCreateImageExplainCard(
+  image: Pick<Image, "caption"> | null | undefined,
+  reference?: Pick<KnowledgeJsonAtomImage, "caption" | "description"> | null
+): boolean {
+  const caption = reference?.caption?.trim() ?? image?.caption?.trim() ?? "";
+  if (!caption || isUploadSourcePageImage({ caption })) {
+    return false;
+  }
+
+  const description = reference?.description?.trim() ?? "";
+  if (description.length < 12) {
+    return false;
+  }
+
+  if (image && isUploadSourcePageImage(image)) {
+    return false;
+  }
+
+  return true;
+}

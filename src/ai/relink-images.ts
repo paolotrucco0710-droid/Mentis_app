@@ -1,35 +1,49 @@
 import { enrichKnowledgeWithImages } from "@/ai/enrich-images";
+import { shouldCreateImageExplainCard } from "@/ai/image-study";
+import { getImageIdFromPayload } from "@/components/feed/card-utils";
 import { findAtomsByKnowledgeSourceId } from "@/db/repositories/atoms";
 import { findCardsByAtomIds } from "@/db/repositories/cards";
 import { findImagesByKnowledgeSourceId } from "@/db/repositories/uploads";
 import { CardType, CognitiveObjective } from "@/domain/enums";
 import type { KnowledgeJson, KnowledgeJsonAtomImage } from "@/domain/knowledge";
-import type { AtomId, KnowledgeSourceId } from "@/domain/ids";
+import type { AtomId, ImageId, KnowledgeSourceId } from "@/domain/ids";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { env } from "@/lib/env";
 
 export async function relinkImagesForKnowledgeSource(
   knowledgeSourceId: KnowledgeSourceId
-): Promise<{ atomsUpdated: number; cardsCreated: number }> {
+): Promise<{ atomsUpdated: number; cardsCreated: number; cardsRemoved: number }> {
   const images = await findImagesByKnowledgeSourceId(knowledgeSourceId);
-  if (images.length === 0) {
-    return { atomsUpdated: 0, cardsCreated: 0 };
-  }
-
   const atoms = await findAtomsByKnowledgeSourceId(knowledgeSourceId);
   if (atoms.length === 0) {
-    return { atomsUpdated: 0, cardsCreated: 0 };
+    return { atomsUpdated: 0, cardsCreated: 0, cardsRemoved: 0 };
   }
 
+  const imageById = new Map(images.map((image) => [image.id, image]));
   const existingCards = await findCardsByAtomIds(atoms.map((atom) => atom.id));
-  const hasImageCards = existingCards.some(
-    (card) => card.type === CardType.ImageExplain
-  );
-  const hasLinkedImages = atoms.some((atom) => atom.images[0]?.imageId);
+  let cardsRemoved = 0;
 
-  if (hasImageCards && hasLinkedImages) {
-    return { atomsUpdated: 0, cardsCreated: 0 };
+  for (const card of existingCards) {
+    if (card.type !== CardType.ImageExplain) {
+      continue;
+    }
+
+    const imageId = getImageIdFromPayload(card.payload);
+    const image = imageId ? imageById.get(imageId as ImageId) : undefined;
+    const atom = atoms.find((entry) => entry.id === card.atomId);
+    const reference = atom?.images[0];
+
+    if (
+      !shouldCreateImageExplainCard(image ?? { caption: reference?.caption ?? null }, reference)
+    ) {
+      await prisma.card.delete({ where: { id: card.id } });
+      cardsRemoved += 1;
+    }
+  }
+
+  if (images.length === 0) {
+    return { atomsUpdated: 0, cardsCreated: 0, cardsRemoved };
   }
 
   const knowledge: KnowledgeJson = {
@@ -78,26 +92,38 @@ export async function relinkImagesForKnowledgeSource(
   const enriched = enrichKnowledgeWithImages(knowledge, images);
   let atomsUpdated = 0;
   let cardsCreated = 0;
+  const refreshedCards = await findCardsByAtomIds(atoms.map((atom) => atom.id));
 
   for (const atom of enriched.atoms) {
     const original = atoms.find((entry) => entry.id === atom.id);
     const imageReference = atom.images[0];
-    if (!imageReference?.imageId) {
-      continue;
-    }
 
+    const nextImages = imageReference?.imageId ? [imageReference] : [];
     const previousImageId = original?.images[0]?.imageId;
-    if (previousImageId !== imageReference.imageId) {
+  const nextImageId = nextImages[0]?.imageId;
+
+    if (previousImageId !== nextImageId) {
       await prisma.atom.update({
         where: { id: atom.id },
         data: {
-          images: atom.images as unknown as Prisma.InputJsonValue,
+          images: nextImages as unknown as Prisma.InputJsonValue,
         },
       });
       atomsUpdated += 1;
     }
 
-    const hasCard = existingCards.some(
+    if (!imageReference?.imageId) {
+      continue;
+    }
+
+    const image = imageById.get(imageReference.imageId as ImageId);
+    if (
+      !shouldCreateImageExplainCard(image ?? { caption: imageReference.caption }, imageReference)
+    ) {
+      continue;
+    }
+
+    const hasCard = refreshedCards.some(
       (card) =>
         card.atomId === atom.id && card.type === CardType.ImageExplain
     );
@@ -124,5 +150,5 @@ export async function relinkImagesForKnowledgeSource(
     }
   }
 
-  return { atomsUpdated, cardsCreated };
+  return { atomsUpdated, cardsCreated, cardsRemoved };
 }

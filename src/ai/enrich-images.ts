@@ -4,6 +4,10 @@ import type {
   KnowledgeJsonAtom,
   KnowledgeJsonAtomImage,
 } from "@/domain/knowledge/knowledge-json";
+import {
+  isStudyIllustrationImage,
+  shouldCreateImageExplainCard,
+} from "./image-study";
 
 function buildImageReference(
   image: Image,
@@ -21,15 +25,27 @@ function buildImageReference(
 
 function sanitizeExistingImages(
   atom: KnowledgeJsonAtom,
-  validImageIds: Set<string>
+  validImageIds: Set<string>,
+  imageById: Map<string, Image>
 ): KnowledgeJsonAtomImage[] {
-  return atom.images.filter((reference) => validImageIds.has(reference.imageId));
+  return atom.images.filter((reference) => {
+    if (!validImageIds.has(reference.imageId)) {
+      return false;
+    }
+
+    const image = imageById.get(reference.imageId);
+    return shouldCreateImageExplainCard(image ?? null, reference);
+  });
 }
 
 function groupImagesByPage(images: Image[]): Map<number, Image[]> {
   const grouped = new Map<number, Image[]>();
 
   for (const image of images) {
+    if (!isStudyIllustrationImage(image)) {
+      continue;
+    }
+
     const page = image.pageNumber ?? 1;
     const bucket = grouped.get(page) ?? [];
     bucket.push(image);
@@ -40,25 +56,34 @@ function groupImagesByPage(images: Image[]): Map<number, Image[]> {
 }
 
 /**
- * Links uploaded chapter images to extracted atoms using page references.
- * Fulfills the extraction prompt contract: images are attached after LLM extraction.
+ * Links study illustrations to atoms. Upload page photos used for OCR are ignored.
  */
 export function enrichKnowledgeWithImages(
   knowledge: KnowledgeJson,
   images: Image[]
 ): KnowledgeJson {
-  if (images.length === 0) {
-    return knowledge;
+  const studyImages = images.filter(isStudyIllustrationImage);
+  if (studyImages.length === 0) {
+    return {
+      ...knowledge,
+      atoms: knowledge.atoms.map((atom) => ({
+        ...atom,
+        images: atom.images.filter((reference) =>
+          shouldCreateImageExplainCard({ caption: reference.caption }, reference)
+        ),
+      })),
+    };
   }
 
-  const validImageIds = new Set(images.map((image) => image.id));
+  const validImageIds = new Set(studyImages.map((image) => image.id));
+  const imageById = new Map(studyImages.map((image) => [image.id, image]));
   const assignedImageIds = new Set<string>();
-  const imagesByPage = groupImagesByPage(images);
+  const imagesByPage = groupImagesByPage(studyImages);
 
   const atomsWithPreservedImages = knowledge.atoms.map((atom) => {
-    const preserved = sanitizeExistingImages(atom, validImageIds);
+    const preserved = sanitizeExistingImages(atom, validImageIds, imageById);
     preserved.forEach((reference) => assignedImageIds.add(reference.imageId));
-    return preserved.length > 0 ? { ...atom, images: preserved } : atom;
+    return preserved.length > 0 ? { ...atom, images: preserved } : { ...atom, images: [] };
   });
 
   const linkedAtoms = atomsWithPreservedImages.map((atom) => {
@@ -73,7 +98,13 @@ export function enrichKnowledgeWithImages(
         (image) => !assignedImageIds.has(image.id)
       );
 
-      if (candidate) {
+      if (
+        candidate &&
+        shouldCreateImageExplainCard(candidate, {
+          caption: candidate.caption?.trim() || `Figura: ${atom.title}`,
+          description: atom.summary,
+        })
+      ) {
         assignedImageIds.add(candidate.id);
         return {
           ...atom,
@@ -84,19 +115,6 @@ export function enrichKnowledgeWithImages(
 
     return atom;
   });
-
-  const remainingImages = images.filter((image) => !assignedImageIds.has(image.id));
-  if (remainingImages.length === 1) {
-    const targetIndex = linkedAtoms.findIndex((atom) => atom.images.length === 0);
-    if (targetIndex >= 0) {
-      const targetAtom = linkedAtoms[targetIndex]!;
-      const image = remainingImages[0]!;
-      linkedAtoms[targetIndex] = {
-        ...targetAtom,
-        images: [buildImageReference(image, targetAtom)],
-      };
-    }
-  }
 
   return {
     ...knowledge,

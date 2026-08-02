@@ -44,6 +44,10 @@ function makeKnowledge(atomCount = 1) {
   );
 }
 
+function studyCaption(label: string): string {
+  return `Illustrazione: ${label}`;
+}
+
 describe("enrichKnowledgeWithImages", () => {
   it("returns knowledge unchanged when no images were uploaded", () => {
     const knowledge = makeKnowledge();
@@ -52,30 +56,58 @@ describe("enrichKnowledgeWithImages", () => {
     expect(enriched).toEqual(knowledge);
   });
 
-  it("links an image to the atom on the same page", () => {
+  it("links a study illustration to the atom on the same page", () => {
     const knowledge = makeKnowledge();
     const imageId = randomUUID();
-    const images = [makeImage({ id: imageId, pageNumber: 1 })];
+    const images = [
+      makeImage({
+        id: imageId,
+        pageNumber: 1,
+        caption: studyCaption("Concetto 1"),
+      }),
+    ];
 
     const enriched = enrichKnowledgeWithImages(knowledge, images);
 
     expect(enriched.atoms[0]?.images).toEqual([
       {
         imageId,
-        caption: "Figura: Concetto 1",
+        caption: studyCaption("Concetto 1"),
         description: knowledge.atoms[0]?.summary,
         referencedConcepts: knowledge.atoms[0]?.keywords.slice(0, 4),
       },
     ]);
   });
 
-  it("assigns page-specific images to matching atoms", () => {
+  it("ignores upload page photos used only for OCR", () => {
+    const knowledge = makeKnowledge();
+    const imageId = randomUUID();
+    const enriched = enrichKnowledgeWithImages(knowledge, [
+      makeImage({
+        id: imageId,
+        pageNumber: 1,
+        caption: "IMG_20260802_122407.jpg",
+      }),
+    ]);
+
+    expect(enriched.atoms[0]?.images).toEqual([]);
+  });
+
+  it("assigns page-specific illustrations to matching atoms", () => {
     const knowledge = makeKnowledge(2);
     const firstImageId = randomUUID();
     const secondImageId = randomUUID();
     const images = [
-      makeImage({ id: firstImageId, pageNumber: 1 }),
-      makeImage({ id: secondImageId, pageNumber: 2 }),
+      makeImage({
+        id: firstImageId,
+        pageNumber: 1,
+        caption: studyCaption("Concetto 1"),
+      }),
+      makeImage({
+        id: secondImageId,
+        pageNumber: 2,
+        caption: studyCaption("Concetto 2"),
+      }),
     ];
 
     const enriched = enrichKnowledgeWithImages(knowledge, images);
@@ -102,13 +134,22 @@ describe("enrichKnowledgeWithImages", () => {
     const otherImageId = randomUUID();
     const enriched = enrichKnowledgeWithImages(
       knowledge,
-      [makeImage({ id: preservedImageId }), makeImage({ id: otherImageId })]
+      [
+        makeImage({
+          id: preservedImageId,
+          caption: "Schema esistente",
+        }),
+        makeImage({
+          id: otherImageId,
+          caption: studyCaption("Altro schema"),
+        }),
+      ]
     );
 
     expect(enriched.atoms[0]?.images).toEqual(knowledge.atoms[0]?.images);
   });
 
-  it("falls back to the first atom when a single image cannot be page-matched", () => {
+  it("does not assign unmatched upload photos to atoms", () => {
     const knowledge = makeKnowledge(2);
     knowledge.atoms[0] = {
       ...knowledge.atoms[0]!,
@@ -120,26 +161,30 @@ describe("enrichKnowledgeWithImages", () => {
     };
 
     const imageId = randomUUID();
-    const enriched = enrichKnowledgeWithImages(
-      knowledge,
-      [makeImage({ id: imageId, pageNumber: 1 })]
-    );
-
-    expect(enriched.atoms[0]?.images[0]?.imageId).toBe(imageId);
-    expect(enriched.atoms[1]?.images).toEqual([]);
-  });
-
-  it("uses the uploaded filename as caption when available", () => {
-    const knowledge = makeKnowledge();
-    const imageId = randomUUID();
     const enriched = enrichKnowledgeWithImages(knowledge, [
       makeImage({
         id: imageId,
         pageNumber: 1,
-        caption: "schema-fotosintesi.png",
+        caption: "IMG_20260802_122407.jpg",
       }),
     ]);
 
-    expect(enriched.atoms[0]?.images[0]?.caption).toBe("schema-fotosintesi.png");
+    expect(enriched.atoms[0]?.images).toEqual([]);
+    expect(enriched.atoms[1]?.images).toEqual([]);
+  });
+
+  it("uses descriptive captions when available", () => {
+    const knowledge = makeKnowledge();
+    const imageId = randomUUID();
+    const caption = "Schema della fotosintesi clorofilliana";
+    const enriched = enrichKnowledgeWithImages(knowledge, [
+      makeImage({
+        id: imageId,
+        pageNumber: 1,
+        caption,
+      }),
+    ]);
+
+    expect(enriched.atoms[0]?.images[0]?.caption).toBe(caption);
   });
 });
