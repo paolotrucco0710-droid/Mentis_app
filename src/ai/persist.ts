@@ -13,12 +13,75 @@ export interface PersistResult {
   cardCount: number;
 }
 
+const PERSIST_TRANSACTION_OPTIONS = {
+  maxWait: 15_000,
+  timeout: 120_000,
+} as const;
+
+function buildAtomRows(
+  knowledge: KnowledgeJson,
+  knowledgeSourceId: KnowledgeSourceId,
+  subjectId: SubjectId
+): Prisma.AtomCreateManyInput[] {
+  return knowledge.atoms.map((atom, index) => ({
+    id: atom.id,
+    knowledgeSourceId,
+    subjectId,
+    title: atom.title,
+    summary: atom.summary,
+    explanation: atom.explanation,
+    importance: atom.importance,
+    difficulty: atom.difficulty,
+    abstractionLevel: 3,
+    logicalOrder: index,
+    originalOrder: index,
+    learningObjectives: atom.learningObjectives,
+    keywords: atom.keywords,
+    aliases: atom.aliases,
+    formulas: atom.formulas,
+    definitions: atom.definitions,
+    examples: atom.examples,
+    counterExamples: atom.counterExamples,
+    commonMistakes: atom.commonMistakes,
+    misconceptions: atom.misconceptions,
+    applications: atom.applications,
+    historicalContext: atom.historicalContext,
+    notes: atom.notes,
+    images: atom.images as unknown as Prisma.InputJsonValue,
+    tables: atom.tables,
+    diagrams: atom.diagrams,
+    equations: atom.equations,
+    citations: atom.citations,
+    pageReferences: atom.pageReferences,
+    confidence: atom.confidence,
+    aiVersion: env.aiPromptVersion,
+    tokensUsed: null,
+    estimatedStudySeconds: 45,
+  }));
+}
+
+function buildPrerequisiteRows(
+  knowledge: KnowledgeJson
+): Prisma.AtomPrerequisiteCreateManyInput[] {
+  return knowledge.atoms.flatMap((atom) =>
+    atom.prerequisites.map((prerequisiteAtomId) => ({
+      atomId: atom.id,
+      prerequisiteAtomId,
+    }))
+  );
+}
+
 export async function persistKnowledgeGraph(input: {
   knowledge: KnowledgeJson;
   knowledgeSourceId: KnowledgeSourceId;
   subjectId: SubjectId;
 }): Promise<PersistResult> {
   const { knowledge, knowledgeSourceId, subjectId } = input;
+  const atomRows = buildAtomRows(knowledge, knowledgeSourceId, subjectId);
+  const prerequisiteRows = buildPrerequisiteRows(knowledge);
+  const cardRows = knowledge.atoms.flatMap((atom) =>
+    buildCardsForAtom(atom.id, atom)
+  );
 
   return prisma.$transaction(async (tx) => {
     await tx.card.deleteMany({
@@ -29,67 +92,23 @@ export async function persistKnowledgeGraph(input: {
     });
     await tx.atom.deleteMany({ where: { knowledgeSourceId } });
 
-    let cardCount = 0;
-
-    for (let index = 0; index < knowledge.atoms.length; index++) {
-      const atom = knowledge.atoms[index];
-
-      await tx.atom.create({
-        data: {
-          id: atom.id,
-          knowledgeSourceId,
-          subjectId,
-          title: atom.title,
-          summary: atom.summary,
-          explanation: atom.explanation,
-          importance: atom.importance,
-          difficulty: atom.difficulty,
-          abstractionLevel: 3,
-          logicalOrder: index,
-          originalOrder: index,
-          learningObjectives: atom.learningObjectives,
-          keywords: atom.keywords,
-          aliases: atom.aliases,
-          formulas: atom.formulas,
-          definitions: atom.definitions,
-          examples: atom.examples,
-          counterExamples: atom.counterExamples,
-          commonMistakes: atom.commonMistakes,
-          misconceptions: atom.misconceptions,
-          applications: atom.applications,
-          historicalContext: atom.historicalContext,
-          notes: atom.notes,
-          images: atom.images as unknown as Prisma.InputJsonValue,
-          tables: atom.tables,
-          diagrams: atom.diagrams,
-          equations: atom.equations,
-          citations: atom.citations,
-          pageReferences: atom.pageReferences,
-          confidence: atom.confidence,
-          aiVersion: env.aiPromptVersion,
-          tokensUsed: null,
-          estimatedStudySeconds: 45,
-        },
-      });
-
-      if (atom.prerequisites.length > 0) {
-        await tx.atomPrerequisite.createMany({
-          data: atom.prerequisites.map((prerequisiteAtomId) => ({
-            atomId: atom.id,
-            prerequisiteAtomId,
-          })),
-        });
-      }
-
-      const cards = buildCardsForAtom(atom.id, atom);
-      if (cards.length > 0) {
-        await tx.card.createMany({ data: cards });
-        cardCount += cards.length;
-      }
+    if (atomRows.length > 0) {
+      await tx.atom.createMany({ data: atomRows });
     }
 
-    return { atomCount: knowledge.atoms.length, cardCount };
-  });
+    if (prerequisiteRows.length > 0) {
+      await tx.atomPrerequisite.createMany({ data: prerequisiteRows });
+    }
+
+    if (cardRows.length > 0) {
+      await tx.card.createMany({ data: cardRows });
+    }
+
+    return {
+      atomCount: knowledge.atoms.length,
+      cardCount: cardRows.length,
+    };
+  }, PERSIST_TRANSACTION_OPTIONS);
 }
 
 function buildCardsForAtom(
