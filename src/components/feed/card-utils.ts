@@ -106,6 +106,7 @@ export interface CardAnswerResult {
 
 export type FeedCardProps = {
   card: Card;
+  atomTitle?: string;
   disabled?: boolean;
   onContinue: (result: CardAnswerResult) => void;
   onSkip: () => void;

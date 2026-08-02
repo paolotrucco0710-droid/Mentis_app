@@ -12,16 +12,23 @@ function hasExpandableExplanation(card: FeedCardProps["card"]): boolean {
   return explanation.length > 0 && explanation !== summary;
 }
 
-function ExplainCardComponent({ card, disabled, onContinue }: FeedCardProps) {
+function ExplainCardComponent({
+  card,
+  atomTitle,
+  disabled,
+  onContinue,
+}: FeedCardProps) {
   const [expanded, setExpanded] = useState(false);
   const canExpand = hasExpandableExplanation(card);
+  const conceptTitle = atomTitle?.trim() || card.prompt || "Concetto";
 
   return (
     <Card className="shadow-md">
       <CardHeader>
-        <CardTitle>{card.prompt ?? "Spiegazione"}</CardTitle>
+        <CardTitle>{conceptTitle}</CardTitle>
         <CardDescription>
-          Fissa l&apos;idea in una frase. Approfondisci solo se ti serve.
+          Spiegazione · fissa l&apos;idea in una frase. Approfondisci solo se ti
+          serve.
         </CardDescription>
       </CardHeader>
       <div className="space-y-4 text-sm leading-7 text-foreground">
