@@ -8,9 +8,15 @@ import { ApiError, fetchImageUrl } from "@/lib/api";
 import type { FeedCardProps } from "../card-utils";
 import { getImageIdFromPayload } from "../card-utils";
 
-function ImageExplainCardComponent({ card, disabled, onContinue }: FeedCardProps) {
+function ImageExplainCardComponent({
+  card,
+  atomTitle,
+  disabled,
+  onContinue,
+}: FeedCardProps) {
   const imageId = getImageIdFromPayload(card.payload);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const conceptTitle = atomTitle?.trim() || card.prompt || "Concetto visivo";
 
   useEffect(() => {
     if (!imageId) {
@@ -40,14 +46,18 @@ function ImageExplainCardComponent({ card, disabled, onContinue }: FeedCardProps
   return (
     <Card className="shadow-md">
       <CardHeader>
-        <CardTitle>{card.prompt ?? "Concetto visivo"}</CardTitle>
-        <CardDescription>Studia il contenuto e collega ciò che vedi al concetto.</CardDescription>
+        <CardTitle>{conceptTitle}</CardTitle>
+        <CardDescription>
+          {card.prompt && card.prompt !== conceptTitle
+            ? card.prompt
+            : "Studia il contenuto e collega ciò che vedi al concetto."}
+        </CardDescription>
       </CardHeader>
       {imageUrl ? (
         <div className="relative aspect-video overflow-hidden rounded-2xl border border-border">
           <OptimizedImage
             src={imageUrl}
-            alt={card.prompt ?? "Immagine del concetto"}
+            alt={conceptTitle}
             fill
             sizes="(max-width: 768px) 100vw, 640px"
           />

@@ -34,6 +34,10 @@ export interface ErrorDetectionCardPayload {
   correction: string;
 }
 
+export interface ImageExplainCardPayload {
+  imageId: string;
+}
+
 export interface MatchCardPayload {
   pairs: Array<{ left: string; right: string }>;
 }
@@ -50,6 +54,7 @@ export type CardPayload =
   | BlurtingCardPayload
   | FeynmanCardPayload
   | ErrorDetectionCardPayload
+  | ImageExplainCardPayload
   | MatchCardPayload
   | OrderCardPayload
   | Record<string, unknown>;
