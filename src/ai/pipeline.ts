@@ -26,6 +26,7 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { toUserFacingAIError } from "./errors";
 import { extractKnowledgeJson } from "./extract";
+import { enrichKnowledgeWithImages } from "./enrich-images";
 import { extractDocumentText } from "./ocr";
 import { normalizeKnowledgeJson } from "./normalize";
 import { persistKnowledgeGraph } from "./persist";
@@ -196,10 +197,11 @@ export async function processKnowledgeSource(
 
     await updateStep(job.id, AIJobStep.Normalization);
     const normalized = normalizeKnowledgeJson(extracted, knowledgeSourceId);
+    const enriched = enrichKnowledgeWithImages(normalized, images);
 
     await updateStep(job.id, AIJobStep.Persistence);
     const { atomCount, cardCount } = await persistKnowledgeGraph({
-      knowledge: normalized,
+      knowledge: enriched,
       knowledgeSourceId,
       subjectId: knowledgeSource.subjectId,
     });
