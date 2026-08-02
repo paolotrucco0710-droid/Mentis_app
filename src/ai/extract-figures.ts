@@ -23,20 +23,29 @@ import {
 const MIN_FIGURE_AREA_RATIO = 0.04;
 const MIN_FIGURE_DIMENSION_PX = 48;
 
-const figureDetectionSchema = z.object({
+const rawFigureDetectionSchema = z.object({
   figures: z
     .array(
       z.object({
-        caption: z.string().min(3).max(120),
-        description: z.string().min(12).max(400),
-        top: z.number().min(0).max(1),
-        left: z.number().min(0).max(1),
-        bottom: z.number().min(0).max(1),
-        right: z.number().min(0).max(1),
+        caption: z.string(),
+        description: z.string(),
+        top: z.number(),
+        left: z.number(),
+        bottom: z.number(),
+        right: z.number(),
       })
     )
     .max(3),
 });
+
+export interface FigureDetection {
+  caption: string;
+  description: string;
+  top: number;
+  left: number;
+  bottom: number;
+  right: number;
+}
 
 export type NormalizedBoundingBox = {
   top: number;
@@ -51,6 +60,43 @@ export type PixelBoundingBox = {
   width: number;
   height: number;
 };
+
+export function normalizeBoundingBox(
+  box: Pick<FigureDetection, "top" | "left" | "bottom" | "right">,
+  pageWidth: number,
+  pageHeight: number
+): NormalizedBoundingBox | null {
+  let { top, left, bottom, right } = box;
+
+  const maxCoord = Math.max(
+    Math.abs(top),
+    Math.abs(left),
+    Math.abs(bottom),
+    Math.abs(right)
+  );
+
+  if (maxCoord > 1) {
+    if (pageWidth <= 0 || pageHeight <= 0) {
+      return null;
+    }
+
+    top = top / pageHeight;
+    left = left / pageWidth;
+    bottom = bottom / pageHeight;
+    right = right / pageWidth;
+  }
+
+  top = Math.max(0, Math.min(1, top));
+  left = Math.max(0, Math.min(1, left));
+  bottom = Math.max(0, Math.min(1, bottom));
+  right = Math.max(0, Math.min(1, right));
+
+  if (bottom <= top || right <= left) {
+    return null;
+  }
+
+  return { top, left, bottom, right };
+}
 
 export function toPixelBoundingBox(
   bbox: NormalizedBoundingBox,
@@ -76,9 +122,27 @@ export function toPixelBoundingBox(
   return { left, top, width, height };
 }
 
-function parseFigureDetection(content: string) {
-  const payload = JSON.parse(content) as unknown;
-  return figureDetectionSchema.parse(payload).figures;
+function parseFigureDetection(content: string): FigureDetection[] {
+  try {
+    const payload = JSON.parse(content) as unknown;
+    const parsed = rawFigureDetectionSchema.parse(payload);
+
+    return parsed.figures
+      .map((figure) => ({
+        caption: figure.caption.trim().slice(0, 120),
+        description: figure.description.trim().slice(0, 400),
+        top: figure.top,
+        left: figure.left,
+        bottom: figure.bottom,
+        right: figure.right,
+      }))
+      .filter(
+        (figure) =>
+          figure.caption.length >= 3 && figure.description.length >= 12
+      );
+  } catch {
+    return [];
+  }
 }
 
 async function detectFiguresOnPage(
@@ -133,7 +197,8 @@ Per ogni illustrazione restituisci JSON:
   ]
 }
 
-Le coordinate top/left/bottom/right sono normalizzate tra 0 e 1 rispetto all'immagine.
+Le coordinate top/left/bottom/right devono essere normalizzate tra 0.0 e 1.0 (frazione dell'immagine), NON in pixel.
+Esempio: un riquadro al centro può essere top=0.2, left=0.55, bottom=0.75, right=0.95.
 Massimo 3 figure. Se non ci sono illustrazioni didattiche, restituisci {"figures":[]}.`,
             },
             {
@@ -221,12 +286,18 @@ export async function extractFiguresFromPageImages(input: {
       }
 
       const buffer = await storage.read(pageImage.storageKey);
-      const detections = await detectFiguresOnPage(
-        buffer,
-        pageImage.mimeType,
-        pageImage.hash,
-        tracker
-      );
+      let detections: FigureDetection[] = [];
+
+      try {
+        detections = await detectFiguresOnPage(
+          buffer,
+          pageImage.mimeType,
+          pageImage.hash,
+          tracker
+        );
+      } catch {
+        return [];
+      }
 
       if (detections.length === 0) {
         return [];
@@ -246,8 +317,17 @@ export async function extractFiguresFromPageImages(input: {
 
       for (let index = 0; index < detections.length; index += 1) {
         const detection = detections[index]!;
-        const pixelBox = toPixelBoundingBox(
+        const normalized = normalizeBoundingBox(
           detection,
+          pageWidth,
+          pageHeight
+        );
+        if (!normalized) {
+          continue;
+        }
+
+        const pixelBox = toPixelBoundingBox(
+          normalized,
           pageWidth,
           pageHeight
         );

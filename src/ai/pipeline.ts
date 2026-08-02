@@ -170,14 +170,22 @@ export async function processKnowledgeSource(
     await persistJobUsage(job.id, tracker);
 
     await updateStep(job.id, AIJobStep.ImageExtraction);
-    const figureImages = await extractFiguresFromPageImages({
-      knowledgeSourceId,
-      ownerId: userId,
-      pageImages: images,
-      existingImages: images,
-      tracker,
-    });
-    const knowledgeImages = mergeKnowledgeSourceImages(images, figureImages);
+    let knowledgeImages = images;
+    try {
+      const figureImages = await extractFiguresFromPageImages({
+        knowledgeSourceId,
+        ownerId: userId,
+        pageImages: images,
+        existingImages: images,
+        tracker,
+      });
+      knowledgeImages = mergeKnowledgeSourceImages(images, figureImages);
+    } catch (error) {
+      logger.warn("Figure extraction failed; continuing without study figures.", {
+        knowledgeSourceId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     await persistJobUsage(job.id, tracker);
 
     await updateStep(job.id, AIJobStep.TextCleaning);

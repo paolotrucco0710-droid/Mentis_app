@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { toPixelBoundingBox } from "@/ai/extract-figures";
+import {
+  normalizeBoundingBox,
+  toPixelBoundingBox,
+} from "@/ai/extract-figures";
 import {
   isFigureStorageKey,
   isPageSourceImage,
@@ -32,6 +35,21 @@ describe("image-study storage paths", () => {
 });
 
 describe("extract-figures bounding boxes", () => {
+  it("converts pixel coordinates to normalized boxes", () => {
+    const box = normalizeBoundingBox(
+      { top: 80, left: 200, bottom: 480, right: 800 },
+      1000,
+      800
+    );
+
+    expect(box).toEqual({
+      top: 0.1,
+      left: 0.2,
+      bottom: 0.6,
+      right: 0.8,
+    });
+  });
+
   it("converts normalized boxes to pixel crops", () => {
     const box = toPixelBoundingBox(
       { top: 0.1, left: 0.2, bottom: 0.6, right: 0.8 },
