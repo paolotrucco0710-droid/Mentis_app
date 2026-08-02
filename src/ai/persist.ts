@@ -4,6 +4,7 @@ import type { AtomId, KnowledgeSourceId, SubjectId } from "@/domain/ids";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { env } from "@/lib/env";
+import { buildErrorDetectionContent } from "./error-detection-options";
 import { buildQuizOptions } from "./quiz-options";
 
 export interface PersistResult {
@@ -216,10 +217,15 @@ function buildCardsForAtom(
     aiVersion: env.aiPromptVersion,
   });
 
-  const flawedText =
-    atom.commonMistakes[0] ??
-    `${atom.title} si definisce come: ${atom.counterExamples[0] ?? "concetto non correlato"}.`;
-  const correction = atom.definitions[0] ?? atom.explanation;
+  const { flawedText, correction } = buildErrorDetectionContent({
+    title: atom.title,
+    summary: atom.summary,
+    explanation: atom.explanation,
+    misconceptions: atom.misconceptions,
+    commonMistakes: atom.commonMistakes,
+    definitions: atom.definitions,
+    counterExamples: atom.counterExamples,
+  });
 
   cards.push({
     atomId,

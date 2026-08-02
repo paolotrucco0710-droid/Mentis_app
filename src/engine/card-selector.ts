@@ -3,12 +3,14 @@ import { CardType } from "@/domain/enums";
 import { CognitiveAtomStage } from "@/domain/enums/cognitive";
 import {
   EXPLANATION_CARD_TYPES,
+  IMAGE_EXPLAIN_CARD_TYPES,
   OPEN_RESPONSE_CARD_TYPES,
   QUICK_RETRIEVAL_CARD_TYPES,
   RETRIEVAL_CARD_TYPES,
 } from "./constants";
 
 const EXPLAIN_TYPES = new Set<string>(EXPLANATION_CARD_TYPES);
+const IMAGE_EXPLAIN_TYPES = new Set<string>(IMAGE_EXPLAIN_CARD_TYPES);
 const RETRIEVAL_TYPES = new Set<string>(RETRIEVAL_CARD_TYPES);
 const OPEN_RESPONSE_TYPES = new Set<string>(OPEN_RESPONSE_CARD_TYPES);
 const QUICK_RETRIEVAL_TYPES = new Set<string>(QUICK_RETRIEVAL_CARD_TYPES);
@@ -22,6 +24,22 @@ export function getPrimaryExplainCard(cards: Card[]): Card | null {
   }
 
   return [...explainCards].sort((left, right) => left.order - right.order)[0];
+}
+
+function getUnseenImageExplainCard(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): Card | null {
+  const imageCards = cards.filter((card) => card.type === CardType.ImageExplain);
+  if (imageCards.length === 0) {
+    return null;
+  }
+
+  const unseen = imageCards.find(
+    (card) => (userCardStates.get(card.id)?.viewCount ?? 0) === 0
+  );
+
+  return unseen ?? null;
 }
 
 export function needsPrimaryIntroduction(
@@ -63,6 +81,11 @@ export function selectCardForAtom(input: {
 
   if (needsPrimaryIntroduction(cards, userCardStates)) {
     return getPrimaryExplainCard(cards);
+  }
+
+  const unseenImageCard = getUnseenImageExplainCard(cards, userCardStates);
+  if (unseenImageCard) {
+    return unseenImageCard;
   }
 
   const scoringStage = resolveScoringStage({
@@ -139,6 +162,7 @@ function scoreCard(
   const viewCount = cardState?.viewCount ?? 0;
   const wrongAnswers = cardState?.wrongAnswerCount ?? 0;
   const isOpenResponse = OPEN_RESPONSE_TYPES.has(card.type);
+  const isImageExplain = IMAGE_EXPLAIN_TYPES.has(card.type);
 
   if (shouldSuppressExplanation(card, atomState, stage, viewCount)) {
     return SUPPRESSED_CARD_SCORE;
@@ -149,6 +173,10 @@ function scoreCard(
   }
 
   score += Math.max(0, 30 - viewCount * 8);
+
+  if (isImageExplain && viewCount === 0) {
+    score += 45;
+  }
 
   if (lastCardType && card.type === lastCardType) {
     score -= 25;
@@ -176,6 +204,9 @@ function scoreCard(
     case CognitiveAtomStage.Forgotten:
       if (EXPLAIN_TYPES.has(card.type)) {
         score += 35;
+      }
+      if (isImageExplain) {
+        score += 30;
       }
       if (QUICK_RETRIEVAL_TYPES.has(card.type)) {
         score += 18;

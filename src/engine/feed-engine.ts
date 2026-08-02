@@ -18,8 +18,9 @@ import {
 import { findUserCardStatesByUserAndCardIds } from "@/db/repositories/user-card-states";
 import type { Atom, Card, FeedItem, FeedResponse, UserAtomState } from "@/domain/entities";
 import { CardType, SessionEventType } from "@/domain/enums";
-import type { AtomId, StudySessionId, SubjectId, UserId } from "@/domain/ids";
+import type { AtomId, KnowledgeSourceId, StudySessionId, SubjectId, UserId } from "@/domain/ids";
 import { env } from "@/lib/env";
+import { relinkImagesForKnowledgeSource } from "@/ai/relink-images";
 import { selectCardForAtom } from "./card-selector";
 import { DEFAULT_SESSION_TARGET_CARDS, MASTERY_STABLE_THRESHOLD } from "./constants";
 import { FeedEngineError } from "./errors";
@@ -31,6 +32,7 @@ export interface GetNextFeedItemInput {
   userId: UserId;
   subjectId: SubjectId;
   sessionId: StudySessionId;
+  knowledgeSourceId?: KnowledgeSourceId;
 }
 
 export async function getNextFeedItem(
@@ -128,9 +130,17 @@ async function loadFeedContext(
   }
 
   const atoms = await findAtomsBySubjectId(input.subjectId);
-  const userAtomStates = await ensureUserAtomStates(input.userId, atoms);
+  const scopedAtoms = input.knowledgeSourceId
+    ? atoms.filter((atom) => atom.knowledgeSourceId === input.knowledgeSourceId)
+    : atoms;
 
-  const cards = await findCardsByAtomIds(atoms.map((atom) => atom.id));
+  if (input.knowledgeSourceId) {
+    await relinkImagesForKnowledgeSource(input.knowledgeSourceId);
+  }
+
+  const userAtomStates = await ensureUserAtomStates(input.userId, scopedAtoms);
+
+  const cards = await findCardsByAtomIds(scopedAtoms.map((atom) => atom.id));
   const cardsByAtomId = groupCardsByAtom(cards);
   const cardsById = new Map(cards.map((card) => [card.id, card]));
 
@@ -146,7 +156,7 @@ async function loadFeedContext(
   const lastCardType = resolveLastCardType(sessionEvents, cardsById);
   const recentAtomIds = resolveRecentAtomIds(sessionEvents);
   const knowledgeSourceExposure = buildKnowledgeSourceExposure(
-    atoms,
+    scopedAtoms,
     userAtomStates
   );
 
@@ -154,7 +164,7 @@ async function loadFeedContext(
     userId: input.userId,
     subjectId: input.subjectId,
     session,
-    atoms,
+    atoms: scopedAtoms,
     cardsByAtomId,
     userAtomStates,
     userCardStates,

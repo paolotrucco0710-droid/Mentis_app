@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { handleApiRouteError } from "@/lib/api/handle-route-error";
-import type { StudySessionId } from "@/domain/ids";
+import type { KnowledgeSourceId, StudySessionId } from "@/domain/ids";
 import {
   getNextFeedItem,
   resolveDevUserId,
@@ -14,6 +14,7 @@ export async function GET(request: Request) {
     const userId = await resolveDevUserId(request);
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get("sessionId");
+    const knowledgeSourceId = searchParams.get("knowledgeSourceId");
     const subjectId = await resolveRequestedSubjectId(
       userId,
       searchParams.get("subjectId")
@@ -33,6 +34,9 @@ export async function GET(request: Request) {
       userId,
       subjectId,
       sessionId: sessionId as StudySessionId,
+      ...(knowledgeSourceId
+        ? { knowledgeSourceId: knowledgeSourceId as KnowledgeSourceId }
+        : {}),
     });
 
     return NextResponse.json(feed, { status: 200 });

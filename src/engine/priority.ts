@@ -149,6 +149,17 @@ function computePriority(input: {
     }
   }
 
+  if (chapterExposure === 0) {
+    score += 90;
+  }
+
+  if (state.exposureCount === 0) {
+    const ageMs = Date.now() - atom.createdAt.getTime();
+    if (ageMs < 14 * 24 * 3_600_000) {
+      score += 35;
+    }
+  }
+
   return Math.max(score, 0);
 }
 

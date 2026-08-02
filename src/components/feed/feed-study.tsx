@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { FeedItem } from "@/domain/entities/feed-item";
 import type { StudySession } from "@/domain/entities/study-session";
 import { SessionEventOutcome } from "@/domain/enums";
-import type { StudySessionId } from "@/domain/ids";
+import type { KnowledgeSourceId, StudySessionId } from "@/domain/ids";
 import {
   ApiError,
   createStudySession,
@@ -29,6 +30,7 @@ import { getCardTypeLabel } from "./card-utils";
 import type { CardAnswerResult } from "./card-utils";
 
 const SESSION_STORAGE_KEY = "mentis.activeSessionId";
+const CHAPTER_SCOPE_KEY = "mentis.activeKnowledgeSourceId";
 
 type FeedState =
   | { status: "loading" }
@@ -37,6 +39,10 @@ type FeedState =
   | { status: "error"; message: string; code?: string };
 
 export function FeedStudy() {
+  const searchParams = useSearchParams();
+  const knowledgeSourceId = searchParams.get(
+    "knowledgeSourceId"
+  ) as KnowledgeSourceId | null;
   const { subjectId, loading: loadingSubject, error: subjectError } =
     useActiveSubjectId();
   const [state, setState] = useState<FeedState>({ status: "loading" });
@@ -53,7 +59,11 @@ export function FeedStudy() {
 
       prefetching.current = true;
       try {
-        const feed = await fetchNextFeedItem({ sessionId, subjectId });
+        const feed = await fetchNextFeedItem({
+          sessionId,
+          subjectId,
+          ...(knowledgeSourceId ? { knowledgeSourceId } : {}),
+        });
         if (feed.item && !feed.sessionComplete) {
           prefetchedItem.current = feed.item;
         }
@@ -63,7 +73,7 @@ export function FeedStudy() {
         prefetching.current = false;
       }
     },
-    [subjectId]
+    [subjectId, knowledgeSourceId]
   );
 
   const applyFeedItem = useCallback(
@@ -91,7 +101,11 @@ export function FeedStudy() {
         return;
       }
 
-      const feed = await fetchNextFeedItem({ sessionId, subjectId });
+      const feed = await fetchNextFeedItem({
+        sessionId,
+        subjectId,
+        ...(knowledgeSourceId ? { knowledgeSourceId } : {}),
+      });
 
       if (!feed.item || feed.sessionComplete) {
         setState({
@@ -108,7 +122,7 @@ export function FeedStudy() {
 
       applyFeedItem(session, feed.item);
     },
-    [applyFeedItem, subjectId]
+    [applyFeedItem, subjectId, knowledgeSourceId]
   );
 
   const bootstrap = useCallback(async () => {
@@ -117,6 +131,13 @@ export function FeedStudy() {
     }
 
     try {
+      const storedScope = sessionStorage.getItem(CHAPTER_SCOPE_KEY) ?? "";
+      const activeScope = knowledgeSourceId ?? "";
+      if (storedScope !== activeScope) {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        sessionStorage.setItem(CHAPTER_SCOPE_KEY, activeScope);
+      }
+
       const storedSessionId = sessionStorage.getItem(SESSION_STORAGE_KEY);
 
       if (storedSessionId) {
@@ -153,7 +174,7 @@ export function FeedStudy() {
         code: error instanceof ApiError ? error.code : undefined,
       });
     }
-  }, [loadNext, subjectId]);
+  }, [knowledgeSourceId, loadNext, subjectId]);
 
   useEffect(() => {
     if (!subjectId || loadingSubject) {
