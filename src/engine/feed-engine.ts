@@ -270,7 +270,12 @@ function selectNextItem(context: FeedEngineContext) {
     );
 
   const bestCandidate = selectBestCandidate(
-    filterCandidatesForSessionVariety(candidates, context.recentAtomCounts),
+    filterCandidatesForSessionVariety(candidates, {
+      recentAtomCounts: context.recentAtomCounts,
+      recentCardTypes: context.recentCardTypes,
+      cardsByAtomId: context.cardsByAtomId,
+      userCardStates: context.userCardStates,
+    }),
     context.recentAtomIds
   );
   if (!bestCandidate) {

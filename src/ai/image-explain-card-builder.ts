@@ -6,8 +6,9 @@ import { env } from "@/lib/env";
 import { buildQuizOptions } from "./quiz-options";
 import { deterministicShuffle } from "./deterministic-shuffle";
 
-const IMAGE_QUESTION =
-  "Quale affermazione descrive meglio ciò che vedi nell'illustrazione?";
+function buildImageQuestion(atomTitle: string): string {
+  return `Quale affermazione su "${atomTitle}" è corretta?`;
+}
 
 export function buildImageExplainCardFields(
   atomId: AtomId,
@@ -46,7 +47,7 @@ export function buildImageExplainCardFields(
     cognitiveObjective: CognitiveObjective.Connection,
     payload: {
       imageId: imageReference.imageId,
-      question: IMAGE_QUESTION,
+      question: buildImageQuestion(atom.title),
       options: quiz.options,
       correctOptionIndex: quiz.correctOptionIndex,
       revealText: imageReference.description ?? atom.summary,

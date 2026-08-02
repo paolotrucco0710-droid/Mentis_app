@@ -43,40 +43,52 @@ export function normalizeUserAnswer(answer: string): string {
   return answer.trim().slice(0, MAX_USER_ANSWER_CHARS);
 }
 
+function pointMatchRatio(point: string, answer: string): number {
+  const answerLower = answer.toLowerCase();
+  const tokens = point
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((token) => token.length > 4);
+
+  if (tokens.length === 0) {
+    return 0;
+  }
+
+  const matched = tokens.filter((token) => answerLower.includes(token));
+  return matched.length / tokens.length;
+}
+
 export function buildHeuristicRetrievalFeedback(
   input: EvaluateRetrievalAnswerInput
 ): RetrievalFeedback {
   const answer = normalizeUserAnswer(input.userAnswer);
-  const minLength = input.mode === "feynman" ? 30 : 20;
+  const minLength = input.mode === "feynman" ? 40 : 30;
   const longEnough = answer.length >= minLength;
-  const matchedPoints = input.referencePoints.filter((point) => {
-    const tokens = point
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((token) => token.length > 4)
-      .slice(0, 4);
-
-    return tokens.some((token) => answer.toLowerCase().includes(token));
-  });
+  const matchedPoints = input.referencePoints.filter(
+    (point) => pointMatchRatio(point, answer) >= 0.4
+  );
+  const bestMatchRatio = input.referencePoints.reduce(
+    (best, point) => Math.max(best, pointMatchRatio(point, answer)),
+    0
+  );
 
   const score = Math.min(
     100,
     Math.round(
-      (longEnough ? 45 : 20) +
-        matchedPoints.length * 15 +
-        Math.min(answer.length / 8, 20)
+      (longEnough ? 25 : 10) +
+        matchedPoints.length * 20 +
+        bestMatchRatio * 25 +
+        Math.min(answer.length / 12, 10)
     )
   );
 
   return {
-    isCorrect: score >= 60,
+    isCorrect: score >= 72 && matchedPoints.length > 0,
     score,
     strengths:
       matchedPoints.length > 0
         ? [`Hai colto: ${matchedPoints[0]}`]
-        : longEnough
-          ? ["Buon tentativo con parole tue."]
-          : [],
+        : [],
     gaps: input.referencePoints
       .filter((point) => !matchedPoints.includes(point))
       .slice(0, 1),
@@ -85,7 +97,9 @@ export function buildHeuristicRetrievalFeedback(
         ? "Aggiungi un esempio concreto."
         : "Integra il punto chiave mancante.",
     summary: longEnough
-      ? "Buona base. Controlla i punti chiave sotto."
+      ? matchedPoints.length > 0
+        ? "Buona base. Controlla i punti chiave sotto."
+        : "Manca il punto centrale del concetto."
       : "Troppo breve: aggiungi un dettaglio in più.",
     source: "heuristic",
   };

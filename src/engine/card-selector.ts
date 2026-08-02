@@ -54,6 +54,36 @@ export function introductionSeen(
   return (userCardStates.get(explainCard.id)?.viewCount ?? 0) > 0;
 }
 
+export function hasAtomRetrievalVerification(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  return cards.some((card) => {
+    if (
+      !QUICK_RETRIEVAL_TYPES.has(card.type) &&
+      !OPEN_RESPONSE_TYPES.has(card.type)
+    ) {
+      return false;
+    }
+
+    return (userCardStates.get(card.id)?.viewCount ?? 0) > 0;
+  });
+}
+
+export function needsRetrievalVerification(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  if (!getPrimaryExplainCard(cards)) {
+    return false;
+  }
+
+  return (
+    introductionSeen(cards, userCardStates) &&
+    !hasAtomRetrievalVerification(cards, userCardStates)
+  );
+}
+
 export function selectCardForAtom(input: {
   cards: Card[];
   atomState: UserAtomState;

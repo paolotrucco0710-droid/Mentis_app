@@ -20,14 +20,14 @@ function ImageExplainCardComponent({
   onContinue,
 }: FeedCardProps) {
   const imageId = getImageIdFromPayload(card.payload);
+  const conceptTitle = atomTitle?.trim() || "Illustrazione";
   const question =
     getImageQuestionFromPayload(card.payload) ??
-    "Quale affermazione descrive meglio ciò che vedi nell'illustrazione?";
+    `Quale affermazione su «${conceptTitle}» è corretta?`;
   const quiz = getImageQuizOptionsFromPayload(card.payload);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(false);
-  const conceptTitle = atomTitle?.trim() || "Illustrazione";
   const isCorrect =
     quiz !== null && selectedIndex === quiz.correctOptionIndex;
 

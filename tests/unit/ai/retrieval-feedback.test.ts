@@ -42,9 +42,25 @@ describe("buildHeuristicRetrievalFeedback", () => {
         "La Reconquista fu un arretramento musulmano dalla Penisola Iberica nel Medioevo.",
     });
 
-    expect(feedback.score).toBeGreaterThanOrEqual(60);
+    expect(feedback.score).toBeGreaterThanOrEqual(72);
     expect(feedback.isCorrect).toBe(true);
     expect(feedback.strengths.length).toBeGreaterThan(0);
+  });
+
+  it("does not mark vague answers as correct when only a few words overlap", () => {
+    const feedback = buildHeuristicRetrievalFeedback({
+      ...baseInput,
+      atomTitle: "Ruolo Intellettuali Umanisti",
+      referencePoints: [
+        "Gli intellettuali umanisti erano figure laiche (notai, cancellieri) che promossero la cultura classica e una nuova visione della vita, acquisendo rilevanza sociale.",
+        "Gli intellettuali umanisti, come notai e cancellieri, acquisirono un ruolo sociale importante, distaccandosi dall'egemonia ecclesiastica.",
+      ],
+      userAnswer:
+        "gli intellettuali umanisti diventarono il centro della firenze medioevale",
+    });
+
+    expect(feedback.isCorrect).toBe(false);
+    expect(feedback.strengths).toHaveLength(0);
   });
 
   it("uses a higher length threshold for feynman mode", () => {
