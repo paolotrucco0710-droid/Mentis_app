@@ -17,7 +17,7 @@ const KNOWLEDGE_JSON_TEMPLATE = `{
     {
       "id": "atom-001",
       "title": "Reconquista",
-      "summary": "Arretramento musulmano dalla Penisola Iberica tra XI e XII secolo.",
+      "summary": "La Reconquista è il graduale arretramento musulmano dalla Penisola Iberica tra XI e XII secolo.",
       "explanation": "Processo lungo e non coordinato. I regni cristiani del nord avanzarono gradualmente. Non fu una singola campagna militare pianificata.",
       "importance": 4,
       "difficulty": 2,
@@ -79,6 +79,9 @@ TITOLO (title)
 
 SUMMARY
 - Esattamente 1 frase breve (max 120 caratteri). È il testo principale della Learn Card.
+- DEVE nominare il concetto (usa il title o un suo alias chiaro nella frase).
+- Esempio BUONO: "La Reconquista è il graduale arretramento musulmano dalla Penisola Iberica."
+- Esempio CATTIVO: "Processo di arretramento musulmano dalla Penisola Iberica tra XI e XII secolo." (manca il nome del concetto)
 
 EXPLANATION
 - Massimo 3 frasi brevi. Espande la definizione con contesto essenziale.

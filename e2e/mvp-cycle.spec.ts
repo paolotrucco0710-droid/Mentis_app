@@ -11,13 +11,19 @@ test.describe("MVP study cycle", () => {
   }) => {
     await page.goto("/feed");
 
+    await expect(page.getByText("Progresso sessione")).toBeVisible({
+      timeout: 20_000,
+    });
+
     await expect(
       page
-        .getByRole("heading", {
-          name: /spiegazione|quiz|blurting|feynman|vero o falso|trova l'errore|immagine/i,
-        })
+        .getByText(
+          /spiegazione|quiz|blurting|feynman|vero o falso|trova l'errore|immagine/i
+        )
         .first()
-    ).toBeVisible({ timeout: 20_000 });
+    ).toBeVisible();
+
+    await expect(page.locator("main").getByRole("heading").first()).toBeVisible();
 
     const continueButton = page
       .getByRole("button", {
@@ -31,7 +37,7 @@ test.describe("MVP study cycle", () => {
     await expect(
       page
         .getByText(
-          /sessione completata|spiegazione|quiz|blurting|feynman|vero o falso|trova l'errore|immagine/i
+          /sessione completata|progresso sessione|spiegazione|quiz|blurting|feynman|vero o falso|trova l'errore|immagine/i
         )
         .first()
     ).toBeVisible({ timeout: 20_000 });

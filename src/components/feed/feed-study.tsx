@@ -323,6 +323,7 @@ export function FeedStudy() {
 
       <FeedCardRenderer
         card={item.card}
+        atomTitle={item.atomTitle}
         disabled={submitting}
         onAnswer={handleAnswer}
         onSkip={handleSkip}

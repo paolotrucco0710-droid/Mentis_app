@@ -46,17 +46,20 @@ const FallbackCard = dynamic(
 
 function FeedCardRendererComponent({
   card,
+  atomTitle,
   disabled,
   onAnswer,
   onSkip,
 }: {
   card: Card;
+  atomTitle?: string;
   disabled?: boolean;
   onAnswer: (result: CardAnswerResult) => void;
   onSkip: () => void;
 }) {
   const props = {
     card,
+    atomTitle,
     disabled,
     onContinue: onAnswer,
     onSkip,
