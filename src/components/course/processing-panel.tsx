@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { KnowledgeSourceProcessingStatus } from "@/domain/enums";
+import type { ChapterWithSource } from "@/course/types";
 import {
   ApiError,
   fetchChapterByKnowledgeSource,
@@ -25,6 +26,8 @@ import {
   Section,
 } from "@/components/ui";
 import {
+  buildChapterStudyHref,
+  canStudyChapter,
   formatProcessingStatus,
   processingProgress,
 } from "./course-utils";
@@ -54,9 +57,11 @@ function simplifyProcessingError(message: string): string {
 }
 
 export function ProcessingPanel() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const knowledgeSourceId = searchParams.get("knowledgeSourceId");
   const jobId = searchParams.get("jobId");
+  const [chapter, setChapter] = useState<ChapterWithSource | null>(null);
   const [title, setTitle] = useState("Capitolo");
   const [status, setStatus] = useState<KnowledgeSourceProcessingStatus>(
     KnowledgeSourceProcessingStatus.Uploaded
@@ -71,9 +76,10 @@ export function ProcessingPanel() {
     }
 
     try {
-      const chapter = await fetchChapterByKnowledgeSource(knowledgeSourceId);
-      setTitle(chapter.title);
-      setStatus(chapter.knowledgeSource.processingStatus);
+      const chapterData = await fetchChapterByKnowledgeSource(knowledgeSourceId);
+      setChapter(chapterData);
+      setTitle(chapterData.title);
+      setStatus(chapterData.knowledgeSource.processingStatus);
       setError(null);
 
       if (jobId) {
@@ -87,7 +93,7 @@ export function ProcessingPanel() {
           setStatus(KnowledgeSourceProcessingStatus.Completed);
         }
       } else if (
-        chapter.knowledgeSource.processingStatus ===
+        chapterData.knowledgeSource.processingStatus ===
         KnowledgeSourceProcessingStatus.Failed
       ) {
         try {
@@ -162,6 +168,7 @@ export function ProcessingPanel() {
   const isActive =
     status === KnowledgeSourceProcessingStatus.Processing ||
     status === KnowledgeSourceProcessingStatus.Queued;
+  const studyReady = chapter ? canStudyChapter(chapter) : false;
 
   return (
     <div className="space-y-8">
@@ -205,14 +212,27 @@ export function ProcessingPanel() {
             </Button>
           </div>
         ) : null}
-        {status === KnowledgeSourceProcessingStatus.Completed ? (
+        {studyReady ? (
           <div className="mt-4 flex flex-wrap gap-3">
-            <Link href="/feed">
-              <Button>Inizia a studiare</Button>
-            </Link>
+            <Button
+              onClick={() => {
+                if (chapter) {
+                  router.push(buildChapterStudyHref(chapter));
+                }
+              }}
+            >
+              Studia capitolo
+            </Button>
             <Link href="/library">
               <Button variant="secondary">Torna alla libreria</Button>
             </Link>
+          </div>
+        ) : status === KnowledgeSourceProcessingStatus.Completed ? (
+          <div className="mt-4">
+            <p className="text-sm text-muted">
+              Elaborazione completata ma nessun concetto estratto. Prova a
+              rielaborare il capitolo.
+            </p>
           </div>
         ) : null}
         {error ? (
