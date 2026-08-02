@@ -10,14 +10,18 @@ function makeImage(input: {
   id: string;
   pageNumber?: number | null;
   caption?: string | null;
+  storageKey?: string;
 }): Image {
+  const id = input.id as ImageId;
   return {
-    id: input.id as ImageId,
+    id,
     knowledgeSourceId: "00000000-0000-4000-8000-000000000201" as KnowledgeSourceId,
     ownerId: "00000000-0000-4000-8000-000000000001" as UserId,
-    storageKey: `images/${input.id}.png`,
+    storageKey:
+      input.storageKey ??
+      `00000000-0000-4000-8000-000000000201/figures/p001-f01.jpg`,
     hash: "hash",
-    mimeType: "image/png",
+    mimeType: "image/jpeg",
     sizeBytes: 1024,
     width: 800,
     height: 600,
@@ -87,6 +91,7 @@ describe("enrichKnowledgeWithImages", () => {
         id: imageId,
         pageNumber: 1,
         caption: "IMG_20260802_122407.jpg",
+        storageKey: "00000000-0000-4000-8000-000000000201/pages/001.jpg",
       }),
     ]);
 
@@ -166,6 +171,7 @@ describe("enrichKnowledgeWithImages", () => {
         id: imageId,
         pageNumber: 1,
         caption: "IMG_20260802_122407.jpg",
+        storageKey: "00000000-0000-4000-8000-000000000201/pages/001.jpg",
       }),
     ]);
 

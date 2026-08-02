@@ -1,4 +1,8 @@
 import { enrichKnowledgeWithImages } from "@/ai/enrich-images";
+import {
+  extractFiguresFromPageImages,
+  mergeKnowledgeSourceImages,
+} from "@/ai/extract-figures";
 import { shouldCreateImageExplainCard } from "@/ai/image-study";
 import { getImageIdFromPayload } from "@/components/feed/card-utils";
 import { findAtomsByKnowledgeSourceId } from "@/db/repositories/atoms";
@@ -6,18 +10,32 @@ import { findCardsByAtomIds } from "@/db/repositories/cards";
 import { findImagesByKnowledgeSourceId } from "@/db/repositories/uploads";
 import { CardType, CognitiveObjective } from "@/domain/enums";
 import type { KnowledgeJson, KnowledgeJsonAtomImage } from "@/domain/knowledge";
-import type { AtomId, ImageId, KnowledgeSourceId } from "@/domain/ids";
+import type { AtomId, ImageId, KnowledgeSourceId, UserId } from "@/domain/ids";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { env } from "@/lib/env";
+import { UsageTracker } from "@/ai/optimization";
 
 export async function relinkImagesForKnowledgeSource(
-  knowledgeSourceId: KnowledgeSourceId
+  knowledgeSourceId: KnowledgeSourceId,
+  options?: { ownerId?: UserId }
 ): Promise<{ atomsUpdated: number; cardsCreated: number; cardsRemoved: number }> {
-  const images = await findImagesByKnowledgeSourceId(knowledgeSourceId);
+  let images = await findImagesByKnowledgeSourceId(knowledgeSourceId);
   const atoms = await findAtomsByKnowledgeSourceId(knowledgeSourceId);
   if (atoms.length === 0) {
     return { atomsUpdated: 0, cardsCreated: 0, cardsRemoved: 0 };
+  }
+
+  if (options?.ownerId) {
+    const tracker = new UsageTracker();
+    const figureImages = await extractFiguresFromPageImages({
+      knowledgeSourceId,
+      ownerId: options.ownerId,
+      pageImages: images,
+      existingImages: images,
+      tracker,
+    });
+    images = mergeKnowledgeSourceImages(images, figureImages);
   }
 
   const imageById = new Map(images.map((image) => [image.id, image]));

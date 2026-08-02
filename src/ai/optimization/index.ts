@@ -12,6 +12,7 @@ export { mapWithConcurrency } from "./batching";
 export {
   buildCacheKey,
   buildExtractionCacheKey,
+  buildFigureDetectionCacheKey,
   buildOcrImageCacheKey,
   hashText,
 } from "./cache-keys";

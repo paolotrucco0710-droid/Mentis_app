@@ -4,6 +4,18 @@ import type { KnowledgeJsonAtomImage } from "@/domain/knowledge/knowledge-json";
 const CAMERA_FILENAME_PATTERN = /^(IMG_|DSC_|PXL_|MVIMG_|WA\d+)/i;
 const IMAGE_FILENAME_PATTERN = /\.(jpe?g|png|heic|webp)$/i;
 
+type ImageSource = Pick<Image, "caption" | "storageKey">;
+
+export function isPageSourceStorageKey(storageKey: string): boolean {
+  return (
+    storageKey.includes("/pages/") || storageKey.endsWith("/document.pdf")
+  );
+}
+
+export function isFigureStorageKey(storageKey: string): boolean {
+  return storageKey.includes("/figures/");
+}
+
 /**
  * Upload page photos are OCR input — not study illustrations for the feed.
  */
@@ -24,9 +36,23 @@ export function isUploadSourcePageImage(image: Pick<Image, "caption">): boolean 
   return false;
 }
 
-export function isStudyIllustrationImage(
-  image: Pick<Image, "caption">
-): boolean {
+export function isPageSourceImage(image: ImageSource): boolean {
+  if (isPageSourceStorageKey(image.storageKey)) {
+    return true;
+  }
+
+  return isUploadSourcePageImage(image);
+}
+
+export function isStudyIllustrationImage(image: ImageSource): boolean {
+  if (isFigureStorageKey(image.storageKey)) {
+    return true;
+  }
+
+  if (isPageSourceImage(image)) {
+    return false;
+  }
+
   return !isUploadSourcePageImage(image);
 }
 

@@ -135,7 +135,9 @@ async function loadFeedContext(
     : atoms;
 
   if (input.knowledgeSourceId) {
-    await relinkImagesForKnowledgeSource(input.knowledgeSourceId);
+    await relinkImagesForKnowledgeSource(input.knowledgeSourceId, {
+      ownerId: input.userId,
+    });
   }
 
   const userAtomStates = await ensureUserAtomStates(input.userId, scopedAtoms);
