@@ -17,7 +17,35 @@ import { prisma } from "@/db/client";
 import { env } from "@/lib/env";
 import { UsageTracker } from "@/ai/optimization";
 
+const relinkCache = new Map<string, number>();
+const RELINK_CACHE_TTL_MS = 30 * 60 * 1000;
+
+function getRelinkCacheKey(
+  knowledgeSourceId: KnowledgeSourceId,
+  ownerId?: UserId
+): string {
+  return `${knowledgeSourceId}:${ownerId ?? "anonymous"}`;
+}
+
 export async function relinkImagesForKnowledgeSource(
+  knowledgeSourceId: KnowledgeSourceId,
+  options?: { ownerId?: UserId }
+): Promise<{ atomsUpdated: number; cardsCreated: number; cardsRemoved: number }> {
+  const cacheKey = getRelinkCacheKey(knowledgeSourceId, options?.ownerId);
+  const cachedAt = relinkCache.get(cacheKey);
+  if (cachedAt && Date.now() - cachedAt < RELINK_CACHE_TTL_MS) {
+    return { atomsUpdated: 0, cardsCreated: 0, cardsRemoved: 0 };
+  }
+
+  const result = await relinkImagesForKnowledgeSourceUncached(
+    knowledgeSourceId,
+    options
+  );
+  relinkCache.set(cacheKey, Date.now());
+  return result;
+}
+
+async function relinkImagesForKnowledgeSourceUncached(
   knowledgeSourceId: KnowledgeSourceId,
   options?: { ownerId?: UserId }
 ): Promise<{ atomsUpdated: number; cardsCreated: number; cardsRemoved: number }> {
