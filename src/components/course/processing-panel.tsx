@@ -37,7 +37,7 @@ const PIPELINE_STEPS = [
   "Validazione JSON",
   "Normalizzazione",
   "Persistenza",
-  "Completato",
+  "Pronto allo studio",
 ];
 
 function simplifyProcessingError(message: string): string {

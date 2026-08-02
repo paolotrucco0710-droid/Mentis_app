@@ -27,3 +27,17 @@ export const RETRIEVAL_CARD_TYPES = new Set([
   "error_detection",
   "memory_recall",
 ]);
+
+/** Open-ended retrieval cards shown less often than quick checks. */
+export const OPEN_RESPONSE_CARD_TYPES = new Set([
+  "blurting",
+  "feynman",
+]);
+
+/** Quick retrieval cards preferred for session variety. */
+export const QUICK_RETRIEVAL_CARD_TYPES = new Set([
+  "quiz",
+  "multiple_choice",
+  "true_false",
+  "error_detection",
+]);

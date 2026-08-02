@@ -18,7 +18,7 @@ import {
 import { findUserCardStatesByUserAndCardIds } from "@/db/repositories/user-card-states";
 import type { Atom, Card, FeedItem, FeedResponse, UserAtomState } from "@/domain/entities";
 import { CardType, SessionEventType } from "@/domain/enums";
-import type { StudySessionId, SubjectId, UserId } from "@/domain/ids";
+import type { AtomId, StudySessionId, SubjectId, UserId } from "@/domain/ids";
 import { env } from "@/lib/env";
 import { selectCardForAtom } from "./card-selector";
 import { DEFAULT_SESSION_TARGET_CARDS, MASTERY_STABLE_THRESHOLD } from "./constants";
@@ -144,6 +144,11 @@ async function loadFeedContext(
 
   const sessionEvents = await findSessionEventsBySessionId(session.id);
   const lastCardType = resolveLastCardType(sessionEvents, cardsById);
+  const recentAtomIds = resolveRecentAtomIds(sessionEvents);
+  const knowledgeSourceExposure = buildKnowledgeSourceExposure(
+    atoms,
+    userAtomStates
+  );
 
   return {
     userId: input.userId,
@@ -155,6 +160,8 @@ async function loadFeedContext(
     userCardStates,
     cardsById,
     lastCardType,
+    recentAtomIds,
+    knowledgeSourceExposure,
     now: new Date(),
   };
 }
@@ -236,6 +243,8 @@ function selectNextItem(context: FeedEngineContext) {
           context.userAtomStates
         ),
         now: context.now,
+        recentAtomIds: context.recentAtomIds,
+        knowledgeSourceExposure: context.knowledgeSourceExposure,
       });
     })
     .filter((candidate): candidate is NonNullable<typeof candidate> =>
@@ -330,6 +339,52 @@ function resolveLastCardType(
   }
 
   return null;
+}
+
+function resolveRecentAtomIds(
+  events: Awaited<ReturnType<typeof findSessionEventsBySessionId>>,
+  limit = 5
+): AtomId[] {
+  const recent: AtomId[] = [];
+  const seen = new Set<string>();
+
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.type !== SessionEventType.OpenCard || !event.atomId) {
+      continue;
+    }
+
+    if (seen.has(event.atomId)) {
+      continue;
+    }
+
+    seen.add(event.atomId);
+    recent.push(event.atomId as AtomId);
+
+    if (recent.length >= limit) {
+      break;
+    }
+  }
+
+  return recent;
+}
+
+function buildKnowledgeSourceExposure(
+  atoms: Atom[],
+  userAtomStates: Map<string, UserAtomState>
+): Map<string, number> {
+  const exposure = new Map<string, number>();
+
+  for (const atom of atoms) {
+    const state = userAtomStates.get(atom.id);
+    const current = exposure.get(atom.knowledgeSourceId) ?? 0;
+    exposure.set(
+      atom.knowledgeSourceId,
+      current + (state?.exposureCount ?? 0)
+    );
+  }
+
+  return exposure;
 }
 
 function emptyFeedResponse(

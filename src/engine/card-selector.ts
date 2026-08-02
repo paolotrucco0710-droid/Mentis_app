@@ -3,11 +3,15 @@ import { CardType } from "@/domain/enums";
 import { CognitiveAtomStage } from "@/domain/enums/cognitive";
 import {
   EXPLANATION_CARD_TYPES,
+  OPEN_RESPONSE_CARD_TYPES,
+  QUICK_RETRIEVAL_CARD_TYPES,
   RETRIEVAL_CARD_TYPES,
 } from "./constants";
 
 const EXPLAIN_TYPES = new Set<string>(EXPLANATION_CARD_TYPES);
 const RETRIEVAL_TYPES = new Set<string>(RETRIEVAL_CARD_TYPES);
+const OPEN_RESPONSE_TYPES = new Set<string>(OPEN_RESPONSE_CARD_TYPES);
+const QUICK_RETRIEVAL_TYPES = new Set<string>(QUICK_RETRIEVAL_CARD_TYPES);
 
 const SUPPRESSED_CARD_SCORE = -1000;
 
@@ -134,8 +138,13 @@ function scoreCard(
 
   const viewCount = cardState?.viewCount ?? 0;
   const wrongAnswers = cardState?.wrongAnswerCount ?? 0;
+  const isOpenResponse = OPEN_RESPONSE_TYPES.has(card.type);
 
   if (shouldSuppressExplanation(card, atomState, stage, viewCount)) {
+    return SUPPRESSED_CARD_SCORE;
+  }
+
+  if (shouldSuppressOpenResponse(card, atomState, stage, viewCount)) {
     return SUPPRESSED_CARD_SCORE;
   }
 
@@ -149,6 +158,18 @@ function scoreCard(
     score -= 12;
   }
 
+  if (
+    lastCardType &&
+    isOpenResponse &&
+    OPEN_RESPONSE_TYPES.has(lastCardType)
+  ) {
+    score -= 35;
+  }
+
+  if (isOpenResponse) {
+    score -= 28;
+  }
+
   switch (stage) {
     case CognitiveAtomStage.Learnable:
     case CognitiveAtomStage.Learning:
@@ -156,22 +177,31 @@ function scoreCard(
       if (EXPLAIN_TYPES.has(card.type)) {
         score += 35;
       }
-      if (RETRIEVAL_TYPES.has(card.type)) {
-        score += 10;
+      if (QUICK_RETRIEVAL_TYPES.has(card.type)) {
+        score += 18;
+      }
+      if (isOpenResponse) {
+        score += 4;
       }
       break;
     case CognitiveAtomStage.Consolidating:
     case CognitiveAtomStage.ReviewNeeded:
-      if (RETRIEVAL_TYPES.has(card.type)) {
-        score += 30;
+      if (QUICK_RETRIEVAL_TYPES.has(card.type)) {
+        score += 32;
+      }
+      if (isOpenResponse) {
+        score += atomState.wrongAnswerCount > 0 ? 14 : 6;
       }
       if (EXPLAIN_TYPES.has(card.type)) {
         score += 12;
       }
       break;
     case CognitiveAtomStage.Stable:
-      if (RETRIEVAL_TYPES.has(card.type)) {
-        score += 20;
+      if (QUICK_RETRIEVAL_TYPES.has(card.type)) {
+        score += 24;
+      }
+      if (isOpenResponse) {
+        score += 8;
       }
       break;
     default:
@@ -188,6 +218,14 @@ function scoreCard(
 
   if (card.type === CardType.Quiz && atomState.wrongAnswerCount >= 2) {
     score -= 18;
+  }
+
+  if (
+    isOpenResponse &&
+    atomState.wrongAnswerCount === 0 &&
+    atomState.mastery < 50
+  ) {
+    score -= 12;
   }
 
   return score;
@@ -214,14 +252,38 @@ function shouldSuppressExplanation(
   return true;
 }
 
+function shouldSuppressOpenResponse(
+  card: Card,
+  atomState: UserAtomState,
+  stage: CognitiveAtomStage,
+  viewCount: number
+): boolean {
+  if (!OPEN_RESPONSE_TYPES.has(card.type) || viewCount === 0) {
+    return false;
+  }
+
+  if (stage === CognitiveAtomStage.Forgotten || atomState.wrongAnswerCount > 0) {
+    return false;
+  }
+
+  return viewCount >= 1;
+}
+
 function isSameCategory(previous: CardType, current: CardType): boolean {
   const previousExplain = EXPLAIN_TYPES.has(previous);
   const currentExplain = EXPLAIN_TYPES.has(current);
-  const previousRetrieval = RETRIEVAL_TYPES.has(previous);
-  const currentRetrieval = RETRIEVAL_TYPES.has(current);
+  const previousOpenResponse = OPEN_RESPONSE_TYPES.has(previous);
+  const currentOpenResponse = OPEN_RESPONSE_TYPES.has(current);
+  const previousQuickRetrieval =
+    QUICK_RETRIEVAL_TYPES.has(previous) ||
+    (RETRIEVAL_TYPES.has(previous) && !OPEN_RESPONSE_TYPES.has(previous));
+  const currentQuickRetrieval =
+    QUICK_RETRIEVAL_TYPES.has(current) ||
+    (RETRIEVAL_TYPES.has(current) && !OPEN_RESPONSE_TYPES.has(current));
 
   return (
     (previousExplain && currentExplain) ||
-    (previousRetrieval && currentRetrieval)
+    (previousOpenResponse && currentOpenResponse) ||
+    (previousQuickRetrieval && currentQuickRetrieval)
   );
 }

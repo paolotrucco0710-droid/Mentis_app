@@ -32,7 +32,7 @@ describe("buildHeuristicRetrievalFeedback", () => {
 
     expect(feedback.source).toBe("heuristic");
     expect(feedback.isCorrect).toBe(false);
-    expect(feedback.summary).toContain("troppo breve");
+    expect(feedback.summary).toContain("Troppo breve");
   });
 
   it("rewards answers that mention reference points", () => {

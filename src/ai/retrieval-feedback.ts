@@ -31,10 +31,10 @@ export interface RetrievalFeedback {
 const retrievalFeedbackSchema = z.object({
   isCorrect: z.boolean(),
   score: z.number().min(0).max(100),
-  strengths: z.array(z.string().min(1)).max(3),
-  gaps: z.array(z.string().min(1)).max(3),
-  suggestion: z.string().min(1).max(400),
-  summary: z.string().min(1).max(400),
+  strengths: z.array(z.string().min(1).max(80)).max(1),
+  gaps: z.array(z.string().min(1).max(80)).max(1),
+  suggestion: z.string().min(1).max(100),
+  summary: z.string().min(1).max(120),
 });
 
 const MAX_USER_ANSWER_CHARS = 2_500;
@@ -73,20 +73,20 @@ export function buildHeuristicRetrievalFeedback(
     score,
     strengths:
       matchedPoints.length > 0
-        ? matchedPoints.slice(0, 2).map((point) => `Hai menzionato: ${point}`)
+        ? [`Hai colto: ${matchedPoints[0]}`]
         : longEnough
-          ? ["Hai provato a richiamare il concetto con parole tue."]
+          ? ["Buon tentativo con parole tue."]
           : [],
     gaps: input.referencePoints
       .filter((point) => !matchedPoints.includes(point))
-      .slice(0, 2),
+      .slice(0, 1),
     suggestion:
       input.mode === "feynman"
-        ? "Prova a spiegare il concetto con un esempio concreto e parole semplici."
-        : "Integra i punti mancanti e collega cause ed effetti in una frase.",
+        ? "Aggiungi un esempio concreto."
+        : "Integra il punto chiave mancante.",
     summary: longEnough
-      ? "Risposta utile. Confronta con il feedback e i punti chiave."
-      : "Risposta troppo breve. Aggiungi i dettagli essenziali del concetto.",
+      ? "Buona base. Controlla i punti chiave sotto."
+      : "Troppo breve: aggiungi un dettaglio in più.",
     source: "heuristic",
   };
 }
@@ -114,12 +114,12 @@ ${normalizeUserAnswer(input.userAnswer)}
 
 Regole:
 - Valuta comprensione reale, non lunghezza o stile perfetto.
-- Tono incoraggiante. Mai punizioni o giudizi duri.
+- Tono incoraggiante e diretto. Zero frasi generiche.
 - isCorrect=true se la risposta coglie l'idea centrale anche con parole diverse.
-- strengths: 1-3 punti forti concreti (array vuoto se davvero nulla).
-- gaps: 1-3 elementi mancanti o imprecisi (array vuoto se tutto ok).
-- suggestion: un solo consiglio pratico e breve.
-- summary: feedback generale in 1-2 frasi, in italiano.
+- summary: UNA frase, max 15 parole, va subito al punto.
+- strengths: al massimo 1 elemento breve (array vuoto se nulla di concreto).
+- gaps: al massimo 1 lacuna breve (array vuoto se tutto ok).
+- suggestion: UNA frase pratica, max 12 parole.
 
 Rispondi SOLO con JSON valido:
 {
@@ -168,7 +168,7 @@ export async function evaluateRetrievalAnswer(
           {
             role: "system",
             content:
-              "Sei un tutor di Mentis. Valuti risposte di studio in italiano con feedback breve, chiaro e incoraggiante.",
+              "Sei un tutor di Mentis. Feedback ultra-breve in italiano: una frase netta, niente liste lunghe.",
           },
           {
             role: "user",

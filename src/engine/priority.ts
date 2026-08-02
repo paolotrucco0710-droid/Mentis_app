@@ -1,3 +1,4 @@
+import type { AtomId } from "@/domain/ids";
 import type { Atom, UserAtomState } from "@/domain/entities";
 import { CognitiveAtomStage } from "@/domain/enums/cognitive";
 import { UserAtomLearningState } from "@/domain/enums";
@@ -13,8 +14,18 @@ export function scoreAtomCandidate(input: {
   userAtomStates: Map<string, UserAtomState>;
   unlocksCount: number;
   now: Date;
+  recentAtomIds?: AtomId[];
+  knowledgeSourceExposure?: Map<string, number>;
 }): ScoredAtomCandidate | null {
-  const { atom, state, userAtomStates, unlocksCount, now } = input;
+  const {
+    atom,
+    state,
+    userAtomStates,
+    unlocksCount,
+    now,
+    recentAtomIds = [],
+    knowledgeSourceExposure = new Map(),
+  } = input;
   const prerequisitesSatisfied = prerequisitesMet(
     atom.prerequisites,
     userAtomStates
@@ -33,6 +44,8 @@ export function scoreAtomCandidate(input: {
     forgetProbability,
     unlocksCount,
     now,
+    recentAtomIds,
+    knowledgeSourceExposure,
   });
 
   return {
@@ -53,8 +66,19 @@ function computePriority(input: {
   forgetProbability: number;
   unlocksCount: number;
   now: Date;
+  recentAtomIds: AtomId[];
+  knowledgeSourceExposure: Map<string, number>;
 }): number {
-  const { atom, state, stage, forgetProbability, unlocksCount, now } = input;
+  const {
+    atom,
+    state,
+    stage,
+    forgetProbability,
+    unlocksCount,
+    now,
+    recentAtomIds,
+    knowledgeSourceExposure,
+  } = input;
 
   let score = 0;
 
@@ -111,6 +135,20 @@ function computePriority(input: {
 
   score += (atom.difficulty / 5) * 5;
   score -= (state.mastery / 100) * 20;
+
+  const recentIndex = recentAtomIds.indexOf(atom.id);
+  if (recentIndex >= 0) {
+    score -= 70 - recentIndex * 12;
+  }
+
+  const chapterExposure = knowledgeSourceExposure.get(atom.knowledgeSourceId) ?? 0;
+  const exposureValues = [...knowledgeSourceExposure.values()];
+  if (exposureValues.length > 1) {
+    const minChapterExposure = Math.min(...exposureValues);
+    if (chapterExposure === minChapterExposure) {
+      score += 28;
+    }
+  }
 
   return Math.max(score, 0);
 }

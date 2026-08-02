@@ -7,42 +7,33 @@ export function RetrievalFeedbackPanel({
 }: {
   feedback: RetrievalFeedback;
 }) {
+  const gap = feedback.gaps[0];
+  const strength = feedback.strengths[0];
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-2 rounded-xl border border-border bg-accent/40 p-4">
       <p
-        className={`text-sm font-medium ${
+        className={`text-sm font-semibold leading-6 ${
           feedback.isCorrect ? "text-emerald-700" : "text-amber-700"
         }`}
       >
         {feedback.summary}
       </p>
 
-      {feedback.strengths.length > 0 ? (
-        <div>
-          <p className="text-sm font-medium">Punti forti</p>
-          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted">
-            {feedback.strengths.map((point) => (
-              <li key={point}>{point}</li>
-            ))}
-          </ul>
-        </div>
+      {strength ? (
+        <p className="text-sm text-muted">{strength}</p>
       ) : null}
 
-      {feedback.gaps.length > 0 ? (
-        <div>
-          <p className="text-sm font-medium">Da integrare</p>
-          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted">
-            {feedback.gaps.map((point) => (
-              <li key={point}>{point}</li>
-            ))}
-          </ul>
-        </div>
+      {gap ? (
+        <p className="text-sm text-muted">
+          <span className="font-medium text-foreground">Manca:</span> {gap}
+        </p>
       ) : null}
 
-      <div className="rounded-xl bg-accent/60 p-4 text-sm text-muted">
-        <p className="font-medium text-foreground">Suggerimento</p>
-        <p className="mt-1">{feedback.suggestion}</p>
-      </div>
+      <p className="text-sm text-muted">
+        <span className="font-medium text-foreground">Prossimo passo:</span>{" "}
+        {feedback.suggestion}
+      </p>
 
       {feedback.source === "heuristic" ? (
         <p className="text-xs text-muted">
