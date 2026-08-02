@@ -2,7 +2,6 @@ import type { AtomId } from "@/domain/ids";
 import type { Atom, UserAtomState } from "@/domain/entities";
 import { CognitiveAtomStage } from "@/domain/enums/cognitive";
 import { UserAtomLearningState } from "@/domain/enums";
-import type { AtomId } from "@/domain/ids";
 import { PREREQUISITE_MASTERY_THRESHOLD, REVIEW_FORGET_THRESHOLD } from "./constants";
 import { computeForgetProbability } from "./decay";
 import type { ScoredAtomCandidate } from "./types";
