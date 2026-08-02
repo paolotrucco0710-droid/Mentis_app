@@ -64,6 +64,7 @@ export {
   uploadAvatar,
 } from "./storage";
 export { fetchAICostSummary, fetchAIJobCosts } from "./ai-costs";
+export { evaluateRetrievalResponse } from "./ai-feedback";
 export {
   trackAnalyticsEvent,
   fetchAnalyticsOverview,

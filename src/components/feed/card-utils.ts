@@ -8,6 +8,7 @@ import type {
   TrueFalseCardPayload,
 } from "@/domain/entities/card";
 import { CardType } from "@/domain/enums";
+import type { AtomId } from "@/domain/ids";
 
 export function isQuizPayload(
   payload: CardPayload | null
@@ -106,6 +107,7 @@ export interface CardAnswerResult {
 
 export type FeedCardProps = {
   card: Card;
+  atomId?: AtomId;
   atomTitle?: string;
   disabled?: boolean;
   onContinue: (result: CardAnswerResult) => void;
