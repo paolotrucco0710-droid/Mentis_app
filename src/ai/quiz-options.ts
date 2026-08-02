@@ -32,6 +32,10 @@ export function asDeclarativeQuizOption(value: string | undefined): string | nul
     return null;
   }
 
+  if (lower.includes("affermazione non corretta")) {
+    return null;
+  }
+
   return trimmed;
 }
 

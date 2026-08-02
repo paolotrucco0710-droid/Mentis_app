@@ -13,6 +13,10 @@ export const DEFAULT_SESSION_TARGET_CARDS = 20;
 /** Card types treated as explanation-heavy (variety rules). */
 export const EXPLANATION_CARD_TYPES = new Set([
   "explain",
+]);
+
+/** Visual explanation cards handled separately from text explain cards. */
+export const IMAGE_EXPLAIN_CARD_TYPES = new Set([
   "image_explain",
 ]);
 

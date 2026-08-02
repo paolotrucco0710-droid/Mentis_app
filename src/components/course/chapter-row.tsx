@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
+import Link from "next/link";
 import type { ChapterWithSource } from "@/course/types";
 import type { ChapterId } from "@/domain/ids";
 import { KnowledgeSourceProcessingStatus } from "@/domain/enums";
@@ -59,6 +60,13 @@ function ChapterRowComponent({
             </Badge>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
+            {status === KnowledgeSourceProcessingStatus.Completed ? (
+              <Link
+                href={`/feed?subjectId=${chapter.subjectId}&knowledgeSourceId=${chapter.knowledgeSourceId}`}
+              >
+                <Button size="sm">Studia capitolo</Button>
+              </Link>
+            ) : null}
             {status !== KnowledgeSourceProcessingStatus.Completed &&
             status !== KnowledgeSourceProcessingStatus.Processing ? (
               <Button

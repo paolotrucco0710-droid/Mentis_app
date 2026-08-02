@@ -1,6 +1,6 @@
 import type { FeedResponse } from "@/domain/entities/feed-item";
 import type { StudySession } from "@/domain/entities/study-session";
-import type { StudySessionId, SubjectId } from "@/domain/ids";
+import type { KnowledgeSourceId, StudySessionId, SubjectId } from "@/domain/ids";
 import { apiFetch } from "./client";
 
 export async function createStudySession(
@@ -16,11 +16,16 @@ export async function createStudySession(
 export async function fetchNextFeedItem(input: {
   sessionId: StudySessionId;
   subjectId: SubjectId;
+  knowledgeSourceId?: KnowledgeSourceId;
 }): Promise<FeedResponse> {
   const params = new URLSearchParams({
     sessionId: input.sessionId,
     subjectId: input.subjectId,
   });
+
+  if (input.knowledgeSourceId) {
+    params.set("knowledgeSourceId", input.knowledgeSourceId);
+  }
 
   return apiFetch<FeedResponse>(`/api/v1/feed/next?${params.toString()}`);
 }
