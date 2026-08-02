@@ -25,6 +25,7 @@ import { selectCardForAtom } from "./card-selector";
 import { DEFAULT_SESSION_TARGET_CARDS, MASTERY_STABLE_THRESHOLD } from "./constants";
 import { FeedEngineError } from "./errors";
 import { countUnlocks, scoreAtomCandidate, selectBestCandidate } from "./priority";
+import { filterCandidatesForSessionVariety } from "./session-variety";
 import { initialLearningStage, prerequisitesMet } from "./stages";
 import type { FeedEngineContext } from "./types";
 
@@ -268,7 +269,10 @@ function selectNextItem(context: FeedEngineContext) {
       Boolean(candidate)
     );
 
-  const bestCandidate = selectBestCandidate(candidates, context.recentAtomIds);
+  const bestCandidate = selectBestCandidate(
+    filterCandidatesForSessionVariety(candidates, context.recentAtomCounts),
+    context.recentAtomIds
+  );
   if (!bestCandidate) {
     return null;
   }

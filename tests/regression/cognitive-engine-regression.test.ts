@@ -9,6 +9,7 @@ import {
   applyMasteryUpdate,
   computeMasteryUpdate,
 } from "@/progress/mastery";
+import { prerequisiteIntroductionMet } from "@/engine/stages";
 import { makeAtom, makeCard, makeUserAtomState } from "../helpers/fixtures";
 import { makeKnowledgeJson } from "../helpers/knowledge-json";
 
@@ -21,12 +22,48 @@ describe("regression/cognitive-engine", () => {
         prereqId,
         makeUserAtomState({
           atomId: prereqId as never,
-          mastery: 30,
+          mastery: 15,
+          exposureCount: 1,
         }),
       ],
     ]);
 
     expect(prerequisitesMet(dependent.prerequisites, states)).toBe(false);
+  });
+
+  it("unlocks dependents after a short introduction", () => {
+    const prereqId = "00000000-0000-4000-8000-000000000099";
+    const dependent = makeAtom({ prerequisites: [prereqId] });
+    const introducedByMastery = new Map([
+      [
+        prereqId,
+        makeUserAtomState({
+          atomId: prereqId as never,
+          mastery: 25,
+          exposureCount: 1,
+        }),
+      ],
+    ]);
+    const introducedByExposure = new Map([
+      [
+        prereqId,
+        makeUserAtomState({
+          atomId: prereqId as never,
+          mastery: 10,
+          exposureCount: 2,
+        }),
+      ],
+    ]);
+
+    expect(prerequisitesMet(dependent.prerequisites, introducedByMastery)).toBe(
+      true
+    );
+    expect(
+      prerequisitesMet(dependent.prerequisites, introducedByExposure)
+    ).toBe(true);
+    expect(
+      prerequisiteIntroductionMet(introducedByExposure.get(prereqId)!)
+    ).toBe(true);
   });
 
   it("keeps mastery progression stable for quiz success path", () => {

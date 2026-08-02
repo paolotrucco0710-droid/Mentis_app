@@ -246,6 +246,17 @@ function scoreCard(
     score += 16;
   }
 
+  if (
+    introductionSeen(cards, userCardStates) &&
+    !hasStartedOpenResponse(cards, userCardStates)
+  ) {
+    if (isOpenResponse) {
+      score += 40;
+    } else if (QUICK_RETRIEVAL_TYPES.has(card.type)) {
+      score -= 35;
+    }
+  }
+
   if (atomState.wrongAnswerCount > 0 && EXPLAIN_TYPES.has(card.type)) {
     score += 20;
   }
@@ -280,6 +291,19 @@ function shouldSuppressExplanation(
   }
 
   return true;
+}
+
+function hasStartedOpenResponse(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  return cards.some((card) => {
+    if (!OPEN_RESPONSE_TYPES.has(card.type)) {
+      return false;
+    }
+
+    return (userCardStates.get(card.id)?.viewCount ?? 0) > 0;
+  });
 }
 
 function hasStartedRetrieval(

@@ -1,5 +1,6 @@
 export { FeedEngineError } from "./errors";
 export {
+  PREREQUISITE_INTRODUCTION_THRESHOLD,
   PREREQUISITE_MASTERY_THRESHOLD,
   REVIEW_FORGET_THRESHOLD,
   MASTERY_STABLE_THRESHOLD,
@@ -7,6 +8,7 @@ export {
 export { computeForgetProbability } from "./decay";
 export {
   prerequisitesMet,
+  prerequisiteIntroductionMet,
   resolveCognitiveStage,
   initialLearningStage,
 } from "./stages";

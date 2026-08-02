@@ -1,5 +1,11 @@
-/** Mastery level that unlocks dependent atoms. */
-export const PREREQUISITE_MASTERY_THRESHOLD = 70;
+/** Mastery level that unlocks dependent atoms after introduction. */
+export const PREREQUISITE_INTRODUCTION_THRESHOLD = 25;
+
+/** Legacy export kept for callers that still reference the old name. */
+export const PREREQUISITE_MASTERY_THRESHOLD = PREREQUISITE_INTRODUCTION_THRESHOLD;
+
+/** Max cards on the same atom in one session before forcing rotation. */
+export const MAX_SESSION_CARDS_PER_ATOM = 2;
 
 /** Forget probability above which review becomes urgent. */
 export const REVIEW_FORGET_THRESHOLD = 0.55;

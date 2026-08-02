@@ -9,14 +9,15 @@ import {
 import { makeAtom, makeUserAtomState } from "../../helpers/fixtures";
 
 describe("engine/stages", () => {
-  it("requires all prerequisites to be mastered", () => {
+  it("requires prerequisites to be introduced before unlocking dependents", () => {
     const prereqId = "00000000-0000-4000-8000-000000000099";
     const states = new Map([
       [
         prereqId,
         makeUserAtomState({
           atomId: prereqId as never,
-          mastery: 40,
+          mastery: 10,
+          exposureCount: 1,
           currentStage: UserAtomLearningState.Learning,
         }),
       ],
@@ -31,8 +32,9 @@ describe("engine/stages", () => {
             prereqId,
             makeUserAtomState({
               atomId: prereqId as never,
-              mastery: 80,
-              currentStage: UserAtomLearningState.Mastered,
+              mastery: 25,
+              exposureCount: 1,
+              currentStage: UserAtomLearningState.Learning,
             }),
           ],
         ])

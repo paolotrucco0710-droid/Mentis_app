@@ -9,7 +9,7 @@ import { getImageIdFromPayload } from "@/components/feed/card-utils";
 import { findAtomsByKnowledgeSourceId } from "@/db/repositories/atoms";
 import { findCardsByAtomIds } from "@/db/repositories/cards";
 import { findImagesByKnowledgeSourceId } from "@/db/repositories/uploads";
-import { CardType, CognitiveObjective } from "@/domain/enums";
+import { CardType } from "@/domain/enums";
 import type { KnowledgeJson, KnowledgeJsonAtomImage } from "@/domain/knowledge";
 import type { AtomId, ImageId, KnowledgeSourceId, UserId } from "@/domain/ids";
 import type { Prisma } from "@prisma/client";

@@ -249,6 +249,7 @@ describe("engine/card-selector", () => {
       stage: CognitiveAtomStage.Consolidating,
       userCardStates: new Map([
         [explain.id, makeCardState(explain.id, 1)],
+        [blurting.id, makeCardState(blurting.id, 1)],
       ]),
       lastCardType: CardType.Blurting,
     });

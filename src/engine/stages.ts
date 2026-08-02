@@ -3,10 +3,20 @@ import { UserAtomLearningState } from "@/domain/enums";
 import type { UserAtomState } from "@/domain/entities";
 import {
   MASTERY_STABLE_THRESHOLD,
-  PREREQUISITE_MASTERY_THRESHOLD,
+  PREREQUISITE_INTRODUCTION_THRESHOLD,
   REVIEW_FORGET_THRESHOLD,
 } from "./constants";
 import { computeForgetProbability } from "./decay";
+
+export function prerequisiteIntroductionMet(
+  state: UserAtomState
+): boolean {
+  return (
+    state.mastery >= PREREQUISITE_INTRODUCTION_THRESHOLD ||
+    state.exposureCount >= 2 ||
+    state.currentStage === UserAtomLearningState.Mastered
+  );
+}
 
 export function prerequisitesMet(
   prerequisiteIds: string[],
@@ -22,10 +32,7 @@ export function prerequisitesMet(
       return false;
     }
 
-    return (
-      prerequisiteState.mastery >= PREREQUISITE_MASTERY_THRESHOLD ||
-      prerequisiteState.currentStage === UserAtomLearningState.Mastered
-    );
+    return prerequisiteIntroductionMet(prerequisiteState);
   });
 }
 
