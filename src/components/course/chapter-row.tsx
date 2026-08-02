@@ -1,13 +1,17 @@
 "use client";
 
 import { memo, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ChapterWithSource } from "@/course/types";
 import type { ChapterId } from "@/domain/ids";
 import { KnowledgeSourceProcessingStatus } from "@/domain/enums";
 import { Badge, Button, Card, CardDescription, CardHeader, CardTitle, Dialog } from "@/components/ui";
 import { deleteChapter } from "@/lib/api";
-import { formatProcessingStatus } from "./course-utils";
+import {
+  buildChapterStudyHref,
+  canStudyChapter,
+  formatProcessingStatus,
+} from "./course-utils";
 
 function ChapterRowComponent({
   chapter,
@@ -16,6 +20,7 @@ function ChapterRowComponent({
   chapter: ChapterWithSource;
   onDeleted?: () => void;
 }) {
+  const router = useRouter();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -31,6 +36,13 @@ function ChapterRowComponent({
   }
 
   const status = chapter.knowledgeSource.processingStatus;
+  const studyReady = canStudyChapter(chapter);
+  const needsProcessing =
+    status === KnowledgeSourceProcessingStatus.Uploaded ||
+    status === KnowledgeSourceProcessingStatus.Failed;
+  const isProcessing =
+    status === KnowledgeSourceProcessingStatus.Processing ||
+    status === KnowledgeSourceProcessingStatus.Queued;
 
   return (
     <>
@@ -42,14 +54,13 @@ function ChapterRowComponent({
               <CardDescription>
                 Capitolo {chapter.chapterNumber ?? "—"} · {chapter.atomCount}{" "}
                 concetti · {chapter.knowledgeSource.pageCount} pagine
-                {status === KnowledgeSourceProcessingStatus.Completed
-                  ? " · Materiale pronto per lo studio"
-                  : ""}
+                {studyReady ? " · Materiale pronto per lo studio" : ""}
+                {needsProcessing ? " · Elaborazione AI richiesta" : ""}
               </CardDescription>
             </div>
             <Badge
               variant={
-                status === KnowledgeSourceProcessingStatus.Completed
+                studyReady
                   ? "success"
                   : status === KnowledgeSourceProcessingStatus.Failed
                     ? "danger"
@@ -60,15 +71,37 @@ function ChapterRowComponent({
             </Badge>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            {status === KnowledgeSourceProcessingStatus.Completed ? (
-              <Link
-                href={`/feed?subjectId=${chapter.subjectId}&knowledgeSourceId=${chapter.knowledgeSourceId}`}
+            {studyReady ? (
+              <Button
+                size="sm"
+                onClick={() => router.push(buildChapterStudyHref(chapter))}
               >
-                <Button size="sm">Studia capitolo</Button>
-              </Link>
+                Studia capitolo
+              </Button>
             ) : null}
-            {status !== KnowledgeSourceProcessingStatus.Completed &&
-            status !== KnowledgeSourceProcessingStatus.Processing ? (
+            {needsProcessing ? (
+              <Button
+                size="sm"
+                variant={studyReady ? "secondary" : "primary"}
+                onClick={() => {
+                  const params = new URLSearchParams({
+                    knowledgeSourceId: chapter.knowledgeSourceId,
+                  });
+                  router.push(`/processing?${params.toString()}`);
+                }}
+              >
+                {status === KnowledgeSourceProcessingStatus.Failed
+                  ? "Riprova elaborazione"
+                  : "Elabora capitolo"}
+              </Button>
+            ) : null}
+            {isProcessing ? (
+              <Button size="sm" variant="secondary" disabled>
+                Elaborazione in corso...
+              </Button>
+            ) : null}
+            {status === KnowledgeSourceProcessingStatus.Completed &&
+            chapter.atomCount === 0 ? (
               <Button
                 size="sm"
                 variant="secondary"
@@ -76,10 +109,10 @@ function ChapterRowComponent({
                   const params = new URLSearchParams({
                     knowledgeSourceId: chapter.knowledgeSourceId,
                   });
-                  window.location.href = `/processing?${params.toString()}`;
+                  router.push(`/processing?${params.toString()}`);
                 }}
               >
-                Elabora
+                Rielabora capitolo
               </Button>
             ) : null}
             <Button

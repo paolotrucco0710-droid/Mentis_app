@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildErrorDetectionContent } from "@/ai/error-detection-options";
+import { buildErrorDetectionContent, buildTrueFalseContent } from "@/ai/error-detection-options";
 
 describe("buildErrorDetectionContent", () => {
   it("converts confound mistakes into declarative flawed statements", () => {
@@ -22,20 +22,39 @@ describe("buildErrorDetectionContent", () => {
     expect(content.flawedText).not.toMatch(/^confondere/i);
   });
 
-  it("prefers misconceptions when they are declarative", () => {
+  it("strips Pensare che prefixes from misconceptions", () => {
     const content = buildErrorDetectionContent({
-      title: "Reconquista",
-      summary: "Processo di arretramento musulmano.",
-      explanation: "Durò secoli.",
+      title: "Signorie cittadine",
+      summary:
+        "Le Signorie cittadine emersero in Italia intorno al 1300, spesso tramite l'impadronimento violento del potere.",
+      explanation: "Il potere era concentrato in un signore.",
       misconceptions: [
-        "La Reconquista fu un'unica campagna militare pianificata fin dall'inizio.",
+        "Pensare che tutte le Signorie siano nate da un'unica modalità di acquisizione del potere.",
       ],
       commonMistakes: [],
       definitions: [],
       counterExamples: [],
     });
 
-    expect(content.flawedText).toContain("unica campagna");
-    expect(content.correction).toBe("Processo di arretramento musulmano.");
+    expect(content.flawedText).toMatch(/tutte le Signorie/i);
+    expect(content.flawedText).not.toMatch(/^pensare che/i);
+  });
+
+  it("builds true/false statements from misconceptions", () => {
+    const content = buildTrueFalseContent({
+      title: "Signorie cittadine",
+      summary: "Le Signorie cittadine emersero intorno al 1300.",
+      explanation: "Il potere era concentrato in un signore.",
+      misconceptions: [
+        "Pensare che tutte le Signorie siano nate da un'unica modalità di acquisizione del potere.",
+      ],
+      commonMistakes: [],
+      definitions: [],
+      counterExamples: [],
+    });
+
+    expect(content.correctAnswer).toBe(false);
+    expect(content.statement).toMatch(/tutte le Signorie/i);
+    expect(content.statement).not.toMatch(/^pensare che/i);
   });
 });

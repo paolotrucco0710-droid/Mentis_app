@@ -154,6 +154,7 @@ async function loadFeedContext(
 
   const sessionEvents = await findSessionEventsBySessionId(session.id);
   const lastCardType = resolveLastCardType(sessionEvents, cardsById);
+  const recentCardTypes = resolveRecentCardTypes(sessionEvents, cardsById);
   const recentAtomIds = resolveRecentAtomIds(sessionEvents);
   const knowledgeSourceExposure = buildKnowledgeSourceExposure(
     scopedAtoms,
@@ -170,6 +171,7 @@ async function loadFeedContext(
     userCardStates,
     cardsById,
     lastCardType,
+    recentCardTypes,
     recentAtomIds,
     knowledgeSourceExposure,
     now: new Date(),
@@ -273,6 +275,7 @@ function selectNextItem(context: FeedEngineContext) {
     stage: bestCandidate.stage,
     userCardStates: context.userCardStates,
     lastCardType: context.lastCardType,
+    recentCardTypes: context.recentCardTypes,
   });
 
   if (!card) {
@@ -349,6 +352,34 @@ function resolveLastCardType(
   }
 
   return null;
+}
+
+function resolveRecentCardTypes(
+  events: Awaited<ReturnType<typeof findSessionEventsBySessionId>>,
+  cardsById: Map<string, Card>,
+  limit = 4
+): CardType[] {
+  const recent: CardType[] = [];
+
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.type !== SessionEventType.OpenCard || !event.cardId) {
+      continue;
+    }
+
+    const card = cardsById.get(event.cardId);
+    if (!card) {
+      continue;
+    }
+
+    recent.push(card.type);
+
+    if (recent.length >= limit) {
+      break;
+    }
+  }
+
+  return recent.reverse();
 }
 
 function resolveRecentAtomIds(

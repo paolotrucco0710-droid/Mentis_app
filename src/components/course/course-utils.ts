@@ -65,3 +65,19 @@ export function formatFileSize(bytes: number): string {
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+export function canStudyChapter(chapter: { atomCount: number }): boolean {
+  return chapter.atomCount > 0;
+}
+
+export function buildChapterStudyHref(chapter: {
+  subjectId: string;
+  knowledgeSourceId: string;
+}): string {
+  const params = new URLSearchParams({
+    subjectId: chapter.subjectId,
+    knowledgeSourceId: chapter.knowledgeSourceId,
+  });
+
+  return `/feed?${params.toString()}`;
+}

@@ -13,6 +13,7 @@ export interface FeedEngineContext {
   userCardStates: Map<string, UserCardState>;
   cardsById: Map<string, Card>;
   lastCardType: CardType | null;
+  recentCardTypes: CardType[];
   recentAtomIds: AtomId[];
   knowledgeSourceExposure: Map<string, number>;
   now: Date;

@@ -24,7 +24,7 @@ function makeCardState(cardId: CardId, viewCount: number) {
 }
 
 describe("image explain selection", () => {
-  it("shows unseen image cards after the primary explain card", () => {
+  it("does not force image cards immediately after explain", () => {
     const explain = makeCard({
       id: "00000000-0000-4000-8000-000000000201" as CardId,
       type: CardType.Explain,
@@ -50,8 +50,9 @@ describe("image explain selection", () => {
         [explain.id, makeCardState(explain.id, 1)],
       ]),
       lastCardType: CardType.Explain,
+      recentCardTypes: [CardType.Explain],
     });
 
-    expect(selected?.type).toBe(CardType.ImageExplain);
+    expect(selected?.type).toBe(CardType.Quiz);
   });
 });

@@ -56,13 +56,58 @@ function mistakeToFlawedStatement(
   return isDeclarativeStatement(trimmed);
 }
 
+function misconceptionToFalseStatement(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  let statement = trimmed;
+  if (statement.toLowerCase().startsWith("pensare che ")) {
+    statement = statement.replace(/^pensare che\s+/i, "");
+  }
+
+  statement = statement.replace(/[.?!…]+$/, "").trim();
+  if (statement.length < 16 || statement.length > 220) {
+    return null;
+  }
+
+  const lower = statement.toLowerCase();
+  if (META_PHRASE_PREFIXES.some((prefix) => lower.startsWith(prefix))) {
+    return null;
+  }
+
+  return statement.charAt(0).toUpperCase() + statement.slice(1) + ".";
+}
+
+export function buildTrueFalseContent(
+  atom: ErrorDetectionSource
+): { statement: string; correctAnswer: boolean } {
+  for (const misconception of atom.misconceptions) {
+    const statement = misconceptionToFalseStatement(misconception);
+    if (statement) {
+      return { statement, correctAnswer: false };
+    }
+  }
+
+  const definition = isDeclarativeStatement(atom.definitions[0]);
+  if (definition) {
+    return { statement: definition, correctAnswer: true };
+  }
+
+  return {
+    statement: `${atom.title}: ${atom.summary}`,
+    correctAnswer: true,
+  };
+}
+
 export function buildErrorDetectionContent(
   atom: ErrorDetectionSource
 ): { flawedText: string; correction: string } {
   const correction = atom.definitions[0] ?? atom.summary;
 
-  for (const candidate of atom.misconceptions) {
-    const flawedText = isDeclarativeStatement(candidate);
+  for (const misconception of atom.misconceptions) {
+    const flawedText = misconceptionToFalseStatement(misconception);
     if (flawedText) {
       return { flawedText, correction: atom.summary };
     }
