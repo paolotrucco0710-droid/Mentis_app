@@ -19,6 +19,19 @@ export function buildFigureDetectionCacheKey(input: {
   return buildCacheKey(["figure_detection", input.imageHash, input.model]);
 }
 
+export function buildSemanticImageLinkCacheKey(input: {
+  payloadHash: string;
+  promptVersion: string;
+  model: string;
+}): string {
+  return buildCacheKey([
+    "semantic_image_link",
+    input.payloadHash,
+    input.promptVersion,
+    input.model,
+  ]);
+}
+
 export function buildExtractionCacheKey(input: {
   textHash: string;
   promptVersion: string;

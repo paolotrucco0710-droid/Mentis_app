@@ -14,6 +14,7 @@ export {
   buildExtractionCacheKey,
   buildFigureDetectionCacheKey,
   buildOcrImageCacheKey,
+  buildSemanticImageLinkCacheKey,
   hashText,
 } from "./cache-keys";
 export { readCacheResult, writeCacheResult } from "./cache";

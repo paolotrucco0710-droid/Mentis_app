@@ -2,6 +2,7 @@ import {
   countAtomsBySubjectId,
   findAtomsBySubjectId,
 } from "@/db/repositories/atoms";
+import { findImagesByKnowledgeSourceId } from "@/db/repositories/uploads";
 import { findCardsByAtomIds } from "@/db/repositories/cards";
 import { createSessionEvent } from "@/db/repositories/session-events";
 import {
@@ -21,6 +22,7 @@ import { CardType, SessionEventType } from "@/domain/enums";
 import type { AtomId, ImageId, KnowledgeSourceId, StudySessionId, SubjectId, UserId } from "@/domain/ids";
 import { env } from "@/lib/env";
 import { relinkImagesForKnowledgeSource } from "@/ai/relink-images";
+import { isStudyIllustrationImage } from "@/ai/image-study";
 import { getImageIdFromPayload } from "@/components/feed/card-utils";
 import { getImageSignedUrlForUser } from "@/storage/access-service";
 import { selectCardForAtom } from "./card-selector";
@@ -138,8 +140,13 @@ async function loadFeedContext(
     : atoms;
 
   if (input.knowledgeSourceId && session.cardsViewed === 0) {
+    const atomsWithImages = scopedAtoms.filter((atom) => atom.images.length > 0).length;
+    const sourceImages = await findImagesByKnowledgeSourceId(input.knowledgeSourceId);
+    const hasStudyFigures = sourceImages.some(isStudyIllustrationImage);
+
     await relinkImagesForKnowledgeSource(input.knowledgeSourceId, {
       ownerId: input.userId,
+      force: hasStudyFigures && atomsWithImages === 0,
     });
   }
 

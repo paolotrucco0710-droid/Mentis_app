@@ -35,6 +35,7 @@ import { extractDocumentText } from "./ocr";
 import { normalizeKnowledgeJson } from "./normalize";
 import { persistKnowledgeGraph } from "./persist";
 import { cleanExtractedText } from "./text-cleaning";
+import { relinkImagesForKnowledgeSource } from "@/ai/relink-images";
 import { validateKnowledgeSemantics } from "./validate";
 import {
   findCompletedKnowledgeSourceByFileHash,
@@ -220,13 +221,29 @@ export async function processKnowledgeSource(
 
     await updateStep(job.id, AIJobStep.Normalization);
     const normalized = normalizeKnowledgeJson(extracted, knowledgeSourceId);
-    const enriched = enrichKnowledgeWithImages(normalized, knowledgeImages);
+    const enriched = await enrichKnowledgeWithImages(normalized, knowledgeImages, {
+      tracker,
+    });
 
     await updateStep(job.id, AIJobStep.Persistence);
     const { atomCount, cardCount } = await persistKnowledgeGraph({
       knowledge: enriched,
       knowledgeSourceId,
       subjectId: knowledgeSource.subjectId,
+    });
+
+    const imageLinkResult = await relinkImagesForKnowledgeSource(
+      knowledgeSourceId,
+      {
+        ownerId: userId,
+        force: true,
+      }
+    );
+
+    logger.info("Knowledge source image linking completed", {
+      knowledgeSourceId,
+      jobId: job.id,
+      ...imageLinkResult,
     });
 
     await updateKnowledgeSourceStatus(

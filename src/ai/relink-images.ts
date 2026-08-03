@@ -1,9 +1,9 @@
-import { enrichKnowledgeWithImages } from "@/ai/enrich-images";
+import { enrichKnowledgeWithImages, summarizeImageLinking } from "@/ai/enrich-images";
 import {
   extractFiguresFromPageImages,
   mergeKnowledgeSourceImages,
 } from "@/ai/extract-figures";
-import { shouldCreateImageExplainCard } from "@/ai/image-study";
+import { isStudyIllustrationImage, shouldCreateImageExplainCard } from "@/ai/image-study";
 import { buildImageExplainCardFields } from "@/ai/image-explain-card-builder";
 import { getImageIdFromPayload } from "@/components/feed/card-utils";
 import { findAtomsByKnowledgeSourceId } from "@/db/repositories/atoms";
@@ -15,10 +15,22 @@ import type { AtomId, ImageId, KnowledgeSourceId, UserId } from "@/domain/ids";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { env } from "@/lib/env";
+import { logger } from "@/lib/logger";
 import { UsageTracker } from "@/ai/optimization";
 
 const relinkCache = new Map<string, number>();
 const RELINK_CACHE_TTL_MS = 30 * 60 * 1000;
+
+export interface RelinkImagesResult {
+  atomsUpdated: number;
+  cardsCreated: number;
+  cardsRemoved: number;
+  studyImageCount: number;
+  atomsWithImages: number;
+  atomCount: number;
+  unassignedImageCount: number;
+  skippedCache: boolean;
+}
 
 function getRelinkCacheKey(
   knowledgeSourceId: KnowledgeSourceId,
@@ -27,73 +39,25 @@ function getRelinkCacheKey(
   return `${knowledgeSourceId}:${ownerId ?? "anonymous"}`;
 }
 
-export async function relinkImagesForKnowledgeSource(
-  knowledgeSourceId: KnowledgeSourceId,
-  options?: { ownerId?: UserId }
-): Promise<{ atomsUpdated: number; cardsCreated: number; cardsRemoved: number }> {
-  const cacheKey = getRelinkCacheKey(knowledgeSourceId, options?.ownerId);
-  const cachedAt = relinkCache.get(cacheKey);
-  if (cachedAt && Date.now() - cachedAt < RELINK_CACHE_TTL_MS) {
-    return { atomsUpdated: 0, cardsCreated: 0, cardsRemoved: 0 };
-  }
-
-  const result = await relinkImagesForKnowledgeSourceUncached(
-    knowledgeSourceId,
-    options
-  );
-  relinkCache.set(cacheKey, Date.now());
-  return result;
+function emptyRelinkResult(skippedCache = false): RelinkImagesResult {
+  return {
+    atomsUpdated: 0,
+    cardsCreated: 0,
+    cardsRemoved: 0,
+    studyImageCount: 0,
+    atomsWithImages: 0,
+    atomCount: 0,
+    unassignedImageCount: 0,
+    skippedCache,
+  };
 }
 
-async function relinkImagesForKnowledgeSourceUncached(
+function buildKnowledgeFromAtoms(
   knowledgeSourceId: KnowledgeSourceId,
-  options?: { ownerId?: UserId }
-): Promise<{ atomsUpdated: number; cardsCreated: number; cardsRemoved: number }> {
-  let images = await findImagesByKnowledgeSourceId(knowledgeSourceId);
-  const atoms = await findAtomsByKnowledgeSourceId(knowledgeSourceId);
-  if (atoms.length === 0) {
-    return { atomsUpdated: 0, cardsCreated: 0, cardsRemoved: 0 };
-  }
-
-  if (options?.ownerId) {
-    const tracker = new UsageTracker();
-    const figureImages = await extractFiguresFromPageImages({
-      knowledgeSourceId,
-      ownerId: options.ownerId,
-      pageImages: images,
-      existingImages: images,
-      tracker,
-    });
-    images = mergeKnowledgeSourceImages(images, figureImages);
-  }
-
-  const imageById = new Map(images.map((image) => [image.id, image]));
-  const existingCards = await findCardsByAtomIds(atoms.map((atom) => atom.id));
-  let cardsRemoved = 0;
-
-  for (const card of existingCards) {
-    if (card.type !== CardType.ImageExplain) {
-      continue;
-    }
-
-    const imageId = getImageIdFromPayload(card.payload);
-    const image = imageId ? imageById.get(imageId as ImageId) : undefined;
-    const atom = atoms.find((entry) => entry.id === card.atomId);
-    const reference = atom?.images[0];
-
-    if (
-      !shouldCreateImageExplainCard(image ?? { caption: reference?.caption ?? null }, reference)
-    ) {
-      await prisma.card.delete({ where: { id: card.id } });
-      cardsRemoved += 1;
-    }
-  }
-
-  if (images.length === 0) {
-    return { atomsUpdated: 0, cardsCreated: 0, cardsRemoved };
-  }
-
-  const knowledge: KnowledgeJson = {
+  atoms: Awaited<ReturnType<typeof findAtomsByKnowledgeSourceId>>,
+  sourcePages: number
+): KnowledgeJson {
+  return {
     metadata: {
       documentId: knowledgeSourceId,
       title: "",
@@ -102,7 +66,7 @@ async function relinkImagesForKnowledgeSourceUncached(
       estimatedReadingTimeMinutes: 0,
       estimatedStudyTimeMinutes: 0,
       chapterNumber: null,
-      sourcePages: images.length,
+      sourcePages,
       generatedAt: new Date().toISOString(),
       version: env.knowledgeJsonVersion,
     },
@@ -135,8 +99,92 @@ async function relinkImagesForKnowledgeSourceUncached(
       confidence: atom.confidence,
     })),
   };
+}
 
-  const enriched = enrichKnowledgeWithImages(knowledge, images);
+export async function relinkImagesForKnowledgeSource(
+  knowledgeSourceId: KnowledgeSourceId,
+  options?: { ownerId?: UserId; force?: boolean }
+): Promise<RelinkImagesResult> {
+  const cacheKey = getRelinkCacheKey(knowledgeSourceId, options?.ownerId);
+
+  if (!options?.force) {
+    const cachedAt = relinkCache.get(cacheKey);
+    if (cachedAt && Date.now() - cachedAt < RELINK_CACHE_TTL_MS) {
+      return emptyRelinkResult(true);
+    }
+  }
+
+  const result = await relinkImagesForKnowledgeSourceUncached(
+    knowledgeSourceId,
+    options
+  );
+  relinkCache.set(cacheKey, Date.now());
+  return result;
+}
+
+async function relinkImagesForKnowledgeSourceUncached(
+  knowledgeSourceId: KnowledgeSourceId,
+  options?: { ownerId?: UserId }
+): Promise<RelinkImagesResult> {
+  let images = await findImagesByKnowledgeSourceId(knowledgeSourceId);
+  const atoms = await findAtomsByKnowledgeSourceId(knowledgeSourceId);
+  if (atoms.length === 0) {
+    return emptyRelinkResult();
+  }
+
+  const tracker = options?.ownerId ? new UsageTracker() : undefined;
+
+  if (options?.ownerId && tracker) {
+    const figureImages = await extractFiguresFromPageImages({
+      knowledgeSourceId,
+      ownerId: options.ownerId,
+      pageImages: images,
+      existingImages: images,
+      tracker,
+    });
+    images = mergeKnowledgeSourceImages(images, figureImages);
+  }
+
+  const studyImages = images.filter(isStudyIllustrationImage);
+  const imageById = new Map(images.map((image) => [image.id, image]));
+  const existingCards = await findCardsByAtomIds(atoms.map((atom) => atom.id));
+  let cardsRemoved = 0;
+
+  for (const card of existingCards) {
+    if (card.type !== CardType.ImageExplain) {
+      continue;
+    }
+
+    const imageId = getImageIdFromPayload(card.payload);
+    const image = imageId ? imageById.get(imageId as ImageId) : undefined;
+    const atom = atoms.find((entry) => entry.id === card.atomId);
+    const reference = atom?.images[0];
+
+    if (
+      !shouldCreateImageExplainCard(image ?? { caption: reference?.caption ?? null }, reference)
+    ) {
+      await prisma.card.delete({ where: { id: card.id } });
+      cardsRemoved += 1;
+    }
+  }
+
+  if (studyImages.length === 0) {
+    return {
+      ...emptyRelinkResult(),
+      cardsRemoved,
+      atomCount: atoms.length,
+    };
+  }
+
+  const knowledge = buildKnowledgeFromAtoms(
+    knowledgeSourceId,
+    atoms,
+    images.length
+  );
+  const enriched = await enrichKnowledgeWithImages(knowledge, images, {
+    tracker,
+  });
+  const linkingSummary = summarizeImageLinking(enriched.atoms, studyImages);
   let atomsUpdated = 0;
   let cardsCreated = 0;
   const refreshedCards = await findCardsByAtomIds(atoms.map((atom) => atom.id));
@@ -194,5 +242,18 @@ async function relinkImagesForKnowledgeSourceUncached(
     }
   }
 
-  return { atomsUpdated, cardsCreated, cardsRemoved };
+  const result: RelinkImagesResult = {
+    atomsUpdated,
+    cardsCreated,
+    cardsRemoved,
+    ...linkingSummary,
+    skippedCache: false,
+  };
+
+  logger.info("Image relink completed", {
+    knowledgeSourceId,
+    ...result,
+  });
+
+  return result;
 }
