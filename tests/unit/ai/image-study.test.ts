@@ -8,13 +8,13 @@ import {
   isPageSourceImage,
   isPageSourceStorageKey,
   isStudyIllustrationImage,
+  isUploadSourcePageImage,
+  shouldCreateImageExplainCard,
 } from "@/ai/image-study";
 
 describe("image-study storage paths", () => {
   it("treats page storage keys as OCR source pages", () => {
-    expect(
-      isPageSourceStorageKey("abc/pages/001.jpg")
-    ).toBe(true);
+    expect(isPageSourceStorageKey("abc/pages/001.jpg")).toBe(true);
     expect(
       isPageSourceImage({
         storageKey: "abc/pages/001.jpg",
@@ -30,6 +30,48 @@ describe("image-study storage paths", () => {
         storageKey: "abc/figures/p001-f01.jpg",
         caption: "Corte medievale",
       })
+    ).toBe(true);
+  });
+});
+
+describe("image-study captions", () => {
+  it("treats camera upload filenames as OCR source pages", () => {
+    expect(isUploadSourcePageImage({ caption: "IMG_20260802_122407.jpg" })).toBe(
+      true
+    );
+    expect(isUploadSourcePageImage({ caption: "DSC_0042.jpg" })).toBe(true);
+    expect(isUploadSourcePageImage({ caption: null })).toBe(true);
+  });
+
+  it("accepts descriptive captions as study illustrations", () => {
+    expect(
+      isUploadSourcePageImage({
+        caption: "Illustrazione della corte medievale",
+      })
+    ).toBe(false);
+  });
+
+  it("does not create image explain cards for upload page photos", () => {
+    expect(
+      shouldCreateImageExplainCard(
+        { caption: "IMG_20260802_122407.jpg" },
+        {
+          caption: "Figura: Signorie cittadine",
+          description: "Le signorie cittadine emersero intorno al 1300.",
+        }
+      )
+    ).toBe(false);
+  });
+
+  it("creates image explain cards only with meaningful captions and descriptions", () => {
+    expect(
+      shouldCreateImageExplainCard(
+        { caption: "Corte medievale sotto gli archi" },
+        {
+          caption: "Corte medievale sotto gli archi",
+          description: "Rappresentazione di una signoria cittadina.",
+        }
+      )
     ).toBe(true);
   });
 });

@@ -254,6 +254,10 @@ function scoreCard(
 
   score += Math.max(0, 30 - viewCount * 8);
 
+  if (isImageExplain && viewCount === 0) {
+    score += 18;
+  }
+
   if (lastCardType && card.type === lastCardType) {
     score -= 25;
   }
@@ -352,12 +356,12 @@ function scoreCard(
       score += 24;
     }
 
-    const recentQuickRetrievalCount = recentCardTypes
+    const recentQuickRetrievalInWindow = recentCardTypes
       .slice(-OPEN_RESPONSE_SESSION_WINDOW)
       .filter((type) => QUICK_RETRIEVAL_TYPES.has(type)).length;
     if (
       countRecentOpenResponseCards(recentCardTypes) === 0 &&
-      recentQuickRetrievalCount >= 3
+      recentQuickRetrievalInWindow >= 3
     ) {
       score += 18;
     }

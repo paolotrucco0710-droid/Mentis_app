@@ -108,6 +108,19 @@ export function ProcessingPanel() {
         if (job.status === "completed") {
           setStatus(KnowledgeSourceProcessingStatus.Completed);
         }
+      } else if (
+        chapterData.knowledgeSource.processingStatus ===
+        KnowledgeSourceProcessingStatus.Failed
+      ) {
+        try {
+          const { job } = await fetchLatestProcessingJob(knowledgeSourceId);
+          setCurrentStep(job.currentStep);
+          if (job.errorMessage) {
+            setError(simplifyProcessingError(job.errorMessage));
+          }
+        } catch {
+          setError("Elaborazione fallita.");
+        }
       }
     } catch (err) {
       setError(

@@ -147,7 +147,7 @@ async function relinkImagesForKnowledgeSourceUncached(
 
     const nextImages = imageReference?.imageId ? [imageReference] : [];
     const previousImageId = original?.images[0]?.imageId;
-  const nextImageId = nextImages[0]?.imageId;
+    const nextImageId = nextImages[0]?.imageId;
 
     if (previousImageId !== nextImageId) {
       await prisma.atom.update({
