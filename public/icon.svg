@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Mentis">
+  <rect width="512" height="512" rx="112" fill="#4f46e5"/>
+  <path
+    fill="#ffffff"
+    d="M148 352V160h52l84 132 84-132h52v192h-48V243l-78 121h-20l-78-121v109z"
+  />
+</svg>
