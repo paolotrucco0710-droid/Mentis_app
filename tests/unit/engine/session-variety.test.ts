@@ -39,7 +39,67 @@ function makeExplainCard(atomId: AtomId, cardId: CardId) {
 }
 
 describe("engine/session-variety", () => {
-  it("prioritizes the next chapter introduction after one card on the current atom", () => {
+  it("requires quick verification before the next chapter introduction", () => {
+    const introduced = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
+      exposureCount: 1,
+      logicalOrder: 0,
+    });
+    const untouched = makeCandidate("00000000-0000-4000-8000-000000000102" as AtomId, {
+      exposureCount: 0,
+      logicalOrder: 1,
+    });
+    const introducedCards = [
+      makeExplainCard(
+        introduced.atom.id,
+        "00000000-0000-4000-8000-000000000201" as CardId
+      ),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000202" as CardId,
+        atomId: introduced.atom.id,
+        type: CardType.Quiz,
+        order: 1,
+      }),
+    ];
+    const untouchedCards = [
+      makeExplainCard(
+        untouched.atom.id,
+        "00000000-0000-4000-8000-000000000203" as CardId
+      ),
+    ];
+
+    const filtered = filterCandidatesForSessionVariety(
+      [introduced, untouched],
+      {
+        recentAtomCounts: new Map([[introduced.atom.id, 1]]),
+        recentAtomIds: [introduced.atom.id],
+        recentCardTypes: [CardType.Explain],
+        cardsByAtomId: new Map([
+          [introduced.atom.id, introducedCards],
+          [untouched.atom.id, untouchedCards],
+        ]),
+        userCardStates: new Map([
+          [
+            introducedCards[0]!.id,
+            {
+              userId: introduced.state.userId,
+              cardId: introducedCards[0]!.id,
+              viewCount: 1,
+              wrongAnswerCount: 0,
+              correctAnswerCount: 0,
+              lastViewedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        ]),
+      }
+    );
+
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.atom.id).toBe(introduced.atom.id);
+  });
+
+  it("prioritizes the next chapter introduction after a quick check on the current atom", () => {
     const introduced = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
       exposureCount: 1,
       logicalOrder: 0,
@@ -112,7 +172,7 @@ describe("engine/session-variety", () => {
     expect(filtered[0]?.atom.id).toBe(untouched.atom.id);
   });
 
-  it("rotates away from the atom just explained when another atom can be practiced", () => {
+  it("keeps the explained atom for verification even when another atom can be practiced", () => {
     const introduced = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
       exposureCount: 1,
       logicalOrder: 0,
@@ -187,12 +247,8 @@ describe("engine/session-variety", () => {
       }
     );
 
-    expect(filtered.some((candidate) => candidate.atom.id === practiced.atom.id)).toBe(
-      true
-    );
-    expect(filtered.some((candidate) => candidate.atom.id === introduced.atom.id)).toBe(
-      false
-    );
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.atom.id).toBe(introduced.atom.id);
   });
 
   it("keeps practice atoms available after a quick quiz instead of forcing only new introductions", () => {
@@ -314,7 +370,7 @@ describe("engine/session-variety", () => {
     expect(filtered).toHaveLength(2);
   });
 
-  it("blocks back-to-back learn cards across atoms", () => {
+  it("moves to the next introduction only after the previous learn card was verified", () => {
     const introduced = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
       exposureCount: 1,
     });
@@ -362,12 +418,8 @@ describe("engine/session-variety", () => {
       ]),
     });
 
-    expect(filtered.some((candidate) => candidate.atom.id === untouched.atom.id)).toBe(
-      true
-    );
-    expect(filtered.some((candidate) => candidate.atom.id === introduced.atom.id)).toBe(
-      false
-    );
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.atom.id).toBe(introduced.atom.id);
   });
 
   it("rotates fairly among atoms already introduced", () => {
