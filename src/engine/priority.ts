@@ -215,7 +215,8 @@ export function countUnlocks(
 
 export function selectBestCandidate(
   candidates: ScoredAtomCandidate[],
-  recentAtomIds: AtomId[] = []
+  recentAtomIds: AtomId[] = [],
+  recentAtomCounts: Map<string, number> = new Map()
 ): ScoredAtomCandidate | null {
   if (candidates.length === 0) {
     return null;
@@ -224,6 +225,12 @@ export function selectBestCandidate(
   return [...candidates].sort((left, right) => {
     if (right.priority !== left.priority) {
       return right.priority - left.priority;
+    }
+
+    const leftSessionCount = recentAtomCounts.get(left.atom.id) ?? 0;
+    const rightSessionCount = recentAtomCounts.get(right.atom.id) ?? 0;
+    if (leftSessionCount !== rightSessionCount) {
+      return leftSessionCount - rightSessionCount;
     }
 
     const leftRecent = recentAtomIds.indexOf(left.atom.id);

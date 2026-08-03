@@ -39,6 +39,79 @@ function makeExplainCard(atomId: AtomId, cardId: CardId) {
 }
 
 describe("engine/session-variety", () => {
+  it("prioritizes the next chapter introduction after one card on the current atom", () => {
+    const introduced = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
+      exposureCount: 1,
+      logicalOrder: 0,
+    });
+    const untouched = makeCandidate("00000000-0000-4000-8000-000000000102" as AtomId, {
+      exposureCount: 0,
+      logicalOrder: 1,
+    });
+    const introducedCards = [
+      makeExplainCard(
+        introduced.atom.id,
+        "00000000-0000-4000-8000-000000000201" as CardId
+      ),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000202" as CardId,
+        atomId: introduced.atom.id,
+        type: CardType.Quiz,
+        order: 1,
+      }),
+    ];
+    const untouchedCards = [
+      makeExplainCard(
+        untouched.atom.id,
+        "00000000-0000-4000-8000-000000000203" as CardId
+      ),
+    ];
+
+    const filtered = filterCandidatesForSessionVariety(
+      [introduced, untouched],
+      {
+        recentAtomCounts: new Map([[introduced.atom.id, 1]]),
+        recentAtomIds: [introduced.atom.id],
+        recentCardTypes: [CardType.Quiz],
+        cardsByAtomId: new Map([
+          [introduced.atom.id, introducedCards],
+          [untouched.atom.id, untouchedCards],
+        ]),
+        userCardStates: new Map([
+          [
+            introducedCards[0]!.id,
+            {
+              userId: introduced.state.userId,
+              cardId: introducedCards[0]!.id,
+              viewCount: 1,
+              wrongAnswerCount: 0,
+              correctAnswerCount: 0,
+              lastViewedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+          [
+            introducedCards[1]!.id,
+            {
+              userId: introduced.state.userId,
+              cardId: introducedCards[1]!.id,
+              viewCount: 1,
+              wrongAnswerCount: 0,
+              correctAnswerCount: 1,
+              lastViewedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        ]),
+      }
+    );
+
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.atom.id).toBe(untouched.atom.id);
+  });
+
   it("rotates away from the atom just explained when another atom can be practiced", () => {
     const introduced = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
       exposureCount: 1,
@@ -209,8 +282,8 @@ describe("engine/session-variety", () => {
     expect(filtered.some((candidate) => candidate.atom.id === second.atom.id)).toBe(
       true
     );
-    expect(filtered.some((candidate) => candidate.atom.id === third.atom.id)).toBe(
-      true
+    expect(filtered.some((candidate) => candidate.atom.id === first.atom.id)).toBe(
+      false
     );
   });
 
@@ -290,10 +363,10 @@ describe("engine/session-variety", () => {
     });
 
     expect(filtered.some((candidate) => candidate.atom.id === untouched.atom.id)).toBe(
-      false
+      true
     );
     expect(filtered.some((candidate) => candidate.atom.id === introduced.atom.id)).toBe(
-      true
+      false
     );
   });
 

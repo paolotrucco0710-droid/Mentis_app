@@ -49,6 +49,7 @@ function FeedCardRendererComponent({
   card,
   atomId,
   atomTitle,
+  imageUrl,
   disabled,
   onAnswer,
   onSkip,
@@ -56,6 +57,7 @@ function FeedCardRendererComponent({
   card: Card;
   atomId?: AtomId;
   atomTitle?: string;
+  imageUrl?: string | null;
   disabled?: boolean;
   onAnswer: (result: CardAnswerResult) => void;
   onSkip: () => void;
@@ -64,6 +66,7 @@ function FeedCardRendererComponent({
     card,
     atomId,
     atomTitle,
+    imageUrl,
     disabled,
     onContinue: onAnswer,
     onSkip,

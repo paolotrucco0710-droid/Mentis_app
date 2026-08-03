@@ -9,7 +9,7 @@ import {
 import { makeAtom, makeUserAtomState } from "../../helpers/fixtures";
 
 describe("engine/stages", () => {
-  it("requires prerequisites to be introduced before unlocking dependents", () => {
+  it("unlocks dependents after the first introduction", () => {
     const prereqId = "00000000-0000-4000-8000-000000000099";
     const states = new Map([
       [
@@ -23,7 +23,7 @@ describe("engine/stages", () => {
       ],
     ]);
 
-    expect(prerequisitesMet([prereqId], states)).toBe(false);
+    expect(prerequisitesMet([prereqId], states)).toBe(true);
     expect(
       prerequisitesMet(
         [prereqId],

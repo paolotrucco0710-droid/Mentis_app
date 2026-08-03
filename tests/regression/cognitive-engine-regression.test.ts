@@ -23,7 +23,7 @@ describe("regression/cognitive-engine", () => {
         makeUserAtomState({
           atomId: prereqId as never,
           mastery: 15,
-          exposureCount: 1,
+          exposureCount: 0,
         }),
       ],
     ]);
@@ -50,7 +50,7 @@ describe("regression/cognitive-engine", () => {
         makeUserAtomState({
           atomId: prereqId as never,
           mastery: 10,
-          exposureCount: 2,
+          exposureCount: 1,
         }),
       ],
     ]);

@@ -25,6 +25,7 @@ export interface FeedItem {
   chapterProgress: Score0To1 | null;
   estimatedDurationSeconds: number;
   masteryBefore: Score0To100 | null;
+  imageUrl?: string | null;
 }
 
 export interface FeedResponse {

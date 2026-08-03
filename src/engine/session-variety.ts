@@ -4,7 +4,6 @@ import {
   EXPLANATION_CARD_TYPES,
   MAX_SESSION_CARDS_PER_ATOM,
   OPEN_RESPONSE_SESSION_WINDOW,
-  QUICK_RETRIEVAL_CARD_TYPES,
 } from "./constants";
 import {
   countRecentOpenResponseCards,
@@ -14,7 +13,6 @@ import {
 import type { ScoredAtomCandidate } from "./types";
 
 const EXPLAIN_TYPES = new Set<string>(EXPLANATION_CARD_TYPES);
-const QUICK_RETRIEVAL_TYPES = new Set<string>(QUICK_RETRIEVAL_CARD_TYPES);
 
 export interface SessionVarietyContext {
   recentAtomCounts: Map<string, number>;
@@ -45,15 +43,6 @@ function countRecentLearnCards(recentCardTypes: CardType[]): number {
   return streak;
 }
 
-function countRecentLearnCardsInWindow(
-  recentCardTypes: CardType[],
-  windowSize: number
-): number {
-  return recentCardTypes
-    .slice(-windowSize)
-    .filter((type) => EXPLAIN_TYPES.has(type)).length;
-}
-
 function excludeRecentAtom(
   candidates: ScoredAtomCandidate[],
   recentAtomId: string | undefined
@@ -65,20 +54,15 @@ function excludeRecentAtom(
   return candidates.filter((candidate) => candidate.atom.id !== recentAtomId);
 }
 
-function filterOutIntroductions(
+function filterUnderSessionCap(
   candidates: ScoredAtomCandidate[],
-  cardsByAtomId: Map<string, Card[]>,
-  userCardStates: Map<string, UserCardState>
+  recentAtomCounts: Map<string, number>
 ): ScoredAtomCandidate[] {
-  const withoutIntroductions = candidates.filter(
+  return candidates.filter(
     (candidate) =>
-      !needsPrimaryIntroduction(
-        getCardsForCandidate(candidate, cardsByAtomId),
-        userCardStates
-      )
+      (recentAtomCounts.get(candidate.atom.id) ?? 0) <
+      MAX_SESSION_CARDS_PER_ATOM
   );
-
-  return withoutIntroductions.length > 0 ? withoutIntroductions : candidates;
 }
 
 export function filterCandidatesForSessionVariety(
@@ -97,72 +81,62 @@ export function filterCandidatesForSessionVariety(
     userCardStates,
   } = context;
 
-  const lastCardType = recentCardTypes[recentCardTypes.length - 1];
-  const lastWasExplain = lastCardType ? EXPLAIN_TYPES.has(lastCardType) : false;
-  const lastWasQuickRetrieval = lastCardType
-    ? QUICK_RETRIEVAL_TYPES.has(lastCardType)
-    : false;
   const recentAtomId = recentAtomIds[0];
-
   let pool = candidates;
 
-  if (lastWasExplain) {
-    const practiceOnly = filterOutIntroductions(pool, cardsByAtomId, userCardStates);
-    const rotated = excludeRecentAtom(practiceOnly, recentAtomId);
-    pool = rotated.length > 0 ? rotated : practiceOnly;
-  } else if (lastWasQuickRetrieval) {
-    pool = excludeRecentAtom(pool, recentAtomId);
-  }
-
-  const recentLearnStreak = countRecentLearnCards(recentCardTypes);
-  const needsIntroduction = pool.filter((candidate) =>
+  const untouchedInSession = pool.filter(
+    (candidate) => (recentAtomCounts.get(candidate.atom.id) ?? 0) === 0
+  );
+  const introNeeded = untouchedInSession.filter((candidate) =>
     needsPrimaryIntroduction(
       getCardsForCandidate(candidate, cardsByAtomId),
       userCardStates
     )
   );
 
-  if (needsIntroduction.length > 0 && recentLearnStreak === 0) {
-    const recentIntroCount = countRecentLearnCardsInWindow(recentCardTypes, 5);
-    const shouldSpreadIntroductions =
-      recentIntroCount < 2 &&
-      (lastWasQuickRetrieval || needsIntroduction.length >= pool.length);
+  if (introNeeded.length > 0 && recentAtomId) {
+    const recentCount = recentAtomCounts.get(recentAtomId) ?? 0;
+    if (recentCount >= 1) {
+      pool = introNeeded;
+    }
+  } else if (
+    untouchedInSession.length > 0 &&
+    untouchedInSession.length < pool.length
+  ) {
+    pool = untouchedInSession;
+  }
 
-    if (shouldSpreadIntroductions) {
-      const practicePool = pool.filter(
-        (candidate) =>
-          !needsPrimaryIntroduction(
-            getCardsForCandidate(candidate, cardsByAtomId),
-            userCardStates
-          )
-      );
-
-      if (practicePool.length > 0) {
-        pool = [...new Set([...needsIntroduction, ...practicePool])];
-      } else {
-        pool = needsIntroduction;
-      }
+  if (recentAtomId) {
+    const rotated = excludeRecentAtom(pool, recentAtomId);
+    if (rotated.length > 0) {
+      pool = rotated;
     }
   }
 
-  const minSessionAppearances = Math.min(
-    ...pool.map((candidate) => recentAtomCounts.get(candidate.atom.id) ?? 0)
-  );
-  const fairnessPool = pool.filter(
-    (candidate) =>
-      (recentAtomCounts.get(candidate.atom.id) ?? 0) <= minSessionAppearances
-  );
-  if (fairnessPool.length > 0 && fairnessPool.length < pool.length) {
-    pool = fairnessPool;
+  const recentLearnStreak = countRecentLearnCards(recentCardTypes);
+  if (recentLearnStreak > 0) {
+    const withoutIntroductions = pool.filter(
+      (candidate) =>
+        !needsPrimaryIntroduction(
+          getCardsForCandidate(candidate, cardsByAtomId),
+          userCardStates
+        )
+    );
+
+    if (withoutIntroductions.length > 0) {
+      pool = withoutIntroductions;
+    }
   }
 
-  const capped = pool.filter(
-    (candidate) =>
-      (recentAtomCounts.get(candidate.atom.id) ?? 0) <
-      MAX_SESSION_CARDS_PER_ATOM
-  );
-
-  pool = capped.length > 0 ? capped : pool;
+  const cappedPool = filterUnderSessionCap(pool, recentAtomCounts);
+  if (cappedPool.length > 0) {
+    pool = cappedPool;
+  } else {
+    const globallyCapped = filterUnderSessionCap(candidates, recentAtomCounts);
+    if (globallyCapped.length > 0) {
+      pool = globallyCapped;
+    }
+  }
 
   if (
     recentCardTypes.length >= 5 &&
@@ -177,7 +151,17 @@ export function filterCandidatesForSessionVariety(
     );
 
     if (productionDue.length > 0) {
-      return productionDue;
+      const minSessionCount = Math.min(
+        ...productionDue.map(
+          (candidate) => recentAtomCounts.get(candidate.atom.id) ?? 0
+        )
+      );
+      const balanced = productionDue.filter(
+        (candidate) =>
+          (recentAtomCounts.get(candidate.atom.id) ?? 0) === minSessionCount
+      );
+      const rotatedProduction = excludeRecentAtom(balanced, recentAtomId);
+      pool = rotatedProduction.length > 0 ? rotatedProduction : balanced;
     }
   }
 
