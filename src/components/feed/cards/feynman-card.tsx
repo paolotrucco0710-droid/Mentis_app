@@ -76,14 +76,14 @@ export function FeynmanCardComponent({
       {feedback ? (
         <div className="mt-4 space-y-4">
           <RetrievalFeedbackPanel feedback={feedback} />
-          <div>
-            <p className="text-sm font-medium">Criteri di riferimento:</p>
-            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted">
-              {payload.evaluationCriteria.map((criterion) => (
-                <li key={criterion}>{criterion}</li>
-              ))}
-            </ul>
-          </div>
+          {!feedback.isCorrect ? (
+            <div>
+              <p className="text-sm font-medium">Da ricordare:</p>
+              <p className="mt-1 text-sm text-muted">
+                {payload.evaluationCriteria[0]}
+              </p>
+            </div>
+          ) : null}
           <Button
             fullWidth
             disabled={disabled}

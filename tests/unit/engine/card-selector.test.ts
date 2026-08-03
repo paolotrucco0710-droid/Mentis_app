@@ -133,6 +133,38 @@ describe("engine/card-selector", () => {
     expect(selected?.type).not.toBe(CardType.Explain);
   });
 
+  it("prefers a quick quiz right after the explain card", () => {
+    const explain = makeCard({
+      id: "00000000-0000-4000-8000-000000000201" as CardId,
+      type: CardType.Explain,
+      order: 0,
+    });
+    const quiz = makeCard({
+      id: "00000000-0000-4000-8000-000000000202" as CardId,
+      type: CardType.Quiz,
+      order: 1,
+    });
+    const blurting = makeCard({
+      id: "00000000-0000-4000-8000-000000000203" as CardId,
+      type: CardType.Blurting,
+      order: 2,
+    });
+
+    const selected = selectCardForAtom({
+      cards: [explain, quiz, blurting],
+      atomState: makeUserAtomState({
+        exposureCount: 1,
+        correctAnswerCount: 0,
+        wrongAnswerCount: 0,
+      }),
+      stage: CognitiveAtomStage.Learning,
+      userCardStates: new Map([[explain.id, makeCardState(explain.id, 1)]]),
+      lastCardType: CardType.Explain,
+    });
+
+    expect(selected?.type).toBe(CardType.Quiz);
+  });
+
   it("re-shows explanation cards after wrong answers", () => {
     const explain = makeCard({
       id: "00000000-0000-4000-8000-000000000201" as CardId,

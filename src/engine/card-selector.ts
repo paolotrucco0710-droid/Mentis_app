@@ -273,18 +273,29 @@ function scoreCard(
   }
 
   if (isOpenResponse && viewCount === 0 && introductionSeen(cards, userCardStates)) {
-    score += 16;
+    score += 8;
   }
 
   if (
     introductionSeen(cards, userCardStates) &&
-    !hasStartedOpenResponse(cards, userCardStates)
+    !hasStartedRetrieval(cards, userCardStates)
   ) {
-    if (isOpenResponse) {
-      score += 40;
-    } else if (QUICK_RETRIEVAL_TYPES.has(card.type)) {
-      score -= 35;
+    if (QUICK_RETRIEVAL_TYPES.has(card.type)) {
+      score += 38;
     }
+    if (isOpenResponse) {
+      score -= 45;
+    }
+  }
+
+  const recentOpenCount = recentCardTypes.filter((type) =>
+    OPEN_RESPONSE_TYPES.has(type)
+  ).length;
+  if (isOpenResponse && atomState.exposureCount < 2 && viewCount === 0) {
+    score -= 35;
+  }
+  if (isOpenResponse && recentOpenCount >= 1) {
+    score -= 28;
   }
 
   if (atomState.wrongAnswerCount > 0 && EXPLAIN_TYPES.has(card.type)) {

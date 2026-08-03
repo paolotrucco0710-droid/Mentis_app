@@ -85,22 +85,23 @@ export function buildHeuristicRetrievalFeedback(
   return {
     isCorrect: score >= 72 && matchedPoints.length > 0,
     score,
-    strengths:
+    strengths: [],
+    gaps:
       matchedPoints.length > 0
-        ? [`Hai colto: ${matchedPoints[0]}`]
-        : [],
-    gaps: input.referencePoints
-      .filter((point) => !matchedPoints.includes(point))
-      .slice(0, 1),
+        ? []
+        : input.referencePoints.slice(0, 1),
     suggestion:
-      input.mode === "feynman"
-        ? "Aggiungi un esempio concreto."
-        : "Integra il punto chiave mancante.",
-    summary: longEnough
-      ? matchedPoints.length > 0
-        ? "Buona base. Controlla i punti chiave sotto."
-        : "Manca il punto centrale del concetto."
-      : "Troppo breve: aggiungi un dettaglio in più.",
+      matchedPoints.length > 0
+        ? ""
+        : input.mode === "feynman"
+          ? "Aggiungi un esempio concreto."
+          : "Aggiungi il punto centrale con parole tue.",
+    summary:
+      matchedPoints.length > 0
+        ? "Ottimo, hai colto il concetto."
+        : longEnough
+          ? "Ci sei vicino: manca il punto centrale."
+          : "Troppo breve: aggiungi un dettaglio in più.",
     source: "heuristic",
   };
 }
@@ -127,13 +128,15 @@ ${normalizeUserAnswer(input.userAnswer)}
 """
 
 Regole:
-- Valuta comprensione reale, non lunghezza o stile perfetto.
-- Tono incoraggiante e diretto. Zero frasi generiche.
-- isCorrect=true se la risposta coglie l'idea centrale anche con parole diverse.
-- summary: UNA frase, max 15 parole, va subito al punto.
-- strengths: al massimo 1 elemento breve (array vuoto se nulla di concreto).
-- gaps: al massimo 1 lacuna breve (array vuoto se tutto ok).
-- suggestion: UNA frase pratica, max 12 parole.
+- Valuta comprensione reale, non perfezione formale.
+- Tono incoraggiante e diretto. Niente "è corretta ma...".
+- Ignora errori marginali (date esatte, traslitterazioni, refusi) se l'idea centrale è giusta.
+- isCorrect=true se la risposta coglie l'idea centrale, anche senza tutti i dettagli.
+- Se isCorrect=true: strengths, gaps e suggestion devono essere array/stringa vuoti.
+- summary: UNA frase breve e positiva se corretto; altrimenti cosa manca in concreto.
+- strengths: al massimo 1 elemento breve (vuoto se corretto o nulla di utile).
+- gaps: al massimo 1 lacuna (vuoto se corretto).
+- suggestion: solo se isCorrect=false, una frase pratica max 12 parole.
 
 Rispondi SOLO con JSON valido:
 {

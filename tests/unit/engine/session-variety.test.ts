@@ -71,6 +71,7 @@ describe("engine/session-variety", () => {
       [introduced, untouched],
       {
         recentAtomCounts: new Map([[introduced.atom.id, 1]]),
+        recentAtomIds: [introduced.atom.id],
         recentCardTypes: [CardType.Explain],
         cardsByAtomId: new Map([
           [introduced.atom.id, introducedCards],
@@ -96,6 +97,75 @@ describe("engine/session-variety", () => {
 
     expect(filtered).toHaveLength(1);
     expect(filtered[0]?.atom.id).toBe(introduced.atom.id);
+  });
+
+  it("allows a new introduction after a quick quiz on the previous atom", () => {
+    const first = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
+      exposureCount: 1,
+    });
+    const second = makeCandidate("00000000-0000-4000-8000-000000000102" as AtomId, {
+      exposureCount: 0,
+    });
+    const firstCards = [
+      makeExplainCard(first.atom.id, "00000000-0000-4000-8000-000000000201" as CardId),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000202" as CardId,
+        atomId: first.atom.id,
+        type: CardType.Quiz,
+        order: 1,
+      }),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000203" as CardId,
+        atomId: first.atom.id,
+        type: CardType.Blurting,
+        order: 2,
+      }),
+    ];
+
+    const filtered = filterCandidatesForSessionVariety([first, second], {
+      recentAtomCounts: new Map([[first.atom.id, 2]]),
+      recentAtomIds: [first.atom.id],
+      recentCardTypes: [CardType.Explain, CardType.Quiz],
+      cardsByAtomId: new Map([
+        [first.atom.id, firstCards],
+        [
+          second.atom.id,
+          [makeExplainCard(second.atom.id, "00000000-0000-4000-8000-000000000204" as CardId)],
+        ],
+      ]),
+      userCardStates: new Map([
+        [
+          firstCards[0]!.id,
+          {
+            userId: first.state.userId,
+            cardId: firstCards[0]!.id,
+            viewCount: 1,
+            wrongAnswerCount: 0,
+            correctAnswerCount: 0,
+            lastViewedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+        [
+          firstCards[1]!.id,
+          {
+            userId: first.state.userId,
+            cardId: firstCards[1]!.id,
+            viewCount: 1,
+            wrongAnswerCount: 0,
+            correctAnswerCount: 1,
+            lastViewedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+      ]),
+    });
+
+    expect(filtered.some((candidate) => candidate.atom.id === second.atom.id)).toBe(
+      true
+    );
   });
 
   it("allows a new introduction only after the previous learn card", () => {
@@ -147,6 +217,7 @@ describe("engine/session-variety", () => {
 
     const filtered = filterCandidatesForSessionVariety([introduced, untouched], {
       recentAtomCounts: new Map([[introduced.atom.id, 1]]),
+      recentAtomIds: [introduced.atom.id],
       recentCardTypes: [CardType.Explain],
       cardsByAtomId: new Map([
         [introduced.atom.id, introducedCards],

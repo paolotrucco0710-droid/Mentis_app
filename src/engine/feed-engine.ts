@@ -272,6 +272,7 @@ function selectNextItem(context: FeedEngineContext) {
   const bestCandidate = selectBestCandidate(
     filterCandidatesForSessionVariety(candidates, {
       recentAtomCounts: context.recentAtomCounts,
+      recentAtomIds: context.recentAtomIds,
       recentCardTypes: context.recentCardTypes,
       cardsByAtomId: context.cardsByAtomId,
       userCardStates: context.userCardStates,

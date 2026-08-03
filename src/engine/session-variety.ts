@@ -11,6 +11,7 @@ const EXPLAIN_TYPES = new Set<string>(EXPLANATION_CARD_TYPES);
 
 export interface SessionVarietyContext {
   recentAtomCounts: Map<string, number>;
+  recentAtomIds?: string[];
   recentCardTypes?: CardType[];
   cardsByAtomId: Map<string, Card[]>;
   userCardStates: Map<string, UserCardState>;
@@ -47,19 +48,29 @@ export function filterCandidatesForSessionVariety(
 
   const {
     recentAtomCounts,
+    recentAtomIds = [],
     recentCardTypes = [],
     cardsByAtomId,
     userCardStates,
   } = context;
 
-  const needsVerification = candidates.filter((candidate) =>
-    needsRetrievalVerification(
-      getCardsForCandidate(candidate, cardsByAtomId),
-      userCardStates
-    )
-  );
-  if (needsVerification.length > 0) {
-    return needsVerification;
+  const lastCardType = recentCardTypes[recentCardTypes.length - 1];
+  const lastWasExplain = lastCardType ? EXPLAIN_TYPES.has(lastCardType) : false;
+  const recentAtomId = recentAtomIds[0];
+
+  if (lastWasExplain && recentAtomId) {
+    const recentCandidate = candidates.find(
+      (candidate) => candidate.atom.id === recentAtomId
+    );
+    if (
+      recentCandidate &&
+      needsRetrievalVerification(
+        getCardsForCandidate(recentCandidate, cardsByAtomId),
+        userCardStates
+      )
+    ) {
+      return [recentCandidate];
+    }
   }
 
   const recentLearnStreak = countRecentLearnCards(recentCardTypes);

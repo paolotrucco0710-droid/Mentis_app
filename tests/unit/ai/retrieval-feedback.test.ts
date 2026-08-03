@@ -44,7 +44,7 @@ describe("buildHeuristicRetrievalFeedback", () => {
 
     expect(feedback.score).toBeGreaterThanOrEqual(72);
     expect(feedback.isCorrect).toBe(true);
-    expect(feedback.strengths.length).toBeGreaterThan(0);
+    expect(feedback.summary).toContain("Ottimo");
   });
 
   it("does not mark vague answers as correct when only a few words overlap", () => {
