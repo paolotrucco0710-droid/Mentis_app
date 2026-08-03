@@ -27,6 +27,10 @@ import { logger } from "@/lib/logger";
 import { toUserFacingAIError } from "./errors";
 import { extractKnowledgeJson } from "./extract";
 import { enrichKnowledgeWithImages } from "./enrich-images";
+import {
+  extractFiguresFromPageImages,
+  mergeKnowledgeSourceImages,
+} from "./extract-figures";
 import { extractDocumentText } from "./ocr";
 import { normalizeKnowledgeJson } from "./normalize";
 import { persistKnowledgeGraph } from "./persist";
@@ -164,6 +168,25 @@ export async function processKnowledgeSource(
     const rawText = await extractDocumentText(knowledgeSource, images, tracker);
     await persistJobUsage(job.id, tracker);
 
+    await updateStep(job.id, AIJobStep.ImageExtraction);
+    let knowledgeImages = images;
+    try {
+      const figureImages = await extractFiguresFromPageImages({
+        knowledgeSourceId,
+        ownerId: userId,
+        pageImages: images,
+        existingImages: images,
+        tracker,
+      });
+      knowledgeImages = mergeKnowledgeSourceImages(images, figureImages);
+    } catch (error) {
+      logger.warn("Figure extraction failed; continuing without study figures.", {
+        knowledgeSourceId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    await persistJobUsage(job.id, tracker);
+
     await updateStep(job.id, AIJobStep.TextCleaning);
     const cleanedText = cleanExtractedText(rawText);
     if (cleanedText.length < 100) {
@@ -197,7 +220,7 @@ export async function processKnowledgeSource(
 
     await updateStep(job.id, AIJobStep.Normalization);
     const normalized = normalizeKnowledgeJson(extracted, knowledgeSourceId);
-    const enriched = enrichKnowledgeWithImages(normalized, images);
+    const enriched = enrichKnowledgeWithImages(normalized, knowledgeImages);
 
     await updateStep(job.id, AIJobStep.Persistence);
     const { atomCount, cardCount } = await persistKnowledgeGraph({

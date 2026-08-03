@@ -43,50 +43,65 @@ export function normalizeUserAnswer(answer: string): string {
   return answer.trim().slice(0, MAX_USER_ANSWER_CHARS);
 }
 
+function pointMatchRatio(point: string, answer: string): number {
+  const answerLower = answer.toLowerCase();
+  const tokens = point
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((token) => token.length > 4);
+
+  if (tokens.length === 0) {
+    return 0;
+  }
+
+  const matched = tokens.filter((token) => answerLower.includes(token));
+  return matched.length / tokens.length;
+}
+
 export function buildHeuristicRetrievalFeedback(
   input: EvaluateRetrievalAnswerInput
 ): RetrievalFeedback {
   const answer = normalizeUserAnswer(input.userAnswer);
-  const minLength = input.mode === "feynman" ? 30 : 20;
+  const minLength = input.mode === "feynman" ? 40 : 30;
   const longEnough = answer.length >= minLength;
-  const matchedPoints = input.referencePoints.filter((point) => {
-    const tokens = point
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((token) => token.length > 4)
-      .slice(0, 4);
-
-    return tokens.some((token) => answer.toLowerCase().includes(token));
-  });
+  const matchedPoints = input.referencePoints.filter(
+    (point) => pointMatchRatio(point, answer) >= 0.4
+  );
+  const bestMatchRatio = input.referencePoints.reduce(
+    (best, point) => Math.max(best, pointMatchRatio(point, answer)),
+    0
+  );
 
   const score = Math.min(
     100,
     Math.round(
-      (longEnough ? 45 : 20) +
-        matchedPoints.length * 15 +
-        Math.min(answer.length / 8, 20)
+      (longEnough ? 25 : 10) +
+        matchedPoints.length * 20 +
+        bestMatchRatio * 25 +
+        Math.min(answer.length / 12, 10)
     )
   );
 
   return {
-    isCorrect: score >= 60,
+    isCorrect: score >= 72 && matchedPoints.length > 0,
     score,
-    strengths:
+    strengths: [],
+    gaps:
       matchedPoints.length > 0
-        ? [`Hai colto: ${matchedPoints[0]}`]
-        : longEnough
-          ? ["Buon tentativo con parole tue."]
-          : [],
-    gaps: input.referencePoints
-      .filter((point) => !matchedPoints.includes(point))
-      .slice(0, 1),
+        ? []
+        : input.referencePoints.slice(0, 1),
     suggestion:
-      input.mode === "feynman"
-        ? "Aggiungi un esempio concreto."
-        : "Integra il punto chiave mancante.",
-    summary: longEnough
-      ? "Buona base. Controlla i punti chiave sotto."
-      : "Troppo breve: aggiungi un dettaglio in più.",
+      matchedPoints.length > 0
+        ? ""
+        : input.mode === "feynman"
+          ? "Aggiungi un esempio concreto."
+          : "Aggiungi il punto centrale con parole tue.",
+    summary:
+      matchedPoints.length > 0
+        ? "Ottimo, hai colto il concetto."
+        : longEnough
+          ? "Ci sei vicino: manca il punto centrale."
+          : "Troppo breve: aggiungi un dettaglio in più.",
     source: "heuristic",
   };
 }
@@ -113,13 +128,15 @@ ${normalizeUserAnswer(input.userAnswer)}
 """
 
 Regole:
-- Valuta comprensione reale, non lunghezza o stile perfetto.
-- Tono incoraggiante e diretto. Zero frasi generiche.
-- isCorrect=true se la risposta coglie l'idea centrale anche con parole diverse.
-- summary: UNA frase, max 15 parole, va subito al punto.
-- strengths: al massimo 1 elemento breve (array vuoto se nulla di concreto).
-- gaps: al massimo 1 lacuna breve (array vuoto se tutto ok).
-- suggestion: UNA frase pratica, max 12 parole.
+- Valuta comprensione reale, non perfezione formale.
+- Tono incoraggiante e diretto. Niente "è corretta ma...".
+- Ignora errori marginali (date esatte, traslitterazioni, refusi) se l'idea centrale è giusta.
+- isCorrect=true se la risposta coglie l'idea centrale, anche senza tutti i dettagli.
+- Se isCorrect=true: strengths, gaps e suggestion devono essere array/stringa vuoti.
+- summary: UNA frase breve e positiva se corretto; altrimenti cosa manca in concreto.
+- strengths: al massimo 1 elemento breve (vuoto se corretto o nulla di utile).
+- gaps: al massimo 1 lacuna (vuoto se corretto).
+- suggestion: solo se isCorrect=false, una frase pratica max 12 parole.
 
 Rispondi SOLO con JSON valido:
 {

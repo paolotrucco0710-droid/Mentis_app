@@ -25,6 +25,7 @@ import { selectCardForAtom } from "./card-selector";
 import { DEFAULT_SESSION_TARGET_CARDS, MASTERY_STABLE_THRESHOLD } from "./constants";
 import { FeedEngineError } from "./errors";
 import { countUnlocks, scoreAtomCandidate, selectBestCandidate } from "./priority";
+import { filterCandidatesForSessionVariety } from "./session-variety";
 import { initialLearningStage, prerequisitesMet } from "./stages";
 import type { FeedEngineContext } from "./types";
 
@@ -135,7 +136,9 @@ async function loadFeedContext(
     : atoms;
 
   if (input.knowledgeSourceId) {
-    await relinkImagesForKnowledgeSource(input.knowledgeSourceId);
+    await relinkImagesForKnowledgeSource(input.knowledgeSourceId, {
+      ownerId: input.userId,
+    });
   }
 
   const userAtomStates = await ensureUserAtomStates(input.userId, scopedAtoms);
@@ -156,6 +159,7 @@ async function loadFeedContext(
   const lastCardType = resolveLastCardType(sessionEvents, cardsById);
   const recentCardTypes = resolveRecentCardTypes(sessionEvents, cardsById);
   const recentAtomIds = resolveRecentAtomIds(sessionEvents);
+  const recentAtomCounts = resolveRecentAtomCounts(sessionEvents);
   const knowledgeSourceExposure = buildKnowledgeSourceExposure(
     scopedAtoms,
     userAtomStates
@@ -173,6 +177,7 @@ async function loadFeedContext(
     lastCardType,
     recentCardTypes,
     recentAtomIds,
+    recentAtomCounts,
     knowledgeSourceExposure,
     now: new Date(),
   };
@@ -256,6 +261,7 @@ function selectNextItem(context: FeedEngineContext) {
         ),
         now: context.now,
         recentAtomIds: context.recentAtomIds,
+        recentAtomCounts: context.recentAtomCounts,
         knowledgeSourceExposure: context.knowledgeSourceExposure,
       });
     })
@@ -263,7 +269,16 @@ function selectNextItem(context: FeedEngineContext) {
       Boolean(candidate)
     );
 
-  const bestCandidate = selectBestCandidate(candidates);
+  const bestCandidate = selectBestCandidate(
+    filterCandidatesForSessionVariety(candidates, {
+      recentAtomCounts: context.recentAtomCounts,
+      recentAtomIds: context.recentAtomIds,
+      recentCardTypes: context.recentCardTypes,
+      cardsByAtomId: context.cardsByAtomId,
+      userCardStates: context.userCardStates,
+    }),
+    context.recentAtomIds
+  );
   if (!bestCandidate) {
     return null;
   }
@@ -380,6 +395,22 @@ function resolveRecentCardTypes(
   }
 
   return recent.reverse();
+}
+
+function resolveRecentAtomCounts(
+  events: Awaited<ReturnType<typeof findSessionEventsBySessionId>>
+): Map<string, number> {
+  const counts = new Map<string, number>();
+
+  for (const event of events) {
+    if (event.type !== SessionEventType.OpenCard || !event.atomId) {
+      continue;
+    }
+
+    counts.set(event.atomId, (counts.get(event.atomId) ?? 0) + 1);
+  }
+
+  return counts;
 }
 
 function resolveRecentAtomIds(

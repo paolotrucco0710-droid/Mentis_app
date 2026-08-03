@@ -28,6 +28,7 @@ import {
 import {
   buildChapterStudyHref,
   canStudyChapter,
+  formatJobStep,
   formatProcessingStatus,
   processingProgress,
 } from "./course-utils";
@@ -82,11 +83,26 @@ export function ProcessingPanel() {
       setStatus(chapterData.knowledgeSource.processingStatus);
       setError(null);
 
-      if (jobId) {
-        const { job } = await fetchProcessingJob(jobId);
+      const shouldLoadJob =
+        Boolean(jobId) ||
+        chapterData.knowledgeSource.processingStatus ===
+          KnowledgeSourceProcessingStatus.Processing ||
+        chapterData.knowledgeSource.processingStatus ===
+          KnowledgeSourceProcessingStatus.Queued ||
+        chapterData.knowledgeSource.processingStatus ===
+          KnowledgeSourceProcessingStatus.Failed;
+
+      if (shouldLoadJob) {
+        const { job } = jobId
+          ? await fetchProcessingJob(jobId)
+          : await fetchLatestProcessingJob(knowledgeSourceId);
         setCurrentStep(job.currentStep);
         if (job.status === "failed") {
-          setError(job.errorMessage ?? "Elaborazione fallita.");
+          setError(
+            job.errorMessage
+              ? simplifyProcessingError(job.errorMessage)
+              : "Elaborazione fallita."
+          );
           setStatus(KnowledgeSourceProcessingStatus.Failed);
         }
         if (job.status === "completed") {
@@ -123,7 +139,7 @@ export function ProcessingPanel() {
     }, 0);
     const interval = window.setInterval(() => {
       void poll();
-    }, 3000);
+    }, 5000);
 
     return () => {
       window.clearTimeout(timer);
@@ -142,6 +158,12 @@ export function ProcessingPanel() {
       setStatus(KnowledgeSourceProcessingStatus.Processing);
       await poll();
     } catch (err) {
+      if (err instanceof ApiError && err.code === "ALREADY_PROCESSING") {
+        setStatus(KnowledgeSourceProcessingStatus.Processing);
+        setError(null);
+        await poll();
+        return;
+      }
       setError(
         err instanceof ApiError ? err.message : "Elaborazione non avviata."
       );
@@ -164,7 +186,8 @@ export function ProcessingPanel() {
     );
   }
 
-  const progress = processingProgress(status);
+  const progress = processingProgress(status, currentStep);
+  const stepLabel = formatJobStep(currentStep);
   const isActive =
     status === KnowledgeSourceProcessingStatus.Processing ||
     status === KnowledgeSourceProcessingStatus.Queued;
@@ -184,7 +207,7 @@ export function ProcessingPanel() {
               <CardTitle>{title}</CardTitle>
               <CardDescription>
                 Stato: {formatProcessingStatus(status)}
-                {currentStep ? ` · ${currentStep}` : ""}
+                {stepLabel ? ` · ${stepLabel}` : ""}
               </CardDescription>
             </div>
             <Badge
@@ -201,7 +224,15 @@ export function ProcessingPanel() {
           </div>
         </CardHeader>
         <ProgressBar value={progress} label="Progresso pipeline" />
-        {isActive ? <Loader label="Elaborazione attiva..." /> : null}
+        {isActive ? (
+          <Loader
+            label={
+              stepLabel
+                ? stepLabel
+                : "Elaborazione attiva — la prima volta può richiedere alcuni minuti"
+            }
+          />
+        ) : null}
         {status === KnowledgeSourceProcessingStatus.Uploaded ||
         status === KnowledgeSourceProcessingStatus.Failed ? (
           <div className="mt-4">

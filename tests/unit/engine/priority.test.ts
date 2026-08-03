@@ -7,6 +7,7 @@ import {
   selectBestCandidate,
 } from "@/engine/priority";
 import { makeAtom, makeUserAtomState } from "../../helpers/fixtures";
+import type { AtomId } from "@/domain/ids";
 
 describe("engine/priority", () => {
   it("returns null for locked atoms", () => {
@@ -74,5 +75,59 @@ describe("engine/priority", () => {
     ]);
 
     expect(countUnlocks(prereqId, [dependent], states)).toBe(1);
+  });
+
+  it("rotates away from the most recent atom when priorities tie", () => {
+    const now = new Date("2026-07-31T10:00:00.000Z");
+    const first = makeAtom({
+      id: "00000000-0000-4000-8000-000000000101" as AtomId,
+      logicalOrder: 0,
+    });
+    const second = makeAtom({
+      id: "00000000-0000-4000-8000-000000000102" as AtomId,
+      logicalOrder: 1,
+    });
+    const firstState = makeUserAtomState({
+      atomId: first.id,
+      exposureCount: 1,
+    });
+    const secondState = makeUserAtomState({
+      atomId: second.id,
+      exposureCount: 0,
+    });
+    const firstScore = scoreAtomCandidate({
+      atom: first,
+      state: firstState,
+      userAtomStates: new Map([
+        [first.id, firstState],
+        [second.id, secondState],
+      ]),
+      unlocksCount: 3,
+      now,
+      recentAtomIds: [first.id],
+      recentAtomCounts: new Map([[first.id, 2]]),
+    });
+    const secondScore = scoreAtomCandidate({
+      atom: second,
+      state: secondState,
+      userAtomStates: new Map([
+        [first.id, firstState],
+        [second.id, secondState],
+      ]),
+      unlocksCount: 0,
+      now,
+      recentAtomIds: [first.id],
+      recentAtomCounts: new Map([[first.id, 2]]),
+    });
+
+    expect(firstScore).not.toBeNull();
+    expect(secondScore).not.toBeNull();
+    expect(secondScore!.priority).toBeGreaterThan(firstScore!.priority);
+
+    const selected = selectBestCandidate(
+      [firstScore!, secondScore!],
+      [first.id]
+    );
+    expect(selected?.atom.id).toBe(second.id);
   });
 });

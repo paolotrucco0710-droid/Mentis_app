@@ -29,6 +29,21 @@ export function buildPageStorageKey(
   return path.posix.join(knowledgeSourceId, "pages", `${padded}.${extension}`);
 }
 
+export function buildFigureStorageKey(
+  knowledgeSourceId: string,
+  pageNumber: number,
+  figureIndex: number,
+  extension: string
+): string {
+  const paddedPage = String(pageNumber).padStart(3, "0");
+  const paddedFigure = String(figureIndex).padStart(2, "0");
+  return path.posix.join(
+    knowledgeSourceId,
+    "figures",
+    `p${paddedPage}-f${paddedFigure}.${extension}`
+  );
+}
+
 export function buildPdfStorageKey(knowledgeSourceId: string): string {
   return path.posix.join(knowledgeSourceId, "document.pdf");
 }

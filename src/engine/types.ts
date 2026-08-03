@@ -15,6 +15,7 @@ export interface FeedEngineContext {
   lastCardType: CardType | null;
   recentCardTypes: CardType[];
   recentAtomIds: AtomId[];
+  recentAtomCounts: Map<string, number>;
   knowledgeSourceExposure: Map<string, number>;
   now: Date;
 }

@@ -6,11 +6,71 @@ import { prisma } from "@/db/client";
 import { env } from "@/lib/env";
 import { shouldCreateImageExplainCard } from "./image-study";
 import { buildErrorDetectionContent, buildTrueFalseContent } from "./error-detection-options";
+import { buildImageExplainCardCreateInput } from "./image-explain-card-builder";
+import { deterministicShuffle } from "./deterministic-shuffle";
 import { buildQuizOptions } from "./quiz-options";
 
 export interface PersistResult {
   atomCount: number;
   cardCount: number;
+}
+
+const PERSIST_TRANSACTION_OPTIONS = {
+  maxWait: 15_000,
+  timeout: 120_000,
+} as const;
+
+function buildAtomRows(
+  knowledge: KnowledgeJson,
+  knowledgeSourceId: KnowledgeSourceId,
+  subjectId: SubjectId
+): Prisma.AtomCreateManyInput[] {
+  return knowledge.atoms.map((atom, index) => ({
+    id: atom.id,
+    knowledgeSourceId,
+    subjectId,
+    title: atom.title,
+    summary: atom.summary,
+    explanation: atom.explanation,
+    importance: atom.importance,
+    difficulty: atom.difficulty,
+    abstractionLevel: 3,
+    logicalOrder: index,
+    originalOrder: index,
+    learningObjectives: atom.learningObjectives,
+    keywords: atom.keywords,
+    aliases: atom.aliases,
+    formulas: atom.formulas,
+    definitions: atom.definitions,
+    examples: atom.examples,
+    counterExamples: atom.counterExamples,
+    commonMistakes: atom.commonMistakes,
+    misconceptions: atom.misconceptions,
+    applications: atom.applications,
+    historicalContext: atom.historicalContext,
+    notes: atom.notes,
+    images: atom.images as unknown as Prisma.InputJsonValue,
+    tables: atom.tables,
+    diagrams: atom.diagrams,
+    equations: atom.equations,
+    citations: atom.citations,
+    pageReferences: atom.pageReferences,
+    confidence: atom.confidence,
+    aiVersion: env.aiPromptVersion,
+    tokensUsed: null,
+    estimatedStudySeconds: 45,
+  }));
+}
+
+function buildPrerequisiteRows(
+  knowledge: KnowledgeJson
+): Prisma.AtomPrerequisiteCreateManyInput[] {
+  return knowledge.atoms.flatMap((atom) =>
+    atom.prerequisites.map((prerequisiteAtomId) => ({
+      atomId: atom.id,
+      prerequisiteAtomId,
+    }))
+  );
 }
 
 export async function persistKnowledgeGraph(input: {
@@ -19,6 +79,11 @@ export async function persistKnowledgeGraph(input: {
   subjectId: SubjectId;
 }): Promise<PersistResult> {
   const { knowledge, knowledgeSourceId, subjectId } = input;
+  const atomRows = buildAtomRows(knowledge, knowledgeSourceId, subjectId);
+  const prerequisiteRows = buildPrerequisiteRows(knowledge);
+  const cardRows = knowledge.atoms.flatMap((atom) =>
+    buildCardsForAtom(atom.id, atom)
+  );
 
   return prisma.$transaction(async (tx) => {
     await tx.card.deleteMany({
@@ -29,67 +94,23 @@ export async function persistKnowledgeGraph(input: {
     });
     await tx.atom.deleteMany({ where: { knowledgeSourceId } });
 
-    let cardCount = 0;
-
-    for (let index = 0; index < knowledge.atoms.length; index++) {
-      const atom = knowledge.atoms[index];
-
-      await tx.atom.create({
-        data: {
-          id: atom.id,
-          knowledgeSourceId,
-          subjectId,
-          title: atom.title,
-          summary: atom.summary,
-          explanation: atom.explanation,
-          importance: atom.importance,
-          difficulty: atom.difficulty,
-          abstractionLevel: 3,
-          logicalOrder: index,
-          originalOrder: index,
-          learningObjectives: atom.learningObjectives,
-          keywords: atom.keywords,
-          aliases: atom.aliases,
-          formulas: atom.formulas,
-          definitions: atom.definitions,
-          examples: atom.examples,
-          counterExamples: atom.counterExamples,
-          commonMistakes: atom.commonMistakes,
-          misconceptions: atom.misconceptions,
-          applications: atom.applications,
-          historicalContext: atom.historicalContext,
-          notes: atom.notes,
-          images: atom.images as unknown as Prisma.InputJsonValue,
-          tables: atom.tables,
-          diagrams: atom.diagrams,
-          equations: atom.equations,
-          citations: atom.citations,
-          pageReferences: atom.pageReferences,
-          confidence: atom.confidence,
-          aiVersion: env.aiPromptVersion,
-          tokensUsed: null,
-          estimatedStudySeconds: 45,
-        },
-      });
-
-      if (atom.prerequisites.length > 0) {
-        await tx.atomPrerequisite.createMany({
-          data: atom.prerequisites.map((prerequisiteAtomId) => ({
-            atomId: atom.id,
-            prerequisiteAtomId,
-          })),
-        });
-      }
-
-      const cards = buildCardsForAtom(atom.id, atom);
-      if (cards.length > 0) {
-        await tx.card.createMany({ data: cards });
-        cardCount += cards.length;
-      }
+    if (atomRows.length > 0) {
+      await tx.atom.createMany({ data: atomRows });
     }
 
-    return { atomCount: knowledge.atoms.length, cardCount };
-  });
+    if (prerequisiteRows.length > 0) {
+      await tx.atomPrerequisite.createMany({ data: prerequisiteRows });
+    }
+
+    if (cardRows.length > 0) {
+      await tx.card.createMany({ data: cardRows });
+    }
+
+    return {
+      atomCount: knowledge.atoms.length,
+      cardCount: cardRows.length,
+    };
+  }, PERSIST_TRANSACTION_OPTIONS);
 }
 
 function buildCardsForAtom(
@@ -116,6 +137,7 @@ function buildCardsForAtom(
       id: atomId,
       title: atom.title,
       summary: atom.summary,
+      definitions: atom.definitions,
       quizDistractors: atom.quizDistractors,
       misconceptions: atom.misconceptions,
       counterExamples: atom.counterExamples,
@@ -259,21 +281,9 @@ function buildCardsForAtom(
       imageReference
     )
   ) {
-    cards.push({
-      atomId,
-      type: CardType.ImageExplain,
-      order: 6,
-      cognitiveObjective: CognitiveObjective.Comprehension,
-      prompt: imageReference.caption ?? `Concetto visivo: ${atom.title}`,
-      text: imageReference.description ?? atom.summary,
-      explanation: atom.explanation,
-      correctFeedback: "Ottima osservazione.",
-      estimatedDurationSeconds: 40,
-      payload: {
-        imageId: imageReference.imageId,
-      } as Prisma.InputJsonValue,
-      aiVersion: env.aiPromptVersion,
-    });
+    cards.push(
+      buildImageExplainCardCreateInput(atomId, atom, imageReference)
+    );
   }
 
   return cards;
@@ -297,22 +307,4 @@ export function getGeneratedCardTypes(
     : MVP_FEED_CARD_TYPES.filter((type) => type !== CardType.ImageExplain);
 
   return [...withImage];
-}
-
-export function deterministicShuffle<T>(items: T[], seed: string): T[] {
-  const copy = [...items];
-  let hash = 2166136261;
-
-  for (let index = 0; index < seed.length; index += 1) {
-    hash ^= seed.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-
-  for (let index = copy.length - 1; index > 0; index -= 1) {
-    hash = Math.imul(hash ^ (hash >>> 13), 1274126177);
-    const swapIndex = (hash >>> 0) % (index + 1);
-    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
-  }
-
-  return copy;
 }

@@ -36,6 +36,10 @@ export interface ErrorDetectionCardPayload {
 
 export interface ImageExplainCardPayload {
   imageId: string;
+  question?: string;
+  options?: string[];
+  correctOptionIndex?: number;
+  revealText?: string;
 }
 
 export interface MatchCardPayload {

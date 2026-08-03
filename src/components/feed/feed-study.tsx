@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, startTransition } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { FeedItem } from "@/domain/entities/feed-item";
@@ -48,33 +48,10 @@ export function FeedStudy() {
   const [state, setState] = useState<FeedState>({ status: "loading" });
   const [submitting, setSubmitting] = useState(false);
   const cardStartedAt = useRef<number>(0);
-  const prefetchedItem = useRef<FeedItem | null>(null);
-  const prefetching = useRef(false);
-
-  const prefetchNext = useCallback(
-    async (sessionId: StudySessionId) => {
-      if (!subjectId || prefetching.current || prefetchedItem.current) {
-        return;
-      }
-
-      prefetching.current = true;
-      try {
-        const feed = await fetchNextFeedItem({
-          sessionId,
-          subjectId,
-          ...(knowledgeSourceId ? { knowledgeSourceId } : {}),
-        });
-        if (feed.item && !feed.sessionComplete) {
-          prefetchedItem.current = feed.item;
-        }
-      } catch {
-        prefetchedItem.current = null;
-      } finally {
-        prefetching.current = false;
-      }
-    },
-    [subjectId, knowledgeSourceId]
-  );
+  const feedRequestId = useRef(0);
+  const loadQueue = useRef<Promise<void>>(Promise.resolve());
+  const bootstrapStarted = useRef(false);
+  const answering = useRef(false);
 
   const applyFeedItem = useCallback(
     (session: StudySession | undefined, item: FeedItem) => {
@@ -89,46 +66,53 @@ export function FeedStudy() {
   );
 
   const loadNext = useCallback(
-    async (sessionId: StudySessionId, session?: StudySession) => {
+    (sessionId: StudySessionId, session?: StudySession) => {
       if (!subjectId) {
-        return;
+        return Promise.resolve();
       }
 
-      if (prefetchedItem.current) {
-        const item = prefetchedItem.current;
-        prefetchedItem.current = null;
-        applyFeedItem(session, item);
-        return;
-      }
+      const requestId = ++feedRequestId.current;
 
-      const feed = await fetchNextFeedItem({
-        sessionId,
-        subjectId,
-        ...(knowledgeSourceId ? { knowledgeSourceId } : {}),
-      });
+      loadQueue.current = loadQueue.current
+        .catch(() => undefined)
+        .then(async () => {
+          const feed = await fetchNextFeedItem({
+            sessionId,
+            subjectId,
+            ...(knowledgeSourceId ? { knowledgeSourceId } : {}),
+          });
 
-      if (!feed.item || feed.sessionComplete) {
-        setState({
-          status: "complete",
-          session:
-            session ??
-            ({
-              id: sessionId,
-            } as StudySession),
+          if (requestId !== feedRequestId.current) {
+            return;
+          }
+
+          if (!feed.item || feed.sessionComplete) {
+            setState({
+              status: "complete",
+              session:
+                session ??
+                ({
+                  id: sessionId,
+                } as StudySession),
+            });
+            sessionStorage.removeItem(SESSION_STORAGE_KEY);
+            return;
+          }
+
+          applyFeedItem(session, feed.item);
         });
-        sessionStorage.removeItem(SESSION_STORAGE_KEY);
-        return;
-      }
 
-      applyFeedItem(session, feed.item);
+      return loadQueue.current;
     },
     [applyFeedItem, subjectId, knowledgeSourceId]
   );
 
   const bootstrap = useCallback(async () => {
-    if (!subjectId) {
+    if (!subjectId || bootstrapStarted.current) {
       return;
     }
+
+    bootstrapStarted.current = true;
 
     try {
       const storedScope = sessionStorage.getItem(CHAPTER_SCOPE_KEY) ?? "";
@@ -164,6 +148,7 @@ export function FeedStudy() {
       sessionStorage.setItem(SESSION_STORAGE_KEY, session.id);
       await loadNext(session.id, session);
     } catch (error) {
+      bootstrapStarted.current = false;
       const message =
         error instanceof ApiError
           ? error.message
@@ -181,15 +166,13 @@ export function FeedStudy() {
       return;
     }
 
-    const timer = window.setTimeout(() => {
+    startTransition(() => {
       void bootstrap();
-    }, 0);
-
-    return () => window.clearTimeout(timer);
+    });
   }, [bootstrap, loadingSubject, subjectId]);
 
   async function handleAnswer(result: CardAnswerResult) {
-    if (state.status !== "ready" || submitting) {
+    if (state.status !== "ready" || submitting || answering.current) {
       return;
     }
 
@@ -197,6 +180,8 @@ export function FeedStudy() {
     const now = Date.now();
     const durationMs = now - cardStartedAt.current;
     const responseTimeMs = durationMs;
+
+    answering.current = true;
 
     try {
       setSubmitting(true);
@@ -211,24 +196,17 @@ export function FeedStudy() {
         feedPosition: item.position,
       });
 
-      prefetchedItem.current = null;
-      await prefetchNext(session.id);
-
-      try {
-        await loadNext(session.id, session);
-      } catch {
-        await new Promise((resolve) => window.setTimeout(resolve, 1500));
-        await loadNext(session.id, session);
-      }
+      await loadNext(session.id, session);
     } catch (error) {
       const message =
         error instanceof ApiError
           ? error.message === "Errore interno."
-            ? "Connessione lenta al server. Il progresso potrebbe essere salvato: premi Riprova."
+            ? "Connessione lenta al server. Riprova tra qualche secondo."
             : error.message
           : "Errore durante l'invio della risposta.";
       setState({ status: "error", message });
     } finally {
+      answering.current = false;
       setSubmitting(false);
     }
   }
@@ -271,6 +249,13 @@ export function FeedStudy() {
     }
   }
 
+  function handleRetry() {
+    bootstrapStarted.current = false;
+    feedRequestId.current += 1;
+    setState({ status: "loading" });
+    void bootstrap();
+  }
+
   if (loadingSubject) {
     return <Loader label="Preparazione del feed..." />;
   }
@@ -300,7 +285,7 @@ export function FeedStudy() {
         description={state.message}
         action={
           <div className="flex gap-3">
-            <Button variant="secondary" onClick={() => void bootstrap()}>
+            <Button variant="secondary" onClick={handleRetry}>
               Riprova
             </Button>
             <Link href="/home">
@@ -343,6 +328,7 @@ export function FeedStudy() {
       </div>
 
       <FeedCardRenderer
+        key={`${item.sessionId}-${item.card.id}-${item.position}`}
         card={item.card}
         atomId={item.atomId}
         atomTitle={item.atomTitle}

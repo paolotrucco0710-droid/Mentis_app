@@ -10,6 +10,7 @@ import { createSessionEvent } from "@/db/repositories/session-events";
 import { recordSessionAnswer } from "@/db/repositories/study-sessions";
 import { prisma } from "@/db/client";
 import type { DbTx } from "@/db/transaction";
+import { PROGRESS_TRANSACTION_OPTIONS } from "@/db/transaction-options";
 import { assertSessionReadyForStudy } from "@/session";
 import {
   findUserAtomState,
@@ -215,7 +216,7 @@ export async function recordCardResponse(
       sessionEvent,
       unlockedAtomIds,
     };
-  });
+  }, PROGRESS_TRANSACTION_OPTIONS);
 
   await scheduleReviewForAtom({
     userId: input.userId,

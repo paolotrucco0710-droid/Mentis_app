@@ -6,13 +6,17 @@ import {
   IMAGE_EXPLAIN_CARD_TYPES,
   LEARN_CARD_TYPES,
   OPEN_RESPONSE_CARD_TYPES,
+  OPEN_RESPONSE_MIN_QUICK_RETRIEVALS,
+  OPEN_RESPONSE_SESSION_WINDOW,
   QUICK_RETRIEVAL_CARD_TYPES,
   RETRIEVAL_CARD_TYPES,
+  VISUAL_RETRIEVAL_CARD_TYPES,
 } from "./constants";
 
 const EXPLAIN_TYPES = new Set<string>(EXPLANATION_CARD_TYPES);
 const IMAGE_EXPLAIN_TYPES = new Set<string>(IMAGE_EXPLAIN_CARD_TYPES);
 const LEARN_TYPES = new Set<string>(LEARN_CARD_TYPES);
+const VISUAL_RETRIEVAL_TYPES = new Set<string>(VISUAL_RETRIEVAL_CARD_TYPES);
 const RETRIEVAL_TYPES = new Set<string>(RETRIEVAL_CARD_TYPES);
 const OPEN_RESPONSE_TYPES = new Set<string>(OPEN_RESPONSE_CARD_TYPES);
 const QUICK_RETRIEVAL_TYPES = new Set<string>(QUICK_RETRIEVAL_CARD_TYPES);
@@ -26,6 +30,51 @@ export function getPrimaryExplainCard(cards: Card[]): Card | null {
   }
 
   return [...explainCards].sort((left, right) => left.order - right.order)[0];
+}
+
+export function hasQuickRetrievalPractice(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  let practiced = 0;
+
+  for (const card of cards) {
+    if (!QUICK_RETRIEVAL_TYPES.has(card.type)) {
+      continue;
+    }
+
+    if ((userCardStates.get(card.id)?.viewCount ?? 0) > 0) {
+      practiced += 1;
+    }
+  }
+
+  return practiced >= OPEN_RESPONSE_MIN_QUICK_RETRIEVALS;
+}
+
+export function hasOpenProductionDue(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  if (!hasQuickRetrievalPractice(cards, userCardStates)) {
+    return false;
+  }
+
+  return cards.some((card) => {
+    if (!OPEN_RESPONSE_TYPES.has(card.type)) {
+      return false;
+    }
+
+    return (userCardStates.get(card.id)?.viewCount ?? 0) === 0;
+  });
+}
+
+export function countRecentOpenResponseCards(
+  recentCardTypes: CardType[],
+  windowSize = OPEN_RESPONSE_SESSION_WINDOW
+): number {
+  return recentCardTypes
+    .slice(-windowSize)
+    .filter((type) => OPEN_RESPONSE_TYPES.has(type)).length;
 }
 
 export function needsPrimaryIntroduction(
@@ -50,6 +99,36 @@ export function introductionSeen(
   }
 
   return (userCardStates.get(explainCard.id)?.viewCount ?? 0) > 0;
+}
+
+export function hasAtomRetrievalVerification(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  return cards.some((card) => {
+    if (
+      !QUICK_RETRIEVAL_TYPES.has(card.type) &&
+      !OPEN_RESPONSE_TYPES.has(card.type)
+    ) {
+      return false;
+    }
+
+    return (userCardStates.get(card.id)?.viewCount ?? 0) > 0;
+  });
+}
+
+export function needsRetrievalVerification(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  if (!getPrimaryExplainCard(cards)) {
+    return false;
+  }
+
+  return (
+    introductionSeen(cards, userCardStates) &&
+    !hasAtomRetrievalVerification(cards, userCardStates)
+  );
 }
 
 export function selectCardForAtom(input: {
@@ -82,6 +161,7 @@ export function selectCardForAtom(input: {
       atomState,
       stage: scoringStage,
       userCardStates,
+      cards,
       lastCardType,
       recentCardTypes,
     });
@@ -89,6 +169,7 @@ export function selectCardForAtom(input: {
       atomState,
       stage: scoringStage,
       userCardStates,
+      cards,
       lastCardType,
       recentCardTypes,
     });
@@ -137,12 +218,19 @@ function scoreCard(
     atomState: UserAtomState;
     stage: CognitiveAtomStage;
     userCardStates: Map<string, UserCardState>;
+    cards: Card[];
     lastCardType: CardType | null;
     recentCardTypes: CardType[];
   }
 ): number {
-  const { atomState, stage, userCardStates, lastCardType, recentCardTypes } =
-    input;
+  const {
+    atomState,
+    stage,
+    userCardStates,
+    cards,
+    lastCardType,
+    recentCardTypes,
+  } = input;
   const cardState = userCardStates.get(card.id);
   let score = 0;
 
@@ -156,7 +244,11 @@ function scoreCard(
     return SUPPRESSED_CARD_SCORE;
   }
 
-  if (shouldSuppressOpenResponse(card, atomState, stage, viewCount)) {
+  if (shouldSuppressImageExplain(card, cards, userCardStates, viewCount)) {
+    return SUPPRESSED_CARD_SCORE;
+  }
+
+  if (shouldSuppressOpenResponse(card, atomState, cards, userCardStates, viewCount)) {
     return SUPPRESSED_CARD_SCORE;
   }
 
@@ -174,6 +266,27 @@ function scoreCard(
     score -= 12;
   }
 
+  const recentQuickRetrievalCount = recentCardTypes.filter((type) =>
+    QUICK_RETRIEVAL_TYPES.has(type)
+  ).length;
+  if (recentQuickRetrievalCount >= 2 && QUICK_RETRIEVAL_TYPES.has(card.type)) {
+    score -= 28;
+  }
+  if (
+    lastCardType &&
+    QUICK_RETRIEVAL_TYPES.has(lastCardType) &&
+    card.type === CardType.Quiz
+  ) {
+    score -= 22;
+  }
+  if (
+    lastCardType &&
+    QUICK_RETRIEVAL_TYPES.has(lastCardType) &&
+    (card.type === CardType.TrueFalse || card.type === CardType.ErrorDetection)
+  ) {
+    score += 18;
+  }
+
   if (lastCardType && LEARN_TYPES.has(lastCardType) && isLearnCard) {
     score -= 28;
   }
@@ -181,8 +294,8 @@ function scoreCard(
   const recentLearnCount = recentCardTypes.filter((type) =>
     LEARN_TYPES.has(type)
   ).length;
-  if (recentLearnCount >= 2 && isLearnCard) {
-    score -= 32;
+  if (recentLearnCount >= 1 && isLearnCard) {
+    score -= 35;
   }
 
   if (
@@ -190,32 +303,21 @@ function scoreCard(
     isOpenResponse &&
     OPEN_RESPONSE_TYPES.has(lastCardType)
   ) {
-    score -= 22;
-  }
-
-  if (isOpenResponse) {
-    score -= 10;
-  }
-
-  if (isOpenResponse && viewCount >= 2) {
-    score -= 12;
+    score -= 18;
   }
 
   switch (stage) {
     case CognitiveAtomStage.Learnable:
     case CognitiveAtomStage.Learning:
     case CognitiveAtomStage.Forgotten:
-      if (EXPLAIN_TYPES.has(card.type)) {
-        score += 35;
-      }
-      if (isImageExplain) {
-        score += 14;
-      }
       if (QUICK_RETRIEVAL_TYPES.has(card.type)) {
-        score += 18;
+        score += 28;
       }
       if (isOpenResponse) {
-        score += 4;
+        score += 22;
+      }
+      if (EXPLAIN_TYPES.has(card.type)) {
+        score += 8;
       }
       break;
     case CognitiveAtomStage.Consolidating:
@@ -224,10 +326,10 @@ function scoreCard(
         score += 32;
       }
       if (isOpenResponse) {
-        score += atomState.wrongAnswerCount > 0 ? 14 : 6;
+        score += atomState.wrongAnswerCount > 0 ? 26 : 20;
       }
       if (EXPLAIN_TYPES.has(card.type)) {
-        score += 12;
+        score += 6;
       }
       break;
     case CognitiveAtomStage.Stable:
@@ -235,11 +337,69 @@ function scoreCard(
         score += 24;
       }
       if (isOpenResponse) {
-        score += 8;
+        score += 14;
       }
       break;
     default:
       break;
+  }
+
+  if (isOpenResponse && viewCount === 0 && introductionSeen(cards, userCardStates)) {
+    if (hasQuickRetrievalPractice(cards, userCardStates)) {
+      score += 12;
+    }
+
+    if (
+      countRecentOpenResponseCards(recentCardTypes) === 0 &&
+      recentCardTypes.length >= 4
+    ) {
+      score += 24;
+    }
+
+    const recentQuickRetrievalInWindow = recentCardTypes
+      .slice(-OPEN_RESPONSE_SESSION_WINDOW)
+      .filter((type) => QUICK_RETRIEVAL_TYPES.has(type)).length;
+    if (
+      countRecentOpenResponseCards(recentCardTypes) === 0 &&
+      recentQuickRetrievalInWindow >= 3
+    ) {
+      score += 18;
+    }
+  }
+
+  if (
+    introductionSeen(cards, userCardStates) &&
+    !hasStartedRetrieval(cards, userCardStates)
+  ) {
+    if (QUICK_RETRIEVAL_TYPES.has(card.type) && viewCount === 0) {
+      score += 14;
+    }
+    if (card.type === CardType.TrueFalse && viewCount === 0) {
+      score += 10;
+    }
+    if (card.type === CardType.ErrorDetection && viewCount === 0) {
+      score += 8;
+    }
+  }
+
+  if (
+    isOpenResponse &&
+    lastCardType &&
+    OPEN_RESPONSE_TYPES.has(lastCardType)
+  ) {
+    score -= 24;
+  }
+
+  if (atomState.wrongAnswerCount > 0 && isOpenResponse && viewCount === 0) {
+    score += 22;
+  }
+
+  if (
+    card.type === CardType.Feynman &&
+    viewCount === 0 &&
+    !hasStartedOpenResponse(cards, userCardStates)
+  ) {
+    score -= 6;
   }
 
   if (atomState.wrongAnswerCount > 0 && EXPLAIN_TYPES.has(card.type)) {
@@ -252,14 +412,6 @@ function scoreCard(
 
   if (card.type === CardType.Quiz && atomState.wrongAnswerCount >= 2) {
     score -= 18;
-  }
-
-  if (
-    isOpenResponse &&
-    atomState.wrongAnswerCount === 0 &&
-    atomState.mastery < 50
-  ) {
-    score -= 12;
   }
 
   return score;
@@ -286,21 +438,80 @@ function shouldSuppressExplanation(
   return true;
 }
 
+function hasStartedOpenResponse(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  return cards.some((card) => {
+    if (!OPEN_RESPONSE_TYPES.has(card.type)) {
+      return false;
+    }
+
+    return (userCardStates.get(card.id)?.viewCount ?? 0) > 0;
+  });
+}
+
+function hasStartedRetrieval(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  return cards.some((card) => {
+    if (
+      !QUICK_RETRIEVAL_TYPES.has(card.type) &&
+      !OPEN_RESPONSE_TYPES.has(card.type)
+    ) {
+      return false;
+    }
+
+    return (userCardStates.get(card.id)?.viewCount ?? 0) > 0;
+  });
+}
+
+function shouldSuppressImageExplain(
+  card: Card,
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>,
+  viewCount: number
+): boolean {
+  if (!IMAGE_EXPLAIN_TYPES.has(card.type)) {
+    return false;
+  }
+
+  if (!introductionSeen(cards, userCardStates)) {
+    return true;
+  }
+
+  if (!hasStartedRetrieval(cards, userCardStates)) {
+    return true;
+  }
+
+  return viewCount >= 1;
+}
+
 function shouldSuppressOpenResponse(
   card: Card,
   atomState: UserAtomState,
-  stage: CognitiveAtomStage,
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>,
   viewCount: number
 ): boolean {
-  if (!OPEN_RESPONSE_TYPES.has(card.type) || viewCount === 0) {
+  if (!OPEN_RESPONSE_TYPES.has(card.type)) {
     return false;
   }
 
-  if (stage === CognitiveAtomStage.Forgotten || atomState.wrongAnswerCount > 0) {
+  if (viewCount === 0 && !hasQuickRetrievalPractice(cards, userCardStates)) {
+    return true;
+  }
+
+  if (viewCount === 0) {
     return false;
   }
 
-  return viewCount >= 2;
+  if (atomState.wrongAnswerCount > 0) {
+    return false;
+  }
+
+  return viewCount >= 3;
 }
 
 function isSameCategory(previous: CardType, current: CardType): boolean {
@@ -310,9 +521,11 @@ function isSameCategory(previous: CardType, current: CardType): boolean {
   const currentOpenResponse = OPEN_RESPONSE_TYPES.has(current);
   const previousQuickRetrieval =
     QUICK_RETRIEVAL_TYPES.has(previous) ||
+    VISUAL_RETRIEVAL_TYPES.has(previous) ||
     (RETRIEVAL_TYPES.has(previous) && !OPEN_RESPONSE_TYPES.has(previous));
   const currentQuickRetrieval =
     QUICK_RETRIEVAL_TYPES.has(current) ||
+    VISUAL_RETRIEVAL_TYPES.has(current) ||
     (RETRIEVAL_TYPES.has(current) && !OPEN_RESPONSE_TYPES.has(current));
 
   return (

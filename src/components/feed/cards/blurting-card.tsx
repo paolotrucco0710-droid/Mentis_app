@@ -76,14 +76,12 @@ export function BlurtingCardComponent({
       {feedback ? (
         <div className="mt-4 space-y-4">
           <RetrievalFeedbackPanel feedback={feedback} />
-          <div>
-            <p className="text-sm font-medium">Punti chiave da ricordare:</p>
-            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted">
-              {payload.keyPoints.map((point) => (
-                <li key={point}>{point}</li>
-              ))}
-            </ul>
-          </div>
+          {!feedback.isCorrect ? (
+            <div>
+              <p className="text-sm font-medium">Da ricordare:</p>
+              <p className="mt-1 text-sm text-muted">{payload.keyPoints[0]}</p>
+            </div>
+          ) : null}
           <Button
             fullWidth
             disabled={disabled}
