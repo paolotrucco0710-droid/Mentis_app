@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, startTransition } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { FeedItem } from "@/domain/entities/feed-item";
@@ -166,7 +166,9 @@ export function FeedStudy() {
       return;
     }
 
-    void bootstrap();
+    startTransition(() => {
+      void bootstrap();
+    });
   }, [bootstrap, loadingSubject, subjectId]);
 
   async function handleAnswer(result: CardAnswerResult) {

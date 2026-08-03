@@ -31,7 +31,6 @@ import {
   extractFiguresFromPageImages,
   mergeKnowledgeSourceImages,
 } from "./extract-figures";
-import { isPageSourceImage } from "./image-study";
 import { extractDocumentText } from "./ocr";
 import { normalizeKnowledgeJson } from "./normalize";
 import { persistKnowledgeGraph } from "./persist";

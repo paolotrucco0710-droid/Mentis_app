@@ -46,7 +46,7 @@ function mistakeToFlawedStatement(
   );
 
   if (confoundMatch) {
-    return `${confoundMatch[1]} è sostanzialmente la stessa cosa di ${confoundMatch[2]}.`;
+    return `Per "${title}", ${confoundMatch[1]} è sostanzialmente la stessa cosa di ${confoundMatch[2]}.`;
   }
 
   if (trimmed.toLowerCase().startsWith("pensare che ")) {
