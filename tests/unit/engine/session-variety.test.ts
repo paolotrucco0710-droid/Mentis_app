@@ -708,4 +708,114 @@ describe("engine/session-variety", () => {
     expect(filtered).toHaveLength(1);
     expect(filtered[0]?.atom.id).toBe(productionDue.atom.id);
   });
+
+  it("prioritizes image retrieval when the session window lacks visual cards", () => {
+    const practiced = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
+      exposureCount: 2,
+    });
+    const imageDue = makeCandidate("00000000-0000-4000-8000-000000000102" as AtomId, {
+      exposureCount: 2,
+    });
+    const practicedCards = [
+      makeExplainCard(practiced.atom.id, "00000000-0000-4000-8000-000000000201" as CardId),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000202" as CardId,
+        atomId: practiced.atom.id,
+        type: CardType.Quiz,
+        order: 1,
+      }),
+    ];
+    const imageCards = [
+      makeExplainCard(imageDue.atom.id, "00000000-0000-4000-8000-000000000203" as CardId),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000204" as CardId,
+        atomId: imageDue.atom.id,
+        type: CardType.Quiz,
+        order: 1,
+      }),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000205" as CardId,
+        atomId: imageDue.atom.id,
+        type: CardType.ImageExplain,
+        order: 2,
+        payload: {
+          imageId: "00000000-0000-4000-8000-000000000301",
+        },
+      }),
+    ];
+
+    const filtered = filterCandidatesForSessionVariety([practiced, imageDue], {
+      recentAtomCounts: new Map([
+        [practiced.atom.id, 1],
+        [imageDue.atom.id, 1],
+      ]),
+      recentCardTypes: [
+        CardType.Explain,
+        CardType.Quiz,
+        CardType.TrueFalse,
+        CardType.Blurting,
+      ],
+      cardsByAtomId: new Map([
+        [practiced.atom.id, practicedCards],
+        [imageDue.atom.id, imageCards],
+      ]),
+      userCardStates: new Map([
+        [
+          practicedCards[0]!.id,
+          {
+            userId: practiced.state.userId,
+            cardId: practicedCards[0]!.id,
+            viewCount: 1,
+            wrongAnswerCount: 0,
+            correctAnswerCount: 0,
+            lastViewedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+        [
+          practicedCards[1]!.id,
+          {
+            userId: practiced.state.userId,
+            cardId: practicedCards[1]!.id,
+            viewCount: 1,
+            wrongAnswerCount: 0,
+            correctAnswerCount: 1,
+            lastViewedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+        [
+          imageCards[0]!.id,
+          {
+            userId: imageDue.state.userId,
+            cardId: imageCards[0]!.id,
+            viewCount: 1,
+            wrongAnswerCount: 0,
+            correctAnswerCount: 0,
+            lastViewedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+        [
+          imageCards[1]!.id,
+          {
+            userId: imageDue.state.userId,
+            cardId: imageCards[1]!.id,
+            viewCount: 1,
+            wrongAnswerCount: 0,
+            correctAnswerCount: 1,
+            lastViewedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+      ]),
+    });
+
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.atom.id).toBe(imageDue.atom.id);
+  });
 });

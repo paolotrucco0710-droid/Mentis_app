@@ -26,6 +26,7 @@ export interface FeedItem {
   estimatedDurationSeconds: number;
   masteryBefore: Score0To100 | null;
   imageUrl?: string | null;
+  imageCaption?: string | null;
 }
 
 export interface FeedResponse {

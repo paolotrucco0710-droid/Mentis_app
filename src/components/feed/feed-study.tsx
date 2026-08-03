@@ -333,6 +333,7 @@ export function FeedStudy() {
         atomId={item.atomId}
         atomTitle={item.atomTitle}
         imageUrl={item.imageUrl}
+        imageCaption={item.imageCaption}
         disabled={submitting}
         onAnswer={handleAnswer}
         onSkip={handleSkip}

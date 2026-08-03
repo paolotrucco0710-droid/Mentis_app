@@ -2,6 +2,7 @@
 
 import { memo, useState } from "react";
 import { Button, Card, CardDescription, CardHeader, CardTitle } from "@/components/ui";
+import { OptimizedImage } from "@/components/ui/optimized-image";
 import type { FeedCardProps } from "../card-utils";
 import { SessionEventOutcome } from "@/domain/enums";
 
@@ -15,6 +16,8 @@ function hasExpandableExplanation(card: FeedCardProps["card"]): boolean {
 function ExplainCardComponent({
   card,
   atomTitle,
+  imageUrl,
+  imageCaption,
   disabled,
   onContinue,
 }: FeedCardProps) {
@@ -31,6 +34,24 @@ function ExplainCardComponent({
           serve.
         </CardDescription>
       </CardHeader>
+      {imageUrl ? (
+        <figure className="space-y-2">
+          <div className="relative aspect-video overflow-hidden rounded-2xl border border-border">
+            <OptimizedImage
+              src={imageUrl}
+              alt={imageCaption ?? conceptTitle}
+              fill
+              priority
+              sizes="(max-width: 768px) 100vw, 640px"
+            />
+          </div>
+          {imageCaption ? (
+            <figcaption className="text-center text-xs text-muted">
+              {imageCaption}
+            </figcaption>
+          ) : null}
+        </figure>
+      ) : null}
       <div className="space-y-4 text-sm leading-7 text-foreground">
         <p className="text-lg font-medium leading-8">{card.text}</p>
         {canExpand && !expanded ? (

@@ -8,6 +8,8 @@ import {
   OPEN_RESPONSE_CARD_TYPES,
   OPEN_RESPONSE_MIN_QUICK_RETRIEVALS,
   OPEN_RESPONSE_SESSION_WINDOW,
+  IMAGE_EXPLAIN_MAX_VIEWS,
+  IMAGE_SESSION_WINDOW,
   QUICK_RETRIEVAL_CARD_TYPES,
   RETRIEVAL_CARD_TYPES,
   VISUAL_RETRIEVAL_CARD_TYPES,
@@ -292,6 +294,23 @@ function scoreCard(
     score += 18;
   }
 
+  if (
+    isImageExplain &&
+    countRecentImageCards(recentCardTypes, IMAGE_SESSION_WINDOW) === 0 &&
+    recentCardTypes.length >= 2
+  ) {
+    score += 24;
+  }
+
+  if (
+    lastCardType &&
+    QUICK_RETRIEVAL_TYPES.has(lastCardType) &&
+    isImageExplain &&
+    viewCount < IMAGE_EXPLAIN_MAX_VIEWS
+  ) {
+    score += 20;
+  }
+
   if (lastCardType && card.type === lastCardType) {
     score -= 25;
   }
@@ -543,7 +562,12 @@ function shouldSuppressImageExplain(
     return true;
   }
 
-  return viewCount >= 1;
+  const cardState = userCardStates.get(card.id);
+  if ((cardState?.wrongAnswerCount ?? 0) > 0) {
+    return false;
+  }
+
+  return viewCount >= IMAGE_EXPLAIN_MAX_VIEWS;
 }
 
 function shouldSuppressOpenResponse(

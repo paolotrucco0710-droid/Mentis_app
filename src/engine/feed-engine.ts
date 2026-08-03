@@ -317,19 +317,22 @@ async function buildFeedItem(input: {
     (state) => state.mastery >= MASTERY_STABLE_THRESHOLD
   ).length;
   let imageUrl: string | null = null;
+  let imageCaption: string | null = null;
 
   if (card.type === CardType.ImageExplain) {
     const imageId = getImageIdFromPayload(card.payload);
     if (imageId) {
-      try {
-        const resolved = await getImageSignedUrlForUser(
-          context.userId,
-          imageId as ImageId
-        );
-        imageUrl = resolved.url;
-      } catch {
-        imageUrl = null;
-      }
+      imageUrl = await resolveFeedImageUrl(context.userId, imageId as ImageId);
+      imageCaption = card.prompt?.trim() || null;
+    }
+  } else if (card.type === CardType.Explain) {
+    const imageReference = atom.images[0];
+    if (imageReference?.imageId) {
+      imageUrl = await resolveFeedImageUrl(
+        context.userId,
+        imageReference.imageId
+      );
+      imageCaption = imageReference.caption?.trim() || null;
     }
   }
 
@@ -347,7 +350,20 @@ async function buildFeedItem(input: {
     estimatedDurationSeconds: card.estimatedDurationSeconds,
     masteryBefore,
     imageUrl,
+    imageCaption,
   };
+}
+
+async function resolveFeedImageUrl(
+  userId: UserId,
+  imageId: ImageId
+): Promise<string | null> {
+  try {
+    const resolved = await getImageSignedUrlForUser(userId, imageId);
+    return resolved.url;
+  } catch {
+    return null;
+  }
 }
 
 function hasActiveLearning(context: FeedEngineContext): boolean {

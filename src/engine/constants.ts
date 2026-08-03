@@ -57,6 +57,15 @@ export const OPEN_RESPONSE_CARD_TYPES = new Set([
 /** Recent cards scanned when checking if production is missing from the session. */
 export const OPEN_RESPONSE_SESSION_WINDOW = 8;
 
+/** Recent cards scanned when checking if image retrieval is missing from the session. */
+export const IMAGE_SESSION_WINDOW = 5;
+
+/** Cards viewed before the engine starts enforcing an image quota in the session. */
+export const IMAGE_SESSION_MIN_CARDS = 4;
+
+/** Image explain cards can reappear until this view count (unless the user struggled). */
+export const IMAGE_EXPLAIN_MAX_VIEWS = 3;
+
 /** Quick retrieval successes needed on an atom before blurting/feynman. */
 export const OPEN_RESPONSE_MIN_QUICK_RETRIEVALS = 1;
 
