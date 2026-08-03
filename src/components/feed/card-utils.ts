@@ -147,6 +147,7 @@ export type FeedCardProps = {
   atomId?: AtomId;
   atomTitle?: string;
   imageUrl?: string | null;
+  imageCaption?: string | null;
   disabled?: boolean;
   onContinue: (result: CardAnswerResult) => void;
   onSkip: () => void;

@@ -2,6 +2,8 @@ import type { Card, UserCardState } from "@/domain/entities";
 import type { CardType } from "@/domain/enums";
 import {
   EXPLANATION_CARD_TYPES,
+  IMAGE_SESSION_MIN_CARDS,
+  IMAGE_SESSION_WINDOW,
   MAX_SESSION_CARDS_PER_ATOM,
   OPEN_RESPONSE_SESSION_WINDOW,
   QUICK_RETRIEVAL_CARD_TYPES,
@@ -138,15 +140,15 @@ function applyPostRetrievalVariety(
       const recentCards = getCardsForCandidate(recentCandidate, cardsByAtomId);
 
       if (
-        openResponseRecent === 0 &&
-        hasOpenProductionDue(recentCards, userCardStates)
+        imageRecent === 0 &&
+        hasImageRetrievalDue(recentCards, userCardStates)
       ) {
         return [recentCandidate];
       }
 
       if (
-        imageRecent === 0 &&
-        hasImageRetrievalDue(recentCards, userCardStates)
+        openResponseRecent === 0 &&
+        hasOpenProductionDue(recentCards, userCardStates)
       ) {
         return [recentCandidate];
       }
@@ -172,12 +174,12 @@ function applyPostRetrievalVariety(
     recentAtomCounts
   );
 
-  if (openResponseRecent === 0 && productionDue.length > 0) {
-    return productionDue;
-  }
-
   if (imageRecent === 0 && imageDue.length > 0) {
     return imageDue;
+  }
+
+  if (openResponseRecent === 0 && productionDue.length > 0) {
+    return productionDue;
   }
 
   if (!learnRecent && untouchedIntros.length > 0) {
@@ -297,6 +299,32 @@ export function filterCandidatesForSessionVariety(
       );
       const rotatedProduction = excludeRecentAtom(balanced, recentAtomId);
       pool = rotatedProduction.length > 0 ? rotatedProduction : balanced;
+    }
+  }
+
+  if (
+    recentCardTypes.length >= IMAGE_SESSION_MIN_CARDS &&
+    countRecentImageCards(recentCardTypes, IMAGE_SESSION_WINDOW) === 0
+  ) {
+    const imageDue = pool.filter((candidate) =>
+      hasImageRetrievalDue(
+        getCardsForCandidate(candidate, cardsByAtomId),
+        userCardStates
+      )
+    );
+
+    if (imageDue.length > 0) {
+      const minSessionCount = Math.min(
+        ...imageDue.map(
+          (candidate) => recentAtomCounts.get(candidate.atom.id) ?? 0
+        )
+      );
+      const balanced = imageDue.filter(
+        (candidate) =>
+          (recentAtomCounts.get(candidate.atom.id) ?? 0) === minSessionCount
+      );
+      const rotatedImage = excludeRecentAtom(balanced, recentAtomId);
+      pool = rotatedImage.length > 0 ? rotatedImage : balanced;
     }
   }
 
