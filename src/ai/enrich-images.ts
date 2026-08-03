@@ -9,6 +9,13 @@ import {
   shouldCreateImageExplainCard,
 } from "./image-study";
 
+export interface ImageLinkingSummary {
+  atomCount: number;
+  studyImageCount: number;
+  atomsWithImages: number;
+  unassignedImageCount: number;
+}
+
 function buildImageReference(
   image: Image,
   atom: KnowledgeJsonAtom
@@ -18,9 +25,30 @@ function buildImageReference(
   return {
     imageId: image.id,
     caption: caption ? caption : `Figura: ${atom.title}`,
-    description: atom.summary,
+    description: imageDescription(atom),
     referencedConcepts: atom.keywords.slice(0, 4),
   };
+}
+
+function imageDescription(atom: KnowledgeJsonAtom): string {
+  const summary = atom.summary.trim();
+  if (summary.length >= 12) {
+    return summary;
+  }
+
+  const explanation = atom.explanation.trim();
+  if (explanation.length >= 12) {
+    return explanation.slice(0, 240);
+  }
+
+  return `${atom.title}. ${summary}`.trim().slice(0, 240);
+}
+
+function canLinkImageToAtom(image: Image, atom: KnowledgeJsonAtom): boolean {
+  return shouldCreateImageExplainCard(image, {
+    caption: image.caption?.trim() || `Figura: ${atom.title}`,
+    description: imageDescription(atom),
+  });
 }
 
 function sanitizeExistingImages(
@@ -55,6 +83,158 @@ function groupImagesByPage(images: Image[]): Map<number, Image[]> {
   return grouped;
 }
 
+function primaryPageForAtom(atom: KnowledgeJsonAtom, atomIndex: number): number {
+  return atom.pageReferences[0] ?? atomIndex + 1;
+}
+
+function getUnassignedStudyImages(
+  studyImages: Image[],
+  assignedImageIds: Set<string>
+): Image[] {
+  return studyImages.filter((image) => !assignedImageIds.has(image.id));
+}
+
+function findNearestUnassignedImage(
+  atom: KnowledgeJsonAtom,
+  atomIndex: number,
+  studyImages: Image[],
+  assignedImageIds: Set<string>
+): Image | undefined {
+  const unassigned = getUnassignedStudyImages(studyImages, assignedImageIds);
+  if (unassigned.length === 0) {
+    return undefined;
+  }
+
+  const atomPage = primaryPageForAtom(atom, atomIndex);
+
+  return [...unassigned].sort((left, right) => {
+    const leftDistance = Math.abs((left.pageNumber ?? 1) - atomPage);
+    const rightDistance = Math.abs((right.pageNumber ?? 1) - atomPage);
+
+    if (leftDistance !== rightDistance) {
+      return leftDistance - rightDistance;
+    }
+
+    return (left.pageNumber ?? 1) - (right.pageNumber ?? 1);
+  })[0];
+}
+
+function assignImageToAtom(
+  atom: KnowledgeJsonAtom,
+  image: Image,
+  assignedImageIds: Set<string>
+): KnowledgeJsonAtom {
+  assignedImageIds.add(image.id);
+  return {
+    ...atom,
+    images: [buildImageReference(image, atom)],
+  };
+}
+
+function linkByExactPage(
+  atoms: KnowledgeJsonAtom[],
+  imagesByPage: Map<number, Image[]>,
+  assignedImageIds: Set<string>
+): KnowledgeJsonAtom[] {
+  return atoms.map((atom, atomIndex) => {
+    if (atom.images.length > 0) {
+      return atom;
+    }
+
+    const pages =
+      atom.pageReferences.length > 0
+        ? atom.pageReferences
+        : [primaryPageForAtom(atom, atomIndex)];
+
+    for (const page of pages) {
+      const candidate = (imagesByPage.get(page) ?? []).find(
+        (image) => !assignedImageIds.has(image.id)
+      );
+
+      if (candidate && canLinkImageToAtom(candidate, atom)) {
+        return assignImageToAtom(atom, candidate, assignedImageIds);
+      }
+    }
+
+    return atom;
+  });
+}
+
+function linkByNearestPage(
+  atoms: KnowledgeJsonAtom[],
+  studyImages: Image[],
+  assignedImageIds: Set<string>
+): KnowledgeJsonAtom[] {
+  return atoms.map((atom, atomIndex) => {
+    if (atom.images.length > 0) {
+      return atom;
+    }
+
+    const candidate = findNearestUnassignedImage(
+      atom,
+      atomIndex,
+      studyImages,
+      assignedImageIds
+    );
+
+    if (candidate && canLinkImageToAtom(candidate, atom)) {
+      return assignImageToAtom(atom, candidate, assignedImageIds);
+    }
+
+    return atom;
+  });
+}
+
+function linkRemainingRoundRobin(
+  atoms: KnowledgeJsonAtom[],
+  studyImages: Image[],
+  assignedImageIds: Set<string>
+): KnowledgeJsonAtom[] {
+  const remainingImages = getUnassignedStudyImages(studyImages, assignedImageIds);
+
+  if (remainingImages.length === 0) {
+    return atoms;
+  }
+
+  let imageIndex = 0;
+
+  return atoms.map((atom) => {
+    if (atom.images.length > 0) {
+      return atom;
+    }
+
+    while (imageIndex < remainingImages.length) {
+      const candidate = remainingImages[imageIndex]!;
+      imageIndex += 1;
+
+      if (!canLinkImageToAtom(candidate, atom)) {
+        continue;
+      }
+
+      return assignImageToAtom(atom, candidate, assignedImageIds);
+    }
+
+    return atom;
+  });
+}
+
+export function summarizeImageLinking(
+  atoms: KnowledgeJsonAtom[],
+  studyImages: Image[]
+): ImageLinkingSummary {
+  const assignedIds = new Set(
+    atoms.flatMap((atom) => atom.images.map((reference) => reference.imageId))
+  );
+
+  return {
+    atomCount: atoms.length,
+    studyImageCount: studyImages.length,
+    atomsWithImages: atoms.filter((atom) => atom.images.length > 0).length,
+    unassignedImageCount: studyImages.filter((image) => !assignedIds.has(image.id))
+      .length,
+  };
+}
+
 /**
  * Links study illustrations to atoms. Upload page photos used for OCR are ignored.
  */
@@ -86,35 +266,21 @@ export function enrichKnowledgeWithImages(
     return preserved.length > 0 ? { ...atom, images: preserved } : { ...atom, images: [] };
   });
 
-  const linkedAtoms = atomsWithPreservedImages.map((atom) => {
-    if (atom.images.length > 0) {
-      return atom;
-    }
-
-    const pages = atom.pageReferences.length > 0 ? atom.pageReferences : [1];
-
-    for (const page of pages) {
-      const candidate = (imagesByPage.get(page) ?? []).find(
-        (image) => !assignedImageIds.has(image.id)
-      );
-
-      if (
-        candidate &&
-        shouldCreateImageExplainCard(candidate, {
-          caption: candidate.caption?.trim() || `Figura: ${atom.title}`,
-          description: atom.summary,
-        })
-      ) {
-        assignedImageIds.add(candidate.id);
-        return {
-          ...atom,
-          images: [buildImageReference(candidate, atom)],
-        };
-      }
-    }
-
-    return atom;
-  });
+  const exactLinked = linkByExactPage(
+    atomsWithPreservedImages,
+    imagesByPage,
+    assignedImageIds
+  );
+  const nearestLinked = linkByNearestPage(
+    exactLinked,
+    studyImages,
+    assignedImageIds
+  );
+  const linkedAtoms = linkRemainingRoundRobin(
+    nearestLinked,
+    studyImages,
+    assignedImageIds
+  );
 
   return {
     ...knowledge,

@@ -1,9 +1,9 @@
-import { enrichKnowledgeWithImages } from "@/ai/enrich-images";
+import { enrichKnowledgeWithImages, summarizeImageLinking } from "@/ai/enrich-images";
 import {
   extractFiguresFromPageImages,
   mergeKnowledgeSourceImages,
 } from "@/ai/extract-figures";
-import { shouldCreateImageExplainCard } from "@/ai/image-study";
+import { isStudyIllustrationImage, shouldCreateImageExplainCard } from "@/ai/image-study";
 import { buildImageExplainCardFields } from "@/ai/image-explain-card-builder";
 import { getImageIdFromPayload } from "@/components/feed/card-utils";
 import { findAtomsByKnowledgeSourceId } from "@/db/repositories/atoms";
@@ -15,10 +15,22 @@ import type { AtomId, ImageId, KnowledgeSourceId, UserId } from "@/domain/ids";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { env } from "@/lib/env";
+import { logger } from "@/lib/logger";
 import { UsageTracker } from "@/ai/optimization";
 
 const relinkCache = new Map<string, number>();
 const RELINK_CACHE_TTL_MS = 30 * 60 * 1000;
+
+export interface RelinkImagesResult {
+  atomsUpdated: number;
+  cardsCreated: number;
+  cardsRemoved: number;
+  studyImageCount: number;
+  atomsWithImages: number;
+  atomCount: number;
+  unassignedImageCount: number;
+  skippedCache: boolean;
+}
 
 function getRelinkCacheKey(
   knowledgeSourceId: KnowledgeSourceId,
@@ -27,14 +39,30 @@ function getRelinkCacheKey(
   return `${knowledgeSourceId}:${ownerId ?? "anonymous"}`;
 }
 
+function emptyRelinkResult(skippedCache = false): RelinkImagesResult {
+  return {
+    atomsUpdated: 0,
+    cardsCreated: 0,
+    cardsRemoved: 0,
+    studyImageCount: 0,
+    atomsWithImages: 0,
+    atomCount: 0,
+    unassignedImageCount: 0,
+    skippedCache,
+  };
+}
+
 export async function relinkImagesForKnowledgeSource(
   knowledgeSourceId: KnowledgeSourceId,
-  options?: { ownerId?: UserId }
-): Promise<{ atomsUpdated: number; cardsCreated: number; cardsRemoved: number }> {
+  options?: { ownerId?: UserId; force?: boolean }
+): Promise<RelinkImagesResult> {
   const cacheKey = getRelinkCacheKey(knowledgeSourceId, options?.ownerId);
-  const cachedAt = relinkCache.get(cacheKey);
-  if (cachedAt && Date.now() - cachedAt < RELINK_CACHE_TTL_MS) {
-    return { atomsUpdated: 0, cardsCreated: 0, cardsRemoved: 0 };
+
+  if (!options?.force) {
+    const cachedAt = relinkCache.get(cacheKey);
+    if (cachedAt && Date.now() - cachedAt < RELINK_CACHE_TTL_MS) {
+      return emptyRelinkResult(true);
+    }
   }
 
   const result = await relinkImagesForKnowledgeSourceUncached(
@@ -48,11 +76,11 @@ export async function relinkImagesForKnowledgeSource(
 async function relinkImagesForKnowledgeSourceUncached(
   knowledgeSourceId: KnowledgeSourceId,
   options?: { ownerId?: UserId }
-): Promise<{ atomsUpdated: number; cardsCreated: number; cardsRemoved: number }> {
+): Promise<RelinkImagesResult> {
   let images = await findImagesByKnowledgeSourceId(knowledgeSourceId);
   const atoms = await findAtomsByKnowledgeSourceId(knowledgeSourceId);
   if (atoms.length === 0) {
-    return { atomsUpdated: 0, cardsCreated: 0, cardsRemoved: 0 };
+    return emptyRelinkResult();
   }
 
   if (options?.ownerId) {
@@ -67,6 +95,7 @@ async function relinkImagesForKnowledgeSourceUncached(
     images = mergeKnowledgeSourceImages(images, figureImages);
   }
 
+  const studyImages = images.filter(isStudyIllustrationImage);
   const imageById = new Map(images.map((image) => [image.id, image]));
   const existingCards = await findCardsByAtomIds(atoms.map((atom) => atom.id));
   let cardsRemoved = 0;
@@ -89,8 +118,12 @@ async function relinkImagesForKnowledgeSourceUncached(
     }
   }
 
-  if (images.length === 0) {
-    return { atomsUpdated: 0, cardsCreated: 0, cardsRemoved };
+  if (studyImages.length === 0) {
+    return {
+      ...emptyRelinkResult(),
+      cardsRemoved,
+      atomCount: atoms.length,
+    };
   }
 
   const knowledge: KnowledgeJson = {
@@ -137,6 +170,7 @@ async function relinkImagesForKnowledgeSourceUncached(
   };
 
   const enriched = enrichKnowledgeWithImages(knowledge, images);
+  const linkingSummary = summarizeImageLinking(enriched.atoms, studyImages);
   let atomsUpdated = 0;
   let cardsCreated = 0;
   const refreshedCards = await findCardsByAtomIds(atoms.map((atom) => atom.id));
@@ -194,5 +228,18 @@ async function relinkImagesForKnowledgeSourceUncached(
     }
   }
 
-  return { atomsUpdated, cardsCreated, cardsRemoved };
+  const result: RelinkImagesResult = {
+    atomsUpdated,
+    cardsCreated,
+    cardsRemoved,
+    ...linkingSummary,
+    skippedCache: false,
+  };
+
+  logger.info("Image relink completed", {
+    knowledgeSourceId,
+    ...result,
+  });
+
+  return result;
 }

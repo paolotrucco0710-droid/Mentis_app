@@ -193,4 +193,52 @@ describe("enrichKnowledgeWithImages", () => {
 
     expect(enriched.atoms[0]?.images[0]?.caption).toBe(caption);
   });
+
+  it("links the nearest page illustration when exact page references do not match", () => {
+    const knowledge = makeKnowledge();
+    knowledge.atoms[0] = {
+      ...knowledge.atoms[0]!,
+      pageReferences: [4],
+    };
+    const imageId = randomUUID();
+
+    const enriched = enrichKnowledgeWithImages(knowledge, [
+      makeImage({
+        id: imageId,
+        pageNumber: 2,
+        caption: studyCaption("Vicina"),
+      }),
+    ]);
+
+    expect(enriched.atoms[0]?.images[0]?.imageId).toBe(imageId);
+  });
+
+  it("distributes remaining illustrations across atoms in chapter order", () => {
+    const knowledge = makeKnowledge(3);
+    const firstImageId = randomUUID();
+    const secondImageId = randomUUID();
+    const thirdImageId = randomUUID();
+
+    const enriched = enrichKnowledgeWithImages(knowledge, [
+      makeImage({
+        id: firstImageId,
+        pageNumber: 9,
+        caption: studyCaption("Figura 1"),
+      }),
+      makeImage({
+        id: secondImageId,
+        pageNumber: 10,
+        caption: studyCaption("Figura 2"),
+      }),
+      makeImage({
+        id: thirdImageId,
+        pageNumber: 11,
+        caption: studyCaption("Figura 3"),
+      }),
+    ]);
+
+    expect(enriched.atoms[0]?.images[0]?.imageId).toBe(firstImageId);
+    expect(enriched.atoms[1]?.images[0]?.imageId).toBe(secondImageId);
+    expect(enriched.atoms[2]?.images[0]?.imageId).toBe(thirdImageId);
+  });
 });
