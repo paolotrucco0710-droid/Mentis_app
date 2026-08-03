@@ -393,4 +393,115 @@ describe("engine/session-variety", () => {
     expect(filtered).toHaveLength(1);
     expect(filtered[0]?.atom.id).toBe(second.atom.id);
   });
+
+  it("prioritizes atoms with unseen blurting or feynman when the session lacks production cards", () => {
+    const practiced = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
+      exposureCount: 2,
+    });
+    const productionDue = makeCandidate("00000000-0000-4000-8000-000000000102" as AtomId, {
+      exposureCount: 2,
+    });
+    const practicedCards = [
+      makeExplainCard(practiced.atom.id, "00000000-0000-4000-8000-000000000201" as CardId),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000202" as CardId,
+        atomId: practiced.atom.id,
+        type: CardType.Quiz,
+        order: 1,
+      }),
+    ];
+    const productionCards = [
+      makeExplainCard(
+        productionDue.atom.id,
+        "00000000-0000-4000-8000-000000000203" as CardId
+      ),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000204" as CardId,
+        atomId: productionDue.atom.id,
+        type: CardType.Quiz,
+        order: 1,
+      }),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000205" as CardId,
+        atomId: productionDue.atom.id,
+        type: CardType.Blurting,
+        order: 2,
+      }),
+    ];
+
+    const filtered = filterCandidatesForSessionVariety([practiced, productionDue], {
+      recentAtomCounts: new Map([
+        [practiced.atom.id, 1],
+        [productionDue.atom.id, 1],
+      ]),
+      recentCardTypes: [
+        CardType.Explain,
+        CardType.Quiz,
+        CardType.TrueFalse,
+        CardType.Quiz,
+        CardType.ErrorDetection,
+      ],
+      cardsByAtomId: new Map([
+        [practiced.atom.id, practicedCards],
+        [productionDue.atom.id, productionCards],
+      ]),
+      userCardStates: new Map([
+        [
+          practicedCards[0]!.id,
+          {
+            userId: practiced.state.userId,
+            cardId: practicedCards[0]!.id,
+            viewCount: 1,
+            wrongAnswerCount: 0,
+            correctAnswerCount: 0,
+            lastViewedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+        [
+          practicedCards[1]!.id,
+          {
+            userId: practiced.state.userId,
+            cardId: practicedCards[1]!.id,
+            viewCount: 1,
+            wrongAnswerCount: 0,
+            correctAnswerCount: 1,
+            lastViewedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+        [
+          productionCards[0]!.id,
+          {
+            userId: productionDue.state.userId,
+            cardId: productionCards[0]!.id,
+            viewCount: 1,
+            wrongAnswerCount: 0,
+            correctAnswerCount: 0,
+            lastViewedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+        [
+          productionCards[1]!.id,
+          {
+            userId: productionDue.state.userId,
+            cardId: productionCards[1]!.id,
+            viewCount: 1,
+            wrongAnswerCount: 0,
+            correctAnswerCount: 1,
+            lastViewedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+      ]),
+    });
+
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.atom.id).toBe(productionDue.atom.id);
+  });
 });

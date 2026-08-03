@@ -297,4 +297,74 @@ describe("engine/card-selector", () => {
 
     expect(selected?.type).toBe(CardType.Quiz);
   });
+
+  it("introduces blurting after quick retrieval when production is missing from the session", () => {
+    const explain = makeCard({
+      id: "00000000-0000-4000-8000-000000000201" as CardId,
+      type: CardType.Explain,
+      order: 0,
+    });
+    const quiz = makeCard({
+      id: "00000000-0000-4000-8000-000000000202" as CardId,
+      type: CardType.Quiz,
+      order: 1,
+    });
+    const blurting = makeCard({
+      id: "00000000-0000-4000-8000-000000000203" as CardId,
+      type: CardType.Blurting,
+      order: 2,
+    });
+
+    const selected = selectCardForAtom({
+      cards: [explain, quiz, blurting],
+      atomState: makeUserAtomState({
+        exposureCount: 2,
+        correctAnswerCount: 1,
+      }),
+      stage: CognitiveAtomStage.Consolidating,
+      userCardStates: new Map([
+        [explain.id, makeCardState(explain.id, 1)],
+        [quiz.id, makeCardState(quiz.id, 1)],
+      ]),
+      lastCardType: CardType.TrueFalse,
+      recentCardTypes: [
+        CardType.Explain,
+        CardType.Quiz,
+        CardType.TrueFalse,
+        CardType.Quiz,
+        CardType.ErrorDetection,
+      ],
+    });
+
+    expect(selected?.type).toBe(CardType.Blurting);
+  });
+
+  it("suppresses blurting before the atom has any quick retrieval practice", () => {
+    const explain = makeCard({
+      id: "00000000-0000-4000-8000-000000000201" as CardId,
+      type: CardType.Explain,
+      order: 0,
+    });
+    const quiz = makeCard({
+      id: "00000000-0000-4000-8000-000000000202" as CardId,
+      type: CardType.Quiz,
+      order: 1,
+    });
+    const blurting = makeCard({
+      id: "00000000-0000-4000-8000-000000000203" as CardId,
+      type: CardType.Blurting,
+      order: 2,
+    });
+
+    const selected = selectCardForAtom({
+      cards: [explain, quiz, blurting],
+      atomState: makeUserAtomState({ exposureCount: 1 }),
+      stage: CognitiveAtomStage.Learning,
+      userCardStates: new Map([[explain.id, makeCardState(explain.id, 1)]]),
+      lastCardType: CardType.Explain,
+      recentCardTypes: [CardType.Explain],
+    });
+
+    expect(selected?.type).toBe(CardType.Quiz);
+  });
 });

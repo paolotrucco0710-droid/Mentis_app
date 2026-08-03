@@ -3,9 +3,14 @@ import type { CardType } from "@/domain/enums";
 import {
   EXPLANATION_CARD_TYPES,
   MAX_SESSION_CARDS_PER_ATOM,
+  OPEN_RESPONSE_SESSION_WINDOW,
   QUICK_RETRIEVAL_CARD_TYPES,
 } from "./constants";
-import { needsPrimaryIntroduction } from "./card-selector";
+import {
+  countRecentOpenResponseCards,
+  hasOpenProductionDue,
+  needsPrimaryIntroduction,
+} from "./card-selector";
 import type { ScoredAtomCandidate } from "./types";
 
 const EXPLAIN_TYPES = new Set<string>(EXPLANATION_CARD_TYPES);
@@ -157,5 +162,24 @@ export function filterCandidatesForSessionVariety(
       MAX_SESSION_CARDS_PER_ATOM
   );
 
-  return capped.length > 0 ? capped : pool;
+  pool = capped.length > 0 ? capped : pool;
+
+  if (
+    recentCardTypes.length >= 5 &&
+    countRecentOpenResponseCards(recentCardTypes, OPEN_RESPONSE_SESSION_WINDOW) ===
+      0
+  ) {
+    const productionDue = pool.filter((candidate) =>
+      hasOpenProductionDue(
+        getCardsForCandidate(candidate, cardsByAtomId),
+        userCardStates
+      )
+    );
+
+    if (productionDue.length > 0) {
+      return productionDue;
+    }
+  }
+
+  return pool;
 }

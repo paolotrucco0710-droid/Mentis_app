@@ -6,6 +6,8 @@ import {
   IMAGE_EXPLAIN_CARD_TYPES,
   LEARN_CARD_TYPES,
   OPEN_RESPONSE_CARD_TYPES,
+  OPEN_RESPONSE_MIN_QUICK_RETRIEVALS,
+  OPEN_RESPONSE_SESSION_WINDOW,
   QUICK_RETRIEVAL_CARD_TYPES,
   RETRIEVAL_CARD_TYPES,
   VISUAL_RETRIEVAL_CARD_TYPES,
@@ -28,6 +30,51 @@ export function getPrimaryExplainCard(cards: Card[]): Card | null {
   }
 
   return [...explainCards].sort((left, right) => left.order - right.order)[0];
+}
+
+export function hasQuickRetrievalPractice(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  let practiced = 0;
+
+  for (const card of cards) {
+    if (!QUICK_RETRIEVAL_TYPES.has(card.type)) {
+      continue;
+    }
+
+    if ((userCardStates.get(card.id)?.viewCount ?? 0) > 0) {
+      practiced += 1;
+    }
+  }
+
+  return practiced >= OPEN_RESPONSE_MIN_QUICK_RETRIEVALS;
+}
+
+export function hasOpenProductionDue(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  if (!hasQuickRetrievalPractice(cards, userCardStates)) {
+    return false;
+  }
+
+  return cards.some((card) => {
+    if (!OPEN_RESPONSE_TYPES.has(card.type)) {
+      return false;
+    }
+
+    return (userCardStates.get(card.id)?.viewCount ?? 0) === 0;
+  });
+}
+
+export function countRecentOpenResponseCards(
+  recentCardTypes: CardType[],
+  windowSize = OPEN_RESPONSE_SESSION_WINDOW
+): number {
+  return recentCardTypes
+    .slice(-windowSize)
+    .filter((type) => OPEN_RESPONSE_TYPES.has(type)).length;
 }
 
 export function needsPrimaryIntroduction(
@@ -201,7 +248,7 @@ function scoreCard(
     return SUPPRESSED_CARD_SCORE;
   }
 
-  if (shouldSuppressOpenResponse(card, atomState, stage, viewCount)) {
+  if (shouldSuppressOpenResponse(card, atomState, cards, userCardStates, viewCount)) {
     return SUPPRESSED_CARD_SCORE;
   }
 
@@ -294,7 +341,26 @@ function scoreCard(
   }
 
   if (isOpenResponse && viewCount === 0 && introductionSeen(cards, userCardStates)) {
-    score += 8;
+    if (hasQuickRetrievalPractice(cards, userCardStates)) {
+      score += 12;
+    }
+
+    if (
+      countRecentOpenResponseCards(recentCardTypes) === 0 &&
+      recentCardTypes.length >= 4
+    ) {
+      score += 24;
+    }
+
+    const recentQuickRetrievalCount = recentCardTypes
+      .slice(-OPEN_RESPONSE_SESSION_WINDOW)
+      .filter((type) => QUICK_RETRIEVAL_TYPES.has(type)).length;
+    if (
+      countRecentOpenResponseCards(recentCardTypes) === 0 &&
+      recentQuickRetrievalCount >= 3
+    ) {
+      score += 18;
+    }
   }
 
   if (
@@ -310,19 +376,26 @@ function scoreCard(
     if (card.type === CardType.ErrorDetection && viewCount === 0) {
       score += 8;
     }
-    if (isOpenResponse && viewCount === 0) {
-      score -= 12;
-    }
   }
 
-  const recentOpenCount = recentCardTypes.filter((type) =>
-    OPEN_RESPONSE_TYPES.has(type)
-  ).length;
-  if (isOpenResponse && atomState.exposureCount < 2 && viewCount === 0) {
-    score -= 35;
+  if (
+    isOpenResponse &&
+    lastCardType &&
+    OPEN_RESPONSE_TYPES.has(lastCardType)
+  ) {
+    score -= 24;
   }
-  if (isOpenResponse && recentOpenCount >= 1) {
-    score -= 28;
+
+  if (atomState.wrongAnswerCount > 0 && isOpenResponse && viewCount === 0) {
+    score += 22;
+  }
+
+  if (
+    card.type === CardType.Feynman &&
+    viewCount === 0 &&
+    !hasStartedOpenResponse(cards, userCardStates)
+  ) {
+    score -= 6;
   }
 
   if (atomState.wrongAnswerCount > 0 && EXPLAIN_TYPES.has(card.type)) {
@@ -414,14 +487,23 @@ function shouldSuppressImageExplain(
 function shouldSuppressOpenResponse(
   card: Card,
   atomState: UserAtomState,
-  stage: CognitiveAtomStage,
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>,
   viewCount: number
 ): boolean {
-  if (!OPEN_RESPONSE_TYPES.has(card.type) || viewCount === 0) {
+  if (!OPEN_RESPONSE_TYPES.has(card.type)) {
     return false;
   }
 
-  if (stage === CognitiveAtomStage.Forgotten || atomState.wrongAnswerCount > 0) {
+  if (viewCount === 0 && !hasQuickRetrievalPractice(cards, userCardStates)) {
+    return true;
+  }
+
+  if (viewCount === 0) {
+    return false;
+  }
+
+  if (atomState.wrongAnswerCount > 0) {
     return false;
   }
 

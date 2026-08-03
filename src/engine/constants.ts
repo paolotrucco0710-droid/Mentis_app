@@ -48,11 +48,17 @@ export const RETRIEVAL_CARD_TYPES = new Set([
   "memory_recall",
 ]);
 
-/** Open-ended retrieval cards shown less often than quick checks. */
+/** Open-ended production/reflection cards (blurting, feynman). */
 export const OPEN_RESPONSE_CARD_TYPES = new Set([
   "blurting",
   "feynman",
 ]);
+
+/** Recent cards scanned when checking if production is missing from the session. */
+export const OPEN_RESPONSE_SESSION_WINDOW = 8;
+
+/** Quick retrieval successes needed on an atom before blurting/feynman. */
+export const OPEN_RESPONSE_MIN_QUICK_RETRIEVALS = 1;
 
 /** Quick retrieval cards preferred for session variety. */
 export const QUICK_RETRIEVAL_CARD_TYPES = new Set([
