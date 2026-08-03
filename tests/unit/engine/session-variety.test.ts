@@ -39,13 +39,13 @@ function makeExplainCard(atomId: AtomId, cardId: CardId) {
 }
 
 describe("engine/session-variety", () => {
-  it("prefers verification before introducing another atom", () => {
+  it("rotates away from the atom just explained when another atom can be practiced", () => {
     const introduced = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
       exposureCount: 1,
       logicalOrder: 0,
     });
-    const untouched = makeCandidate("00000000-0000-4000-8000-000000000102" as AtomId, {
-      exposureCount: 0,
+    const practiced = makeCandidate("00000000-0000-4000-8000-000000000102" as AtomId, {
+      exposureCount: 1,
       logicalOrder: 1,
     });
     const introducedCards = [
@@ -60,22 +60,28 @@ describe("engine/session-variety", () => {
         order: 1,
       }),
     ];
-    const untouchedCards = [
+    const practicedCards = [
       makeExplainCard(
-        untouched.atom.id,
+        practiced.atom.id,
         "00000000-0000-4000-8000-000000000203" as CardId
       ),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000204" as CardId,
+        atomId: practiced.atom.id,
+        type: CardType.TrueFalse,
+        order: 1,
+      }),
     ];
 
     const filtered = filterCandidatesForSessionVariety(
-      [introduced, untouched],
+      [introduced, practiced],
       {
         recentAtomCounts: new Map([[introduced.atom.id, 1]]),
         recentAtomIds: [introduced.atom.id],
         recentCardTypes: [CardType.Explain],
         cardsByAtomId: new Map([
           [introduced.atom.id, introducedCards],
-          [untouched.atom.id, untouchedCards],
+          [practiced.atom.id, practicedCards],
         ]),
         userCardStates: new Map([
           [
@@ -91,20 +97,40 @@ describe("engine/session-variety", () => {
               updatedAt: new Date(),
             },
           ],
+          [
+            practicedCards[0]!.id,
+            {
+              userId: practiced.state.userId,
+              cardId: practicedCards[0]!.id,
+              viewCount: 1,
+              wrongAnswerCount: 0,
+              correctAnswerCount: 0,
+              lastViewedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
         ]),
       }
     );
 
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0]?.atom.id).toBe(introduced.atom.id);
+    expect(filtered.some((candidate) => candidate.atom.id === practiced.atom.id)).toBe(
+      true
+    );
+    expect(filtered.some((candidate) => candidate.atom.id === introduced.atom.id)).toBe(
+      false
+    );
   });
 
-  it("allows a new introduction after a quick quiz on the previous atom", () => {
+  it("keeps practice atoms available after a quick quiz instead of forcing only new introductions", () => {
     const first = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
       exposureCount: 1,
     });
     const second = makeCandidate("00000000-0000-4000-8000-000000000102" as AtomId, {
       exposureCount: 0,
+    });
+    const third = makeCandidate("00000000-0000-4000-8000-000000000103" as AtomId, {
+      exposureCount: 1,
     });
     const firstCards = [
       makeExplainCard(first.atom.id, "00000000-0000-4000-8000-000000000201" as CardId),
@@ -114,15 +140,18 @@ describe("engine/session-variety", () => {
         type: CardType.Quiz,
         order: 1,
       }),
+    ];
+    const thirdCards = [
+      makeExplainCard(third.atom.id, "00000000-0000-4000-8000-000000000205" as CardId),
       makeCard({
-        id: "00000000-0000-4000-8000-000000000203" as CardId,
-        atomId: first.atom.id,
-        type: CardType.Blurting,
-        order: 2,
+        id: "00000000-0000-4000-8000-000000000206" as CardId,
+        atomId: third.atom.id,
+        type: CardType.TrueFalse,
+        order: 1,
       }),
     ];
 
-    const filtered = filterCandidatesForSessionVariety([first, second], {
+    const filtered = filterCandidatesForSessionVariety([first, second, third], {
       recentAtomCounts: new Map([[first.atom.id, 2]]),
       recentAtomIds: [first.atom.id],
       recentCardTypes: [CardType.Explain, CardType.Quiz],
@@ -132,6 +161,7 @@ describe("engine/session-variety", () => {
           second.atom.id,
           [makeExplainCard(second.atom.id, "00000000-0000-4000-8000-000000000204" as CardId)],
         ],
+        [third.atom.id, thirdCards],
       ]),
       userCardStates: new Map([
         [
@@ -160,10 +190,26 @@ describe("engine/session-variety", () => {
             updatedAt: new Date(),
           },
         ],
+        [
+          thirdCards[0]!.id,
+          {
+            userId: third.state.userId,
+            cardId: thirdCards[0]!.id,
+            viewCount: 1,
+            wrongAnswerCount: 0,
+            correctAnswerCount: 0,
+            lastViewedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
       ]),
     });
 
     expect(filtered.some((candidate) => candidate.atom.id === second.atom.id)).toBe(
+      true
+    );
+    expect(filtered.some((candidate) => candidate.atom.id === third.atom.id)).toBe(
       true
     );
   });
@@ -243,8 +289,12 @@ describe("engine/session-variety", () => {
       ]),
     });
 
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0]?.atom.id).toBe(introduced.atom.id);
+    expect(filtered.some((candidate) => candidate.atom.id === untouched.atom.id)).toBe(
+      false
+    );
+    expect(filtered.some((candidate) => candidate.atom.id === introduced.atom.id)).toBe(
+      true
+    );
   });
 
   it("rotates fairly among atoms already introduced", () => {

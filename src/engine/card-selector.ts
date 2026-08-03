@@ -215,6 +215,27 @@ function scoreCard(
     score -= 12;
   }
 
+  const recentQuickRetrievalCount = recentCardTypes.filter((type) =>
+    QUICK_RETRIEVAL_TYPES.has(type)
+  ).length;
+  if (recentQuickRetrievalCount >= 2 && QUICK_RETRIEVAL_TYPES.has(card.type)) {
+    score -= 28;
+  }
+  if (
+    lastCardType &&
+    QUICK_RETRIEVAL_TYPES.has(lastCardType) &&
+    card.type === CardType.Quiz
+  ) {
+    score -= 22;
+  }
+  if (
+    lastCardType &&
+    QUICK_RETRIEVAL_TYPES.has(lastCardType) &&
+    (card.type === CardType.TrueFalse || card.type === CardType.ErrorDetection)
+  ) {
+    score += 18;
+  }
+
   if (lastCardType && LEARN_TYPES.has(lastCardType) && isLearnCard) {
     score -= 28;
   }
@@ -280,11 +301,17 @@ function scoreCard(
     introductionSeen(cards, userCardStates) &&
     !hasStartedRetrieval(cards, userCardStates)
   ) {
-    if (QUICK_RETRIEVAL_TYPES.has(card.type)) {
-      score += 38;
+    if (QUICK_RETRIEVAL_TYPES.has(card.type) && viewCount === 0) {
+      score += 14;
     }
-    if (isOpenResponse) {
-      score -= 45;
+    if (card.type === CardType.TrueFalse && viewCount === 0) {
+      score += 10;
+    }
+    if (card.type === CardType.ErrorDetection && viewCount === 0) {
+      score += 8;
+    }
+    if (isOpenResponse && viewCount === 0) {
+      score -= 12;
     }
   }
 

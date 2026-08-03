@@ -29,6 +29,7 @@ export function buildImageExplainCardFields(
       id: atomId,
       title: atom.title,
       summary: atom.summary,
+      definitions: atom.definitions,
       quizDistractors: atom.quizDistractors,
       misconceptions: atom.misconceptions,
       counterExamples: atom.counterExamples,

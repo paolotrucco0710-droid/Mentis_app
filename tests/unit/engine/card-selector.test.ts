@@ -133,7 +133,7 @@ describe("engine/card-selector", () => {
     expect(selected?.type).not.toBe(CardType.Explain);
   });
 
-  it("prefers a quick quiz right after the explain card", () => {
+  it("prefers varied retrieval after explain instead of always choosing quiz", () => {
     const explain = makeCard({
       id: "00000000-0000-4000-8000-000000000201" as CardId,
       type: CardType.Explain,
@@ -144,14 +144,19 @@ describe("engine/card-selector", () => {
       type: CardType.Quiz,
       order: 1,
     });
-    const blurting = makeCard({
+    const trueFalse = makeCard({
       id: "00000000-0000-4000-8000-000000000203" as CardId,
-      type: CardType.Blurting,
+      type: CardType.TrueFalse,
       order: 2,
+    });
+    const blurting = makeCard({
+      id: "00000000-0000-4000-8000-000000000204" as CardId,
+      type: CardType.Blurting,
+      order: 3,
     });
 
     const selected = selectCardForAtom({
-      cards: [explain, quiz, blurting],
+      cards: [explain, quiz, trueFalse, blurting],
       atomState: makeUserAtomState({
         exposureCount: 1,
         correctAnswerCount: 0,
@@ -159,10 +164,14 @@ describe("engine/card-selector", () => {
       }),
       stage: CognitiveAtomStage.Learning,
       userCardStates: new Map([[explain.id, makeCardState(explain.id, 1)]]),
-      lastCardType: CardType.Explain,
+      lastCardType: CardType.Quiz,
+      recentCardTypes: [CardType.Explain, CardType.Quiz],
     });
 
-    expect(selected?.type).toBe(CardType.Quiz);
+    expect(selected?.type).not.toBe(CardType.Quiz);
+    expect([CardType.TrueFalse, CardType.ErrorDetection, CardType.Blurting]).toContain(
+      selected?.type
+    );
   });
 
   it("re-shows explanation cards after wrong answers", () => {
