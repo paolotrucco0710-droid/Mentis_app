@@ -52,6 +52,55 @@ function emptyRelinkResult(skippedCache = false): RelinkImagesResult {
   };
 }
 
+function buildKnowledgeFromAtoms(
+  knowledgeSourceId: KnowledgeSourceId,
+  atoms: Awaited<ReturnType<typeof findAtomsByKnowledgeSourceId>>,
+  sourcePages: number
+): KnowledgeJson {
+  return {
+    metadata: {
+      documentId: knowledgeSourceId,
+      title: "",
+      subject: "",
+      language: "it",
+      estimatedReadingTimeMinutes: 0,
+      estimatedStudyTimeMinutes: 0,
+      chapterNumber: null,
+      sourcePages,
+      generatedAt: new Date().toISOString(),
+      version: env.knowledgeJsonVersion,
+    },
+    atoms: atoms.map((atom) => ({
+      id: atom.id,
+      title: atom.title,
+      summary: atom.summary,
+      explanation: atom.explanation,
+      importance: atom.importance,
+      difficulty: atom.difficulty,
+      prerequisites: atom.prerequisites,
+      learningObjectives: atom.learningObjectives,
+      keywords: atom.keywords,
+      aliases: atom.aliases,
+      formulas: atom.formulas,
+      definitions: atom.definitions,
+      examples: atom.examples,
+      counterExamples: atom.counterExamples,
+      commonMistakes: atom.commonMistakes,
+      misconceptions: atom.misconceptions,
+      applications: atom.applications,
+      historicalContext: atom.historicalContext,
+      notes: atom.notes,
+      images: atom.images as KnowledgeJsonAtomImage[],
+      tables: atom.tables,
+      diagrams: atom.diagrams,
+      equations: atom.equations,
+      citations: atom.citations,
+      pageReferences: atom.pageReferences,
+      confidence: atom.confidence,
+    })),
+  };
+}
+
 export async function relinkImagesForKnowledgeSource(
   knowledgeSourceId: KnowledgeSourceId,
   options?: { ownerId?: UserId; force?: boolean }
@@ -83,8 +132,9 @@ async function relinkImagesForKnowledgeSourceUncached(
     return emptyRelinkResult();
   }
 
-  if (options?.ownerId) {
-    const tracker = new UsageTracker();
+  const tracker = options?.ownerId ? new UsageTracker() : undefined;
+
+  if (options?.ownerId && tracker) {
     const figureImages = await extractFiguresFromPageImages({
       knowledgeSourceId,
       ownerId: options.ownerId,
@@ -126,50 +176,14 @@ async function relinkImagesForKnowledgeSourceUncached(
     };
   }
 
-  const knowledge: KnowledgeJson = {
-    metadata: {
-      documentId: knowledgeSourceId,
-      title: "",
-      subject: "",
-      language: "it",
-      estimatedReadingTimeMinutes: 0,
-      estimatedStudyTimeMinutes: 0,
-      chapterNumber: null,
-      sourcePages: images.length,
-      generatedAt: new Date().toISOString(),
-      version: env.knowledgeJsonVersion,
-    },
-    atoms: atoms.map((atom) => ({
-      id: atom.id,
-      title: atom.title,
-      summary: atom.summary,
-      explanation: atom.explanation,
-      importance: atom.importance,
-      difficulty: atom.difficulty,
-      prerequisites: atom.prerequisites,
-      learningObjectives: atom.learningObjectives,
-      keywords: atom.keywords,
-      aliases: atom.aliases,
-      formulas: atom.formulas,
-      definitions: atom.definitions,
-      examples: atom.examples,
-      counterExamples: atom.counterExamples,
-      commonMistakes: atom.commonMistakes,
-      misconceptions: atom.misconceptions,
-      applications: atom.applications,
-      historicalContext: atom.historicalContext,
-      notes: atom.notes,
-      images: atom.images as KnowledgeJsonAtomImage[],
-      tables: atom.tables,
-      diagrams: atom.diagrams,
-      equations: atom.equations,
-      citations: atom.citations,
-      pageReferences: atom.pageReferences,
-      confidence: atom.confidence,
-    })),
-  };
-
-  const enriched = enrichKnowledgeWithImages(knowledge, images);
+  const knowledge = buildKnowledgeFromAtoms(
+    knowledgeSourceId,
+    atoms,
+    images.length
+  );
+  const enriched = await enrichKnowledgeWithImages(knowledge, images, {
+    tracker,
+  });
   const linkingSummary = summarizeImageLinking(enriched.atoms, studyImages);
   let atomsUpdated = 0;
   let cardsCreated = 0;

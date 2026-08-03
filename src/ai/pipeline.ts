@@ -221,7 +221,9 @@ export async function processKnowledgeSource(
 
     await updateStep(job.id, AIJobStep.Normalization);
     const normalized = normalizeKnowledgeJson(extracted, knowledgeSourceId);
-    const enriched = enrichKnowledgeWithImages(normalized, knowledgeImages);
+    const enriched = await enrichKnowledgeWithImages(normalized, knowledgeImages, {
+      tracker,
+    });
 
     await updateStep(job.id, AIJobStep.Persistence);
     const { atomCount, cardCount } = await persistKnowledgeGraph({

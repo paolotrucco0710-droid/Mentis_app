@@ -8,6 +8,11 @@ import {
   isStudyIllustrationImage,
   shouldCreateImageExplainCard,
 } from "./image-study";
+import {
+  resolveSemanticImageLinks,
+  type SemanticImageLinkTarget,
+} from "./link-images-semantically";
+import type { UsageTracker } from "./optimization";
 
 export interface ImageLinkingSummary {
   atomCount: number;
@@ -218,6 +223,48 @@ function linkRemainingRoundRobin(
   });
 }
 
+async function linkBySemanticMatch(
+  atoms: KnowledgeJsonAtom[],
+  studyImages: Image[],
+  assignedImageIds: Set<string>,
+  tracker?: UsageTracker
+): Promise<KnowledgeJsonAtom[]> {
+  const candidates = atoms
+    .map((atom, atomIndex) => ({ atom, atomIndex }))
+    .filter(({ atom }) => atom.images.length === 0);
+  const targets: SemanticImageLinkTarget[] = getUnassignedStudyImages(
+    studyImages,
+    assignedImageIds
+  ).map((image, imageIndex) => ({ image, imageIndex }));
+
+  if (candidates.length === 0 || targets.length === 0) {
+    return atoms;
+  }
+
+  const links = await resolveSemanticImageLinks(candidates, targets, tracker);
+  const updated = [...atoms];
+
+  for (const link of links) {
+    const atom = updated[link.atomIndex];
+    const target = targets[link.imageIndex];
+    const image = target?.image;
+
+    if (
+      !atom ||
+      atom.images.length > 0 ||
+      !image ||
+      assignedImageIds.has(image.id) ||
+      !canLinkImageToAtom(image, atom)
+    ) {
+      continue;
+    }
+
+    updated[link.atomIndex] = assignImageToAtom(atom, image, assignedImageIds);
+  }
+
+  return updated;
+}
+
 export function summarizeImageLinking(
   atoms: KnowledgeJsonAtom[],
   studyImages: Image[]
@@ -238,10 +285,11 @@ export function summarizeImageLinking(
 /**
  * Links study illustrations to atoms. Upload page photos used for OCR are ignored.
  */
-export function enrichKnowledgeWithImages(
+export async function enrichKnowledgeWithImages(
   knowledge: KnowledgeJson,
-  images: Image[]
-): KnowledgeJson {
+  images: Image[],
+  options?: { tracker?: UsageTracker }
+): Promise<KnowledgeJson> {
   const studyImages = images.filter(isStudyIllustrationImage);
   if (studyImages.length === 0) {
     return {
@@ -271,8 +319,14 @@ export function enrichKnowledgeWithImages(
     imagesByPage,
     assignedImageIds
   );
-  const nearestLinked = linkByNearestPage(
+  const semanticLinked = await linkBySemanticMatch(
     exactLinked,
+    studyImages,
+    assignedImageIds,
+    options?.tracker
+  );
+  const nearestLinked = linkByNearestPage(
+    semanticLinked,
     studyImages,
     assignedImageIds
   );
