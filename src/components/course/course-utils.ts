@@ -1,4 +1,7 @@
-import { KnowledgeSourceProcessingStatus } from "@/domain/enums";
+import {
+  AIJobStep,
+  KnowledgeSourceProcessingStatus,
+} from "@/domain/enums";
 
 export const SUBJECT_COLORS = [
   "#4F46E5",
@@ -38,21 +41,74 @@ export function formatProcessingStatus(
 }
 
 export function processingProgress(
-  status: KnowledgeSourceProcessingStatus
+  status: KnowledgeSourceProcessingStatus,
+  currentStep?: AIJobStep | string | null
 ): number {
+  if (status === KnowledgeSourceProcessingStatus.Completed) {
+    return 100;
+  }
+  if (status === KnowledgeSourceProcessingStatus.Failed) {
+    return 100;
+  }
+  if (currentStep) {
+    return jobStepProgress(currentStep);
+  }
+
   switch (status) {
     case KnowledgeSourceProcessingStatus.Uploaded:
       return 10;
     case KnowledgeSourceProcessingStatus.Queued:
-      return 20;
+      return 15;
     case KnowledgeSourceProcessingStatus.Processing:
-      return 60;
-    case KnowledgeSourceProcessingStatus.Completed:
-      return 100;
-    case KnowledgeSourceProcessingStatus.Failed:
-      return 100;
+      return 35;
     default:
       return 0;
+  }
+}
+
+export function formatJobStep(step: AIJobStep | string | null): string | null {
+  switch (step) {
+    case AIJobStep.Ocr:
+      return "OCR — lettura foto/pagine";
+    case AIJobStep.ImageExtraction:
+      return "Estrazione figure dalle pagine";
+    case AIJobStep.TextCleaning:
+      return "Pulizia testo";
+    case AIJobStep.LlmExtraction:
+      return "Estrazione concetti (LLM)";
+    case AIJobStep.JsonValidation:
+      return "Validazione JSON";
+    case AIJobStep.Normalization:
+      return "Normalizzazione atoms";
+    case AIJobStep.Persistence:
+      return "Salvataggio card nel database";
+    case AIJobStep.StructureRecognition:
+      return "Riconoscimento struttura";
+    default:
+      return null;
+  }
+}
+
+function jobStepProgress(step: AIJobStep | string): number {
+  switch (step) {
+    case AIJobStep.Ocr:
+      return 20;
+    case AIJobStep.ImageExtraction:
+      return 40;
+    case AIJobStep.TextCleaning:
+      return 50;
+    case AIJobStep.LlmExtraction:
+      return 68;
+    case AIJobStep.JsonValidation:
+      return 78;
+    case AIJobStep.Normalization:
+      return 86;
+    case AIJobStep.Persistence:
+      return 94;
+    case AIJobStep.StructureRecognition:
+      return 55;
+    default:
+      return 35;
   }
 }
 
