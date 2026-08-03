@@ -108,7 +108,7 @@ function applyPostRetrievalVariety(
   recentAtomId: string | undefined
 ): ScoredAtomCandidate[] {
   const {
-    recentCardTypes,
+    recentCardTypes = [],
     cardsByAtomId,
     userCardStates,
     recentAtomCounts,
