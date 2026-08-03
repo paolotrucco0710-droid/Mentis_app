@@ -339,6 +339,74 @@ describe("engine/card-selector", () => {
     expect(selected?.type).toBe(CardType.Blurting);
   });
 
+  it("prefers true/false verification on easy atoms right after explain", () => {
+    const explain = makeCard({
+      id: "00000000-0000-4000-8000-000000000201" as CardId,
+      type: CardType.Explain,
+      order: 0,
+    });
+    const quiz = makeCard({
+      id: "00000000-0000-4000-8000-000000000202" as CardId,
+      type: CardType.Quiz,
+      order: 1,
+    });
+    const trueFalse = makeCard({
+      id: "00000000-0000-4000-8000-000000000203" as CardId,
+      type: CardType.TrueFalse,
+      order: 2,
+    });
+
+    const selected = selectCardForAtom({
+      cards: [explain, quiz, trueFalse],
+      atomState: makeUserAtomState({
+        exposureCount: 1,
+        correctAnswerCount: 0,
+        wrongAnswerCount: 0,
+      }),
+      stage: CognitiveAtomStage.Learning,
+      userCardStates: new Map([[explain.id, makeCardState(explain.id, 1)]]),
+      lastCardType: CardType.Explain,
+      recentCardTypes: [CardType.Explain],
+      atomDifficulty: 1,
+    });
+
+    expect(selected?.type).toBe(CardType.TrueFalse);
+  });
+
+  it("prefers quiz verification on hard atoms right after explain", () => {
+    const explain = makeCard({
+      id: "00000000-0000-4000-8000-000000000201" as CardId,
+      type: CardType.Explain,
+      order: 0,
+    });
+    const quiz = makeCard({
+      id: "00000000-0000-4000-8000-000000000202" as CardId,
+      type: CardType.Quiz,
+      order: 1,
+    });
+    const trueFalse = makeCard({
+      id: "00000000-0000-4000-8000-000000000203" as CardId,
+      type: CardType.TrueFalse,
+      order: 2,
+    });
+
+    const selected = selectCardForAtom({
+      cards: [explain, quiz, trueFalse],
+      atomState: makeUserAtomState({
+        exposureCount: 1,
+        correctAnswerCount: 0,
+        wrongAnswerCount: 0,
+      }),
+      stage: CognitiveAtomStage.Learning,
+      userCardStates: new Map([[explain.id, makeCardState(explain.id, 1)]]),
+      lastCardType: CardType.Explain,
+      recentCardTypes: [CardType.Explain],
+      atomDifficulty: 5,
+    });
+
+    expect(selected?.type).toBe(CardType.Quiz);
+  });
+
   it("suppresses blurting before the atom has any quick retrieval practice", () => {
     const explain = makeCard({
       id: "00000000-0000-4000-8000-000000000201" as CardId,

@@ -99,7 +99,86 @@ describe("engine/session-variety", () => {
     expect(filtered[0]?.atom.id).toBe(introduced.atom.id);
   });
 
-  it("prioritizes the next chapter introduction after a quick check on the current atom", () => {
+  it("prefers production cards over the next introduction when the session lacks them", () => {
+    const introduced = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
+      exposureCount: 1,
+      logicalOrder: 0,
+    });
+    const untouched = makeCandidate("00000000-0000-4000-8000-000000000102" as AtomId, {
+      exposureCount: 0,
+      logicalOrder: 1,
+    });
+    const introducedCards = [
+      makeExplainCard(
+        introduced.atom.id,
+        "00000000-0000-4000-8000-000000000201" as CardId
+      ),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000202" as CardId,
+        atomId: introduced.atom.id,
+        type: CardType.Quiz,
+        order: 1,
+      }),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000203" as CardId,
+        atomId: introduced.atom.id,
+        type: CardType.Blurting,
+        order: 2,
+      }),
+    ];
+    const untouchedCards = [
+      makeExplainCard(
+        untouched.atom.id,
+        "00000000-0000-4000-8000-000000000204" as CardId
+      ),
+    ];
+
+    const filtered = filterCandidatesForSessionVariety(
+      [introduced, untouched],
+      {
+        recentAtomCounts: new Map([[introduced.atom.id, 1]]),
+        recentAtomIds: [introduced.atom.id],
+        recentCardTypes: [CardType.Explain, CardType.Quiz],
+        cardsByAtomId: new Map([
+          [introduced.atom.id, introducedCards],
+          [untouched.atom.id, untouchedCards],
+        ]),
+        userCardStates: new Map([
+          [
+            introducedCards[0]!.id,
+            {
+              userId: introduced.state.userId,
+              cardId: introducedCards[0]!.id,
+              viewCount: 1,
+              wrongAnswerCount: 0,
+              correctAnswerCount: 0,
+              lastViewedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+          [
+            introducedCards[1]!.id,
+            {
+              userId: introduced.state.userId,
+              cardId: introducedCards[1]!.id,
+              viewCount: 1,
+              wrongAnswerCount: 0,
+              correctAnswerCount: 1,
+              lastViewedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        ]),
+      }
+    );
+
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.atom.id).toBe(introduced.atom.id);
+  });
+
+  it("prioritizes the next chapter introduction after production and retrieval variety", () => {
     const introduced = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
       exposureCount: 1,
       logicalOrder: 0,
@@ -132,7 +211,7 @@ describe("engine/session-variety", () => {
       {
         recentAtomCounts: new Map([[introduced.atom.id, 1]]),
         recentAtomIds: [introduced.atom.id],
-        recentCardTypes: [CardType.Quiz],
+        recentCardTypes: [CardType.Explain, CardType.Quiz, CardType.Blurting],
         cardsByAtomId: new Map([
           [introduced.atom.id, introducedCards],
           [untouched.atom.id, untouchedCards],

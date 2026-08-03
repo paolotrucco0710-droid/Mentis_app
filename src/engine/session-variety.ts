@@ -7,7 +7,9 @@ import {
   QUICK_RETRIEVAL_CARD_TYPES,
 } from "./constants";
 import {
+  countRecentImageCards,
   countRecentOpenResponseCards,
+  hasImageRetrievalDue,
   hasOpenProductionDue,
   needsPrimaryIntroduction,
   needsRetrievalVerification,
@@ -16,6 +18,7 @@ import type { ScoredAtomCandidate } from "./types";
 
 const EXPLAIN_TYPES = new Set<string>(EXPLANATION_CARD_TYPES);
 const QUICK_RETRIEVAL_TYPES = new Set<string>(QUICK_RETRIEVAL_CARD_TYPES);
+const SESSION_RHYTHM_WINDOW = 6;
 
 export interface SessionVarietyContext {
   recentAtomCounts: Map<string, number>;
@@ -84,6 +87,110 @@ function filterUnderSessionCap(
   );
 }
 
+function filterUntouchedIntroductions(
+  candidates: ScoredAtomCandidate[],
+  cardsByAtomId: Map<string, Card[]>,
+  userCardStates: Map<string, UserCardState>,
+  recentAtomCounts: Map<string, number>
+): ScoredAtomCandidate[] {
+  return candidates.filter(
+    (candidate) =>
+      needsPrimaryIntroduction(
+        getCardsForCandidate(candidate, cardsByAtomId),
+        userCardStates
+      ) && (recentAtomCounts.get(candidate.atom.id) ?? 0) === 0
+  );
+}
+
+function applyPostRetrievalVariety(
+  pool: ScoredAtomCandidate[],
+  context: SessionVarietyContext,
+  recentAtomId: string | undefined
+): ScoredAtomCandidate[] {
+  const {
+    recentCardTypes,
+    cardsByAtomId,
+    userCardStates,
+    recentAtomCounts,
+  } = context;
+
+  if (recentCardTypes.length < 2) {
+    return pool;
+  }
+
+  const openResponseRecent = countRecentOpenResponseCards(
+    recentCardTypes,
+    SESSION_RHYTHM_WINDOW
+  );
+  const imageRecent = countRecentImageCards(
+    recentCardTypes,
+    SESSION_RHYTHM_WINDOW
+  );
+  const learnRecent = recentCardTypes
+    .slice(-SESSION_RHYTHM_WINDOW)
+    .some((type) => EXPLAIN_TYPES.has(type));
+
+  if (recentAtomId) {
+    const recentCandidate = pool.find(
+      (candidate) => candidate.atom.id === recentAtomId
+    );
+    if (recentCandidate) {
+      const recentCards = getCardsForCandidate(recentCandidate, cardsByAtomId);
+
+      if (
+        openResponseRecent === 0 &&
+        hasOpenProductionDue(recentCards, userCardStates)
+      ) {
+        return [recentCandidate];
+      }
+
+      if (
+        imageRecent === 0 &&
+        hasImageRetrievalDue(recentCards, userCardStates)
+      ) {
+        return [recentCandidate];
+      }
+    }
+  }
+
+  const productionDue = pool.filter((candidate) =>
+    hasOpenProductionDue(
+      getCardsForCandidate(candidate, cardsByAtomId),
+      userCardStates
+    )
+  );
+  const imageDue = pool.filter((candidate) =>
+    hasImageRetrievalDue(
+      getCardsForCandidate(candidate, cardsByAtomId),
+      userCardStates
+    )
+  );
+  const untouchedIntros = filterUntouchedIntroductions(
+    pool,
+    cardsByAtomId,
+    userCardStates,
+    recentAtomCounts
+  );
+
+  if (openResponseRecent === 0 && productionDue.length > 0) {
+    return productionDue;
+  }
+
+  if (imageRecent === 0 && imageDue.length > 0) {
+    return imageDue;
+  }
+
+  if (!learnRecent && untouchedIntros.length > 0) {
+    return untouchedIntros;
+  }
+
+  if (untouchedIntros.length > 0 && openResponseRecent > 0 && imageRecent > 0) {
+    return untouchedIntros;
+  }
+
+  return pool;
+}
+
 export function filterCandidatesForSessionVariety(
   candidates: ScoredAtomCandidate[],
   context: SessionVarietyContext
@@ -130,21 +237,24 @@ export function filterCandidatesForSessionVariety(
   }
 
   if (lastWasQuickRetrieval && recentAtomId) {
-    const rotated = excludeRecentAtom(pool, recentAtomId);
-    if (rotated.length > 0) {
-      pool = rotated;
-    }
-
-    const untouchedIntros = pool.filter(
-      (candidate) =>
-        needsPrimaryIntroduction(
-          getCardsForCandidate(candidate, cardsByAtomId),
-          userCardStates
-        ) && (recentAtomCounts.get(candidate.atom.id) ?? 0) === 0
+    const sameAtomProductionOrImage = applyPostRetrievalVariety(
+      pool,
+      context,
+      recentAtomId
     );
+    const keepsRecentAtom =
+      sameAtomProductionOrImage.length === 1 &&
+      sameAtomProductionOrImage[0]?.atom.id === recentAtomId;
 
-    if (untouchedIntros.length > 0) {
-      pool = untouchedIntros;
+    if (keepsRecentAtom) {
+      pool = sameAtomProductionOrImage;
+    } else {
+      const rotated = excludeRecentAtom(pool, recentAtomId);
+      if (rotated.length > 0) {
+        pool = rotated;
+      }
+
+      pool = applyPostRetrievalVariety(pool, context, recentAtomId);
     }
   } else if (recentAtomId && !lastWasExplain) {
     const rotated = excludeRecentAtom(pool, recentAtomId);

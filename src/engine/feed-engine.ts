@@ -294,6 +294,7 @@ function selectNextItem(context: FeedEngineContext) {
     userCardStates: context.userCardStates,
     lastCardType: context.lastCardType,
     recentCardTypes: context.recentCardTypes,
+    atomDifficulty: bestCandidate.atom.difficulty,
   });
 
   if (!card) {
