@@ -16,6 +16,7 @@ import {
 function ImageExplainCardComponent({
   card,
   atomTitle,
+  imageUrl: initialImageUrl,
   disabled,
   onContinue,
 }: FeedCardProps) {
@@ -25,14 +26,15 @@ function ImageExplainCardComponent({
     getImageQuestionFromPayload(card.payload) ??
     `Quale affermazione su «${conceptTitle}» è corretta?`;
   const quiz = getImageQuizOptionsFromPayload(card.payload);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [fetchedImageUrl, setFetchedImageUrl] = useState<string | null>(null);
+  const imageUrl = initialImageUrl ?? fetchedImageUrl;
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(false);
   const isCorrect =
     quiz !== null && selectedIndex === quiz.correctOptionIndex;
 
   useEffect(() => {
-    if (!imageId) {
+    if (initialImageUrl || !imageId) {
       return;
     }
 
@@ -42,11 +44,11 @@ function ImageExplainCardComponent({
       try {
         const result = await fetchImageUrl(imageId);
         if (!cancelled) {
-          setImageUrl(result.url);
+          setFetchedImageUrl(result.url);
         }
       } catch (error) {
         if (!cancelled && !(error instanceof ApiError && error.status === 404)) {
-          setImageUrl(null);
+          setFetchedImageUrl(null);
         }
       }
     })();
@@ -54,7 +56,7 @@ function ImageExplainCardComponent({
     return () => {
       cancelled = true;
     };
-  }, [imageId]);
+  }, [imageId, initialImageUrl]);
 
   function handleContinue() {
     onContinue({
@@ -81,6 +83,7 @@ function ImageExplainCardComponent({
             src={imageUrl}
             alt={conceptTitle}
             fill
+            priority
             sizes="(max-width: 768px) 100vw, 640px"
           />
         </div>

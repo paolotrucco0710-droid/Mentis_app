@@ -68,6 +68,34 @@ export function hasOpenProductionDue(
   });
 }
 
+export function hasImageRetrievalDue(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  if (!introductionSeen(cards, userCardStates)) {
+    return false;
+  }
+
+  if (!hasStartedRetrieval(cards, userCardStates)) {
+    return false;
+  }
+
+  return cards.some(
+    (card) =>
+      IMAGE_EXPLAIN_TYPES.has(card.type) &&
+      (userCardStates.get(card.id)?.viewCount ?? 0) === 0
+  );
+}
+
+export function countRecentImageCards(
+  recentCardTypes: CardType[],
+  windowSize = OPEN_RESPONSE_SESSION_WINDOW
+): number {
+  return recentCardTypes
+    .slice(-windowSize)
+    .filter((type) => IMAGE_EXPLAIN_TYPES.has(type)).length;
+}
+
 export function countRecentOpenResponseCards(
   recentCardTypes: CardType[],
   windowSize = OPEN_RESPONSE_SESSION_WINDOW
@@ -138,9 +166,11 @@ export function selectCardForAtom(input: {
   userCardStates: Map<string, UserCardState>;
   lastCardType: CardType | null;
   recentCardTypes?: CardType[];
+  atomDifficulty?: number;
 }): Card | null {
   const { cards, atomState, stage, userCardStates, lastCardType } = input;
   const recentCardTypes = input.recentCardTypes ?? [];
+  const atomDifficulty = input.atomDifficulty ?? 3;
 
   if (cards.length === 0) {
     return null;
@@ -164,6 +194,7 @@ export function selectCardForAtom(input: {
       cards,
       lastCardType,
       recentCardTypes,
+      atomDifficulty,
     });
     const rightScore = scoreCard(right, {
       atomState,
@@ -172,6 +203,7 @@ export function selectCardForAtom(input: {
       cards,
       lastCardType,
       recentCardTypes,
+      atomDifficulty,
     });
 
     if (rightScore !== leftScore) {
@@ -221,6 +253,7 @@ function scoreCard(
     cards: Card[];
     lastCardType: CardType | null;
     recentCardTypes: CardType[];
+    atomDifficulty: number;
   }
 ): number {
   const {
@@ -230,6 +263,7 @@ function scoreCard(
     cards,
     lastCardType,
     recentCardTypes,
+    atomDifficulty,
   } = input;
   const cardState = userCardStates.get(card.id);
   let score = 0;
@@ -379,6 +413,30 @@ function scoreCard(
     }
     if (card.type === CardType.ErrorDetection && viewCount === 0) {
       score += 8;
+    }
+
+    if (lastCardType && LEARN_TYPES.has(lastCardType)) {
+      if (atomDifficulty <= 2) {
+        if (card.type === CardType.TrueFalse) {
+          score += 16;
+        }
+        if (card.type === CardType.ErrorDetection) {
+          score += 12;
+        }
+        if (card.type === CardType.Quiz) {
+          score += 4;
+        }
+      } else if (atomDifficulty >= 4) {
+        if (card.type === CardType.Quiz) {
+          score += 18;
+        }
+        if (card.type === CardType.TrueFalse) {
+          score += 6;
+        }
+        if (card.type === CardType.ErrorDetection) {
+          score += 8;
+        }
+      }
     }
   }
 

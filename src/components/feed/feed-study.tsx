@@ -332,6 +332,7 @@ export function FeedStudy() {
         card={item.card}
         atomId={item.atomId}
         atomTitle={item.atomTitle}
+        imageUrl={item.imageUrl}
         disabled={submitting}
         onAnswer={handleAnswer}
         onSkip={handleSkip}

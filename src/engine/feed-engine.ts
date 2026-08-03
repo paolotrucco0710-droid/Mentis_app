@@ -18,9 +18,11 @@ import {
 import { findUserCardStatesByUserAndCardIds } from "@/db/repositories/user-card-states";
 import type { Atom, Card, FeedItem, FeedResponse, UserAtomState } from "@/domain/entities";
 import { CardType, SessionEventType } from "@/domain/enums";
-import type { AtomId, KnowledgeSourceId, StudySessionId, SubjectId, UserId } from "@/domain/ids";
+import type { AtomId, ImageId, KnowledgeSourceId, StudySessionId, SubjectId, UserId } from "@/domain/ids";
 import { env } from "@/lib/env";
 import { relinkImagesForKnowledgeSource } from "@/ai/relink-images";
+import { getImageIdFromPayload } from "@/components/feed/card-utils";
+import { getImageSignedUrlForUser } from "@/storage/access-service";
 import { selectCardForAtom } from "./card-selector";
 import { DEFAULT_SESSION_TARGET_CARDS, MASTERY_STABLE_THRESHOLD } from "./constants";
 import { FeedEngineError } from "./errors";
@@ -82,7 +84,7 @@ export async function getNextFeedItem(
     },
   });
 
-  const feedItem = buildFeedItem({
+  const feedItem = await buildFeedItem({
     context,
     atom: selection.candidate.atom,
     card: selection.card,
@@ -135,7 +137,7 @@ async function loadFeedContext(
     ? atoms.filter((atom) => atom.knowledgeSourceId === input.knowledgeSourceId)
     : atoms;
 
-  if (input.knowledgeSourceId) {
+  if (input.knowledgeSourceId && session.cardsViewed === 0) {
     await relinkImagesForKnowledgeSource(input.knowledgeSourceId, {
       ownerId: input.userId,
     });
@@ -277,7 +279,8 @@ function selectNextItem(context: FeedEngineContext) {
       cardsByAtomId: context.cardsByAtomId,
       userCardStates: context.userCardStates,
     }),
-    context.recentAtomIds
+    context.recentAtomIds,
+    context.recentAtomCounts
   );
   if (!bestCandidate) {
     return null;
@@ -291,6 +294,7 @@ function selectNextItem(context: FeedEngineContext) {
     userCardStates: context.userCardStates,
     lastCardType: context.lastCardType,
     recentCardTypes: context.recentCardTypes,
+    atomDifficulty: bestCandidate.atom.difficulty,
   });
 
   if (!card) {
@@ -300,18 +304,34 @@ function selectNextItem(context: FeedEngineContext) {
   return { candidate: bestCandidate, card };
 }
 
-function buildFeedItem(input: {
+async function buildFeedItem(input: {
   context: FeedEngineContext;
   atom: Atom;
   card: Card;
   masteryBefore: number;
-}): FeedItem {
+}): Promise<FeedItem> {
   const { context, atom, card, masteryBefore } = input;
   const sessionTarget = getSessionTargetCards();
   const totalAtoms = context.atoms.length;
   const masteredCount = [...context.userAtomStates.values()].filter(
     (state) => state.mastery >= MASTERY_STABLE_THRESHOLD
   ).length;
+  let imageUrl: string | null = null;
+
+  if (card.type === CardType.ImageExplain) {
+    const imageId = getImageIdFromPayload(card.payload);
+    if (imageId) {
+      try {
+        const resolved = await getImageSignedUrlForUser(
+          context.userId,
+          imageId as ImageId
+        );
+        imageUrl = resolved.url;
+      } catch {
+        imageUrl = null;
+      }
+    }
+  }
 
   return {
     card,
@@ -326,6 +346,7 @@ function buildFeedItem(input: {
     chapterProgress: totalAtoms > 0 ? masteredCount / totalAtoms : null,
     estimatedDurationSeconds: card.estimatedDurationSeconds,
     masteryBefore,
+    imageUrl,
   };
 }
 

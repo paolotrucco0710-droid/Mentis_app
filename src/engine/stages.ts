@@ -13,7 +13,7 @@ export function prerequisiteIntroductionMet(
 ): boolean {
   return (
     state.mastery >= PREREQUISITE_INTRODUCTION_THRESHOLD ||
-    state.exposureCount >= 2 ||
+    state.exposureCount >= 1 ||
     state.currentStage === UserAtomLearningState.Mastered
   );
 }
