@@ -251,11 +251,15 @@ describe("engine/session-variety", () => {
     expect(filtered[0]?.atom.id).toBe(untouched.atom.id);
   });
 
-  it("keeps the explained atom for verification even when another atom can be practiced", () => {
+  it("prefers earlier atom practice when a hard atom was just introduced", () => {
     const introduced = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
       exposureCount: 1,
       logicalOrder: 0,
     });
+    introduced.atom = {
+      ...introduced.atom,
+      difficulty: 5,
+    };
     const practiced = makeCandidate("00000000-0000-4000-8000-000000000102" as AtomId, {
       exposureCount: 1,
       logicalOrder: 1,
@@ -327,7 +331,7 @@ describe("engine/session-variety", () => {
     );
 
     expect(filtered).toHaveLength(1);
-    expect(filtered[0]?.atom.id).toBe(introduced.atom.id);
+    expect(filtered[0]?.atom.id).toBe(practiced.atom.id);
   });
 
   it("keeps practice atoms available after a quick quiz instead of forcing only new introductions", () => {

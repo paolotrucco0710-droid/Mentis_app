@@ -14,21 +14,15 @@ import {
   hasImageRetrievalDue,
   hasOpenProductionDue,
   needsPrimaryIntroduction,
-  needsRetrievalVerification,
 } from "./card-selector";
-import type { ScoredAtomCandidate } from "./types";
+import type { ScoredAtomCandidate, SessionVarietyContext } from "./types";
+import { applyChapterTourVariety } from "./chapter-tour";
+
+export type { SessionVarietyContext } from "./types";
 
 const EXPLAIN_TYPES = new Set<string>(EXPLANATION_CARD_TYPES);
 const QUICK_RETRIEVAL_TYPES = new Set<string>(QUICK_RETRIEVAL_CARD_TYPES);
 const SESSION_RHYTHM_WINDOW = 6;
-
-export interface SessionVarietyContext {
-  recentAtomCounts: Map<string, number>;
-  recentAtomIds?: string[];
-  recentCardTypes?: CardType[];
-  cardsByAtomId: Map<string, Card[]>;
-  userCardStates: Map<string, UserCardState>;
-}
 
 function getCardsForCandidate(
   candidate: ScoredAtomCandidate,
@@ -209,29 +203,15 @@ export function filterCandidatesForSessionVariety(
     userCardStates,
   } = context;
 
+  const recentAtomId = recentAtomIds[0];
+
+  let pool = applyChapterTourVariety(candidates, context, recentAtomId);
+
   const lastCardType = recentCardTypes[recentCardTypes.length - 1];
   const lastWasExplain = lastCardType ? EXPLAIN_TYPES.has(lastCardType) : false;
   const lastWasQuickRetrieval = lastCardType
     ? QUICK_RETRIEVAL_TYPES.has(lastCardType)
     : false;
-  const recentAtomId = recentAtomIds[0];
-
-  if (lastWasExplain && recentAtomId) {
-    const recentCandidate = candidates.find(
-      (candidate) => candidate.atom.id === recentAtomId
-    );
-    if (
-      recentCandidate &&
-      needsRetrievalVerification(
-        getCardsForCandidate(recentCandidate, cardsByAtomId),
-        userCardStates
-      )
-    ) {
-      return [recentCandidate];
-    }
-  }
-
-  let pool = candidates;
 
   const recentLearnStreak = countRecentLearnCards(recentCardTypes);
   if (recentLearnStreak > 0) {
