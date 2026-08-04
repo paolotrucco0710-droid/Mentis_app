@@ -66,6 +66,11 @@ export const IMAGE_SESSION_MIN_CARDS = 4;
 /** Image explain cards can reappear until this view count (unless the user struggled). */
 export const IMAGE_EXPLAIN_MAX_VIEWS = 3;
 
+/** Minimum practice cards between chapter introductions by difficulty band. */
+export const CHAPTER_INTRO_SPACING_EASY = 1;
+export const CHAPTER_INTRO_SPACING_MEDIUM = 2;
+export const CHAPTER_INTRO_SPACING_HARD = 3;
+
 /** Quick retrieval successes needed on an atom before blurting/feynman. */
 export const OPEN_RESPONSE_MIN_QUICK_RETRIEVALS = 1;
 
