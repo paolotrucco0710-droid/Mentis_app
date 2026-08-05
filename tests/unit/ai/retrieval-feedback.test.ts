@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildHeuristicRetrievalFeedback,
   normalizeUserAnswer,
+  parseRetrievalFeedbackContent,
 } from "@/ai/retrieval-feedback";
 
 const baseInput = {
@@ -72,5 +73,42 @@ describe("buildHeuristicRetrievalFeedback", () => {
 
     expect(feedback.isCorrect).toBe(false);
     expect(feedback.suggestion).toContain("esempio");
+  });
+});
+
+describe("parseRetrievalFeedbackContent", () => {
+  it("accepts correct answers with empty suggestion and gaps", () => {
+    const feedback = parseRetrievalFeedbackContent(
+      JSON.stringify({
+        isCorrect: true,
+        score: 88,
+        strengths: [],
+        gaps: [],
+        suggestion: "",
+        summary: "Hai colto bene l'idea centrale.",
+      })
+    );
+
+    expect(feedback.source).toBe("ai");
+    expect(feedback.isCorrect).toBe(true);
+    expect(feedback.suggestion).toBe("");
+    expect(feedback.gaps).toEqual([]);
+  });
+
+  it("coerces string strengths and gaps from the model", () => {
+    const feedback = parseRetrievalFeedbackContent(
+      JSON.stringify({
+        isCorrect: false,
+        score: "42",
+        strengths: "Hai citato il periodo storico.",
+        gaps: "Manca il legame con la Penisola Iberica.",
+        suggestion: "Aggiungi dove avvenne il processo.",
+        summary: "Parzialmente corretto.",
+      })
+    );
+
+    expect(feedback.score).toBe(42);
+    expect(feedback.strengths).toEqual(["Hai citato il periodo storico."]);
+    expect(feedback.gaps).toEqual(["Manca il legame con la Penisola Iberica."]);
   });
 });

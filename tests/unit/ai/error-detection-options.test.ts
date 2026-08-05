@@ -57,4 +57,29 @@ describe("buildErrorDetectionContent", () => {
     expect(content.statement).toMatch(/tutte le Signorie/i);
     expect(content.statement).not.toMatch(/^pensare che/i);
   });
+
+  it("builds different statements for true/false and error detection", () => {
+    const atom = {
+      title: "Signorie cittadine",
+      summary: "Le Signorie cittadine emersero intorno al 1300.",
+      explanation: "Il potere era concentrato in un signore.",
+      misconceptions: [
+        "Pensare che tutte le Signorie siano nate da un'unica modalità di acquisizione del potere.",
+      ],
+      commonMistakes: [
+        "Confondere le Signorie cittadine con le repubbliche medievali.",
+      ],
+      definitions: [],
+      counterExamples: [],
+    };
+
+    const trueFalse = buildTrueFalseContent(atom);
+    const errorDetection = buildErrorDetectionContent(atom, {
+      excludeStatements: [trueFalse.statement],
+    });
+
+    expect(trueFalse.correctAnswer).toBe(false);
+    expect(errorDetection.flawedText).not.toBe(trueFalse.statement);
+    expect(errorDetection.flawedText).toContain("stessa cosa");
+  });
 });

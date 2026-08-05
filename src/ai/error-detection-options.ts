@@ -18,6 +18,10 @@ export interface ErrorDetectionSource {
   counterExamples: string[];
 }
 
+export interface ErrorDetectionOptions {
+  excludeStatements?: string[];
+}
+
 function isDeclarativeStatement(value: string | undefined): string | null {
   if (!value) {
     return null;
@@ -34,6 +38,38 @@ function isDeclarativeStatement(value: string | undefined): string | null {
   }
 
   return trimmed;
+}
+
+function normalizeStatement(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isSameStatement(left: string, right: string): boolean {
+  const normalizedLeft = normalizeStatement(left);
+  const normalizedRight = normalizeStatement(right);
+
+  if (!normalizedLeft || !normalizedRight) {
+    return false;
+  }
+
+  return (
+    normalizedLeft === normalizedRight ||
+    normalizedLeft.includes(normalizedRight) ||
+    normalizedRight.includes(normalizedLeft)
+  );
+}
+
+function isExcludedStatement(
+  statement: string,
+  excludeStatements: string[] = []
+): boolean {
+  return excludeStatements.some((excluded) =>
+    isSameStatement(statement, excluded)
+  );
 }
 
 function mistakeToFlawedStatement(
@@ -80,6 +116,16 @@ function misconceptionToFalseStatement(value: string): string | null {
   return statement.charAt(0).toUpperCase() + statement.slice(1) + ".";
 }
 
+function buildSummaryFlaw(title: string, summary: string): string {
+  const summarySnippet = summary
+    .replace(/[.?!…]+$/, "")
+    .split(/\s+/)
+    .slice(0, 6)
+    .join(" ");
+
+  return `${title} riguarda solo ${summarySnippet}, senza altre implicazioni storiche.`;
+}
+
 export function buildTrueFalseContent(
   atom: ErrorDetectionSource
 ): { statement: string; correctAnswer: boolean } {
@@ -102,28 +148,49 @@ export function buildTrueFalseContent(
 }
 
 export function buildErrorDetectionContent(
-  atom: ErrorDetectionSource
+  atom: ErrorDetectionSource,
+  options: ErrorDetectionOptions = {}
 ): { flawedText: string; correction: string } {
+  const excludeStatements = options.excludeStatements ?? [];
   const correction = atom.definitions[0] ?? atom.summary;
-
-  for (const misconception of atom.misconceptions) {
-    const flawedText = misconceptionToFalseStatement(misconception);
-    if (flawedText) {
-      return { flawedText, correction: atom.summary };
-    }
-  }
 
   for (const mistake of atom.commonMistakes) {
     const flawedText = mistakeToFlawedStatement(mistake, atom.title);
-    if (flawedText) {
+    if (flawedText && !isExcludedStatement(flawedText, excludeStatements)) {
       return { flawedText, correction };
+    }
+  }
+
+  for (const misconception of atom.misconceptions) {
+    const flawedText = misconceptionToFalseStatement(misconception);
+    if (flawedText && !isExcludedStatement(flawedText, excludeStatements)) {
+      return { flawedText, correction: atom.summary };
     }
   }
 
   const counterExample = isDeclarativeStatement(atom.counterExamples[0]);
   if (counterExample) {
+    const flawedText = `${atom.title} si riduce a: ${counterExample}`;
+    if (!isExcludedStatement(flawedText, excludeStatements)) {
+      return {
+        flawedText,
+        correction,
+      };
+    }
+  }
+
+  const definition = isDeclarativeStatement(atom.definitions[0]);
+  if (definition && !isExcludedStatement(definition, excludeStatements)) {
     return {
-      flawedText: `${atom.title} si riduce a: ${counterExample}`,
+      flawedText: buildSummaryFlaw(atom.title, atom.summary),
+      correction: definition,
+    };
+  }
+
+  const fallback = buildSummaryFlaw(atom.title, atom.summary);
+  if (!isExcludedStatement(fallback, excludeStatements)) {
+    return {
+      flawedText: fallback,
       correction,
     };
   }
