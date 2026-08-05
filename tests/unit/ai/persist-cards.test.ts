@@ -25,7 +25,6 @@ describe("ai/persist MVP card generation", () => {
       CardType.Explain,
       CardType.Quiz,
       CardType.Blurting,
-      CardType.Feynman,
       CardType.TrueFalse,
       CardType.ErrorDetection,
       CardType.ImageExplain,
@@ -36,6 +35,7 @@ describe("ai/persist MVP card generation", () => {
     const atom = makeMvpKnowledgeJson({ atomId: randomUUID() }).atoms[0];
 
     expect(getGeneratedCardTypes(atom)).not.toContain(CardType.ImageExplain);
-    expect(getGeneratedCardTypes(atom)).toHaveLength(6);
+    expect(getGeneratedCardTypes(atom)).not.toContain(CardType.Feynman);
+    expect(getGeneratedCardTypes(atom)).toHaveLength(5);
   });
 });

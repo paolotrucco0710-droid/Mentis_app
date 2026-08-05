@@ -1,3 +1,9 @@
+import {
+  compactPhrase,
+  isLowQualityStudyText,
+  normalizeForComparison,
+} from "./text-snippets";
+
 const META_PHRASE_PREFIXES = [
   "pensare che",
   "credere che",
@@ -40,17 +46,9 @@ function isDeclarativeStatement(value: string | undefined): string | null {
   return trimmed;
 }
 
-function normalizeStatement(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function isSameStatement(left: string, right: string): boolean {
-  const normalizedLeft = normalizeStatement(left);
-  const normalizedRight = normalizeStatement(right);
+  const normalizedLeft = normalizeForComparison(left);
+  const normalizedRight = normalizeForComparison(right);
 
   if (!normalizedLeft || !normalizedRight) {
     return false;
@@ -92,7 +90,7 @@ function mistakeToFlawedStatement(
   return isDeclarativeStatement(trimmed);
 }
 
-function misconceptionToFalseStatement(value: string): string | null {
+export function misconceptionToFalseStatement(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) {
     return null;
@@ -116,16 +114,6 @@ function misconceptionToFalseStatement(value: string): string | null {
   return statement.charAt(0).toUpperCase() + statement.slice(1) + ".";
 }
 
-function buildSummaryFlaw(title: string, summary: string): string {
-  const summarySnippet = summary
-    .replace(/[.?!…]+$/, "")
-    .split(/\s+/)
-    .slice(0, 6)
-    .join(" ");
-
-  return `${title} riguarda solo ${summarySnippet}, senza altre implicazioni storiche.`;
-}
-
 export function buildTrueFalseContent(
   atom: ErrorDetectionSource
 ): { statement: string; correctAnswer: boolean } {
@@ -142,7 +130,7 @@ export function buildTrueFalseContent(
   }
 
   return {
-    statement: `${atom.title}: ${atom.summary}`,
+    statement: compactPhrase(`${atom.title}: ${atom.summary}`, 140),
     correctAnswer: true,
   };
 }
@@ -150,28 +138,48 @@ export function buildTrueFalseContent(
 export function buildErrorDetectionContent(
   atom: ErrorDetectionSource,
   options: ErrorDetectionOptions = {}
-): { flawedText: string; correction: string } {
+): { flawedText: string; correction: string } | null {
   const excludeStatements = options.excludeStatements ?? [];
-  const correction = atom.definitions[0] ?? atom.summary;
+  const correction = compactPhrase(atom.definitions[0] ?? atom.summary, 140);
 
   for (const mistake of atom.commonMistakes) {
     const flawedText = mistakeToFlawedStatement(mistake, atom.title);
-    if (flawedText && !isExcludedStatement(flawedText, excludeStatements)) {
-      return { flawedText, correction };
+    if (
+      flawedText &&
+      !isExcludedStatement(flawedText, excludeStatements) &&
+      !isLowQualityStudyText(flawedText)
+    ) {
+      return {
+        flawedText: compactPhrase(flawedText, 160),
+        correction,
+      };
     }
   }
 
   for (const misconception of atom.misconceptions) {
     const flawedText = misconceptionToFalseStatement(misconception);
-    if (flawedText && !isExcludedStatement(flawedText, excludeStatements)) {
-      return { flawedText, correction: atom.summary };
+    if (
+      flawedText &&
+      !isExcludedStatement(flawedText, excludeStatements) &&
+      !isLowQualityStudyText(flawedText)
+    ) {
+      return {
+        flawedText: compactPhrase(flawedText, 160),
+        correction: compactPhrase(atom.summary, 140),
+      };
     }
   }
 
   const counterExample = isDeclarativeStatement(atom.counterExamples[0]);
   if (counterExample) {
-    const flawedText = `${atom.title} si riduce a: ${counterExample}`;
-    if (!isExcludedStatement(flawedText, excludeStatements)) {
+    const flawedText = compactPhrase(
+      `${atom.title} coincide sempre con: ${counterExample}`,
+      160
+    );
+    if (
+      !isExcludedStatement(flawedText, excludeStatements) &&
+      !isLowQualityStudyText(flawedText)
+    ) {
       return {
         flawedText,
         correction,
@@ -179,24 +187,5 @@ export function buildErrorDetectionContent(
     }
   }
 
-  const definition = isDeclarativeStatement(atom.definitions[0]);
-  if (definition && !isExcludedStatement(definition, excludeStatements)) {
-    return {
-      flawedText: buildSummaryFlaw(atom.title, atom.summary),
-      correction: definition,
-    };
-  }
-
-  const fallback = buildSummaryFlaw(atom.title, atom.summary);
-  if (!isExcludedStatement(fallback, excludeStatements)) {
-    return {
-      flawedText: fallback,
-      correction,
-    };
-  }
-
-  return {
-    flawedText: `${atom.title} non ha alcun legame con: ${atom.summary}`,
-    correction,
-  };
+  return null;
 }
