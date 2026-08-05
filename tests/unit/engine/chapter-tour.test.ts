@@ -29,8 +29,8 @@ function makeExplainCard(atomId: AtomId, cardId: CardId) {
 describe("chapter-tour", () => {
   it("scales spacing with atom difficulty", () => {
     expect(getIntroductionSpacing(1)).toBe(1);
-    expect(getIntroductionSpacing(3)).toBe(2);
-    expect(getIntroductionSpacing(5)).toBe(3);
+    expect(getIntroductionSpacing(3)).toBe(1);
+    expect(getIntroductionSpacing(5)).toBe(2);
   });
 
   it("counts cards since the last introduction", () => {

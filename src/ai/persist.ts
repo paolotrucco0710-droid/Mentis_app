@@ -5,10 +5,14 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/db/client";
 import { env } from "@/lib/env";
 import { shouldCreateImageExplainCard } from "./image-study";
-import { buildErrorDetectionContent, buildTrueFalseContent } from "./error-detection-options";
+import {
+  buildErrorDetectionContent,
+} from "./error-detection-options";
 import { buildImageExplainCardCreateInput } from "./image-explain-card-builder";
 import { deterministicShuffle } from "./deterministic-shuffle";
-import { buildQuizOptions } from "./quiz-options";
+import { buildBlurtingKeyPoints, buildTrueFalseCards } from "./micro-cards";
+import { buildQuizOptions, buildSecondaryQuiz } from "./quiz-options";
+import { compactPhrase } from "./text-snippets";
 
 export interface PersistResult {
   atomCount: number;
@@ -117,20 +121,32 @@ function buildCardsForAtom(
   atomId: AtomId,
   atom: KnowledgeJson["atoms"][number]
 ): Prisma.CardCreateManyInput[] {
-  const cards: Prisma.CardCreateManyInput[] = [
-    {
-      atomId,
-      type: CardType.Explain,
-      order: 0,
-      cognitiveObjective: CognitiveObjective.Comprehension,
-      prompt: null,
-      text: atom.summary,
-      explanation: atom.explanation,
-      correctFeedback: "Ottimo, continua così.",
-      estimatedDurationSeconds: 45,
-      aiVersion: env.aiPromptVersion,
-    },
-  ];
+  const cards: Prisma.CardCreateManyInput[] = [];
+  let order = 0;
+
+  const sourceContext = {
+    title: atom.title,
+    summary: atom.summary,
+    explanation: atom.explanation,
+    misconceptions: atom.misconceptions ?? [],
+    commonMistakes: atom.commonMistakes ?? [],
+    definitions: atom.definitions ?? [],
+    examples: atom.examples ?? [],
+    counterExamples: atom.counterExamples ?? [],
+  };
+
+  cards.push({
+    atomId,
+    type: CardType.Explain,
+    order: order++,
+    cognitiveObjective: CognitiveObjective.Comprehension,
+    prompt: atom.title,
+    text: compactPhrase(atom.summary, 120),
+    explanation: compactPhrase(atom.explanation, 280),
+    correctFeedback: "Ottimo, continua così.",
+    estimatedDurationSeconds: 30,
+    aiVersion: env.aiPromptVersion,
+  });
 
   const quiz = buildQuizOptions(
     {
@@ -149,14 +165,14 @@ function buildCardsForAtom(
   cards.push({
     atomId,
     type: CardType.Quiz,
-    order: 1,
+    order: order++,
     cognitiveObjective: CognitiveObjective.Retrieval,
     prompt: quiz.question,
     text: quiz.question,
-    explanation: atom.explanation,
+    explanation: compactPhrase(atom.explanation, 200),
     correctFeedback: "Risposta corretta.",
-    incorrectFeedback: atom.summary,
-    estimatedDurationSeconds: 30,
+    incorrectFeedback: compactPhrase(atom.summary, 120),
+    estimatedDurationSeconds: 20,
     payload: {
       question: quiz.question,
       options: quiz.options,
@@ -165,116 +181,142 @@ function buildCardsForAtom(
     aiVersion: env.aiPromptVersion,
   });
 
-  const blurtingKeyPoints = [
-    ...atom.definitions.slice(0, 2),
-    ...atom.examples.slice(0, 2),
-    atom.summary,
-  ]
-    .filter(Boolean)
-    .slice(0, 4);
+  const primaryCorrect =
+    quiz.options[quiz.correctOptionIndex] ?? compactPhrase(atom.summary, 120);
+  const secondaryQuiz = buildSecondaryQuiz(
+    {
+      id: atomId,
+      title: atom.title,
+      summary: atom.summary,
+      definitions: atom.definitions,
+      quizDistractors: atom.quizDistractors,
+      misconceptions: atom.misconceptions,
+      counterExamples: atom.counterExamples,
+      commonMistakes: atom.commonMistakes,
+    },
+    deterministicShuffle,
+    primaryCorrect
+  );
+
+  if (secondaryQuiz) {
+    cards.push({
+      atomId,
+      type: CardType.Quiz,
+      order: order++,
+      cognitiveObjective: CognitiveObjective.Retrieval,
+      prompt: secondaryQuiz.question,
+      text: secondaryQuiz.question,
+      explanation: compactPhrase(atom.explanation, 200),
+      correctFeedback: "Risposta corretta.",
+      incorrectFeedback: compactPhrase(atom.summary, 120),
+      estimatedDurationSeconds: 20,
+      payload: {
+        question: secondaryQuiz.question,
+        options: secondaryQuiz.options,
+        correctOptionIndex: secondaryQuiz.correctOptionIndex,
+      } as Prisma.InputJsonValue,
+      aiVersion: env.aiPromptVersion,
+    });
+  }
+
+  const trueFalseCards = buildTrueFalseCards(sourceContext);
+  const usedStatements: string[] = [];
+
+  for (const trueFalse of trueFalseCards) {
+    usedStatements.push(trueFalse.statement);
+    cards.push({
+      atomId,
+      type: CardType.TrueFalse,
+      order: order++,
+      cognitiveObjective: CognitiveObjective.Connection,
+      prompt: "Vero o falso?",
+      text: trueFalse.statement,
+      explanation: compactPhrase(atom.explanation, 200),
+      correctFeedback: "Esatto.",
+      incorrectFeedback: compactPhrase(atom.summary, 120),
+      estimatedDurationSeconds: 15,
+      payload: {
+        statement: trueFalse.statement,
+        correctAnswer: trueFalse.correctAnswer,
+      } as Prisma.InputJsonValue,
+      aiVersion: env.aiPromptVersion,
+    });
+  }
+
+  const errorDetection = buildErrorDetectionContent(sourceContext, {
+    excludeStatements: usedStatements,
+  });
+
+  if (errorDetection) {
+    cards.push({
+      atomId,
+      type: CardType.ErrorDetection,
+      order: order++,
+      cognitiveObjective: CognitiveObjective.Connection,
+      prompt: "Trova l'errore nel testo.",
+      text: errorDetection.flawedText,
+      explanation: compactPhrase(atom.explanation, 200),
+      correctFeedback: "Hai individuato l'errore.",
+      incorrectFeedback: errorDetection.correction,
+      estimatedDurationSeconds: 25,
+      payload: {
+        text: errorDetection.flawedText,
+        errorIndices: errorDetection.flawedText.length > 0 ? [0] : [],
+        correction: errorDetection.correction,
+      } as Prisma.InputJsonValue,
+      aiVersion: env.aiPromptVersion,
+    });
+  }
+
+  const blurtingKeyPoints = buildBlurtingKeyPoints({
+    ...sourceContext,
+    keywords: atom.keywords,
+  });
 
   cards.push({
     atomId,
     type: CardType.Blurting,
-    order: 2,
+    order: order++,
     cognitiveObjective: CognitiveObjective.Retrieval,
-    prompt: `Scrivi tutto ciò che ricordi su "${atom.title}".`,
-    text: `Blurting su ${atom.title}`,
-    explanation: atom.explanation,
+    prompt: `Cosa ricordi su "${atom.title}"?`,
+    text: `Blurting: ${atom.title}`,
+    explanation: compactPhrase(atom.explanation, 200),
     correctFeedback: "Ottimo recupero attivo.",
-    estimatedDurationSeconds: 60,
+    estimatedDurationSeconds: 45,
     payload: {
-      prompt: `Scrivi tutto ciò che ricordi su "${atom.title}" senza guardare gli appunti.`,
+      prompt: `Scrivi i punti chiave su "${atom.title}" con parole tue.`,
       keyPoints: blurtingKeyPoints,
     } as Prisma.InputJsonValue,
     aiVersion: env.aiPromptVersion,
   });
 
-  const feynmanCriteria = atom.learningObjectives.map((objective) =>
-    objective === "understand"
-      ? "Spiega il concetto con parole semplici"
-      : `Dimostra l'obiettivo: ${objective}`
-  );
+  if (atom.difficulty >= 3) {
+    const feynmanCriteria = atom.learningObjectives.map((objective) =>
+      objective === "understand"
+        ? "Spiega il concetto con parole semplici"
+        : `Dimostra l'obiettivo: ${objective}`
+    );
 
-  cards.push({
-    atomId,
-    type: CardType.Feynman,
-    order: 3,
-    cognitiveObjective: CognitiveObjective.Comprehension,
-    prompt: `Spiega "${atom.title}" come se lo stessi insegnando.`,
-    text: `Metodo Feynman per ${atom.title}`,
-    explanation: atom.explanation,
-    correctFeedback: "Spiegazione chiara.",
-    estimatedDurationSeconds: 90,
-    payload: {
-      prompt: `Spiega "${atom.title}" come se lo stessi insegnando a un amico.`,
-      evaluationCriteria:
-        feynmanCriteria.length > 0
-          ? feynmanCriteria
-          : ["Usa un linguaggio semplice", "Collega il concetto a un esempio"],
-    } as Prisma.InputJsonValue,
-    aiVersion: env.aiPromptVersion,
-  });
-
-  const trueFalse = buildTrueFalseContent({
-    title: atom.title,
-    summary: atom.summary,
-    explanation: atom.explanation,
-    misconceptions: atom.misconceptions,
-    commonMistakes: atom.commonMistakes,
-    definitions: atom.definitions,
-    counterExamples: atom.counterExamples,
-  });
-
-  cards.push({
-    atomId,
-    type: CardType.TrueFalse,
-    order: 4,
-    cognitiveObjective: CognitiveObjective.Connection,
-    prompt: "Vero o falso?",
-    text: trueFalse.statement,
-    explanation: atom.explanation,
-    correctFeedback: "Esatto.",
-    incorrectFeedback: atom.explanation,
-    estimatedDurationSeconds: 20,
-    payload: {
-      statement: trueFalse.statement,
-      correctAnswer: trueFalse.correctAnswer,
-    } as Prisma.InputJsonValue,
-    aiVersion: env.aiPromptVersion,
-  });
-
-  const { flawedText, correction } = buildErrorDetectionContent(
-    {
-      title: atom.title,
-      summary: atom.summary,
-      explanation: atom.explanation,
-      misconceptions: atom.misconceptions,
-      commonMistakes: atom.commonMistakes,
-      definitions: atom.definitions,
-      counterExamples: atom.counterExamples,
-    },
-    { excludeStatements: [trueFalse.statement] }
-  );
-
-  cards.push({
-    atomId,
-    type: CardType.ErrorDetection,
-    order: 5,
-    cognitiveObjective: CognitiveObjective.Connection,
-    prompt: "Trova l'errore nel testo.",
-    text: flawedText,
-    explanation: atom.explanation,
-    correctFeedback: "Hai individuato l'errore.",
-    incorrectFeedback: correction,
-    estimatedDurationSeconds: 45,
-    payload: {
-      text: flawedText,
-      errorIndices: flawedText.length > 0 ? [0] : [],
-      correction,
-    } as Prisma.InputJsonValue,
-    aiVersion: env.aiPromptVersion,
-  });
+    cards.push({
+      atomId,
+      type: CardType.Feynman,
+      order: order++,
+      cognitiveObjective: CognitiveObjective.Comprehension,
+      prompt: `Spiega "${atom.title}" in modo semplice.`,
+      text: `Feynman: ${atom.title}`,
+      explanation: compactPhrase(atom.explanation, 200),
+      correctFeedback: "Spiegazione chiara.",
+      estimatedDurationSeconds: 60,
+      payload: {
+        prompt: `Spiega "${atom.title}" come se lo stessi insegnando a un amico.`,
+        evaluationCriteria:
+          feynmanCriteria.length > 0
+            ? feynmanCriteria
+            : ["Usa un linguaggio semplice", "Collega il concetto a un esempio"],
+      } as Prisma.InputJsonValue,
+      aiVersion: env.aiPromptVersion,
+    });
+  }
 
   const imageReference = atom.images[0];
   if (
@@ -305,9 +347,13 @@ export const MVP_FEED_CARD_TYPES = [
 export function getGeneratedCardTypes(
   atom: KnowledgeJson["atoms"][number]
 ): CardType[] {
-  const withImage = atom.images[0]?.imageId
-    ? MVP_FEED_CARD_TYPES
+  let types = atom.images[0]?.imageId
+    ? [...MVP_FEED_CARD_TYPES]
     : MVP_FEED_CARD_TYPES.filter((type) => type !== CardType.ImageExplain);
 
-  return [...withImage];
+  if (atom.difficulty < 3) {
+    types = types.filter((type) => type !== CardType.Feynman);
+  }
+
+  return types;
 }

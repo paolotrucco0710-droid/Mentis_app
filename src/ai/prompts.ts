@@ -107,6 +107,7 @@ QUIZDISTRACTORS (OBBLIGATORIO: esattamente 3)
 - Devono essere frasi dichiarative complete, non meta-frasi ("Pensare che...", "Affermazione non corretta...").
 - Devono essere diverse dal summary e tra loro.
 - Devono avere lunghezza e stile simili alla definition/summary (±25%): non rendere la risposta corretta identificabile perché è l'unica opzione lunga o dettagliata.
+- Max 100 caratteri ciascuna, frase completa con punto finale.
 - Servono per le opzioni sbagliate del quiz a scelta multipla.
 
 KEYWORDS

@@ -18,8 +18,9 @@ describe("buildErrorDetectionContent", () => {
       counterExamples: [],
     });
 
-    expect(content.flawedText).toContain("stessa cosa");
-    expect(content.flawedText).not.toMatch(/^confondere/i);
+    expect(content).not.toBeNull();
+    expect(content!.flawedText).toContain("stessa cosa");
+    expect(content!.flawedText).not.toMatch(/^confondere/i);
   });
 
   it("strips Pensare che prefixes from misconceptions", () => {
@@ -36,8 +37,9 @@ describe("buildErrorDetectionContent", () => {
       counterExamples: [],
     });
 
-    expect(content.flawedText).toMatch(/tutte le Signorie/i);
-    expect(content.flawedText).not.toMatch(/^pensare che/i);
+    expect(content).not.toBeNull();
+    expect(content!.flawedText).toMatch(/tutte le Signorie/i);
+    expect(content!.flawedText).not.toMatch(/^pensare che/i);
   });
 
   it("builds true/false statements from misconceptions", () => {
@@ -79,7 +81,23 @@ describe("buildErrorDetectionContent", () => {
     });
 
     expect(trueFalse.correctAnswer).toBe(false);
-    expect(errorDetection.flawedText).not.toBe(trueFalse.statement);
-    expect(errorDetection.flawedText).toContain("stessa cosa");
+    expect(errorDetection).not.toBeNull();
+    expect(errorDetection!.flawedText).not.toBe(trueFalse.statement);
+    expect(errorDetection!.flawedText).toContain("stessa cosa");
+  });
+
+  it("returns null instead of synthetic flawed text when sources are weak", () => {
+    const content = buildErrorDetectionContent({
+      title: "Turchi Selgiuchidi e Gerusalemme",
+      summary:
+        "Verso la fine dell'XI secolo, i turchi selgiuchidi presero il controllo di Gerusalemme.",
+      explanation: "Ostacolarono i pellegrini cristiani.",
+      misconceptions: [],
+      commonMistakes: [],
+      definitions: [],
+      counterExamples: [],
+    });
+
+    expect(content).toBeNull();
   });
 });

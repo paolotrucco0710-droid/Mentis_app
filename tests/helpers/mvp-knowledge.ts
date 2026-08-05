@@ -80,7 +80,6 @@ export const MVP_REQUIRED_CARD_TYPES = [
   CardType.Explain,
   CardType.Quiz,
   CardType.Blurting,
-  CardType.Feynman,
   CardType.TrueFalse,
   CardType.ErrorDetection,
   CardType.ImageExplain,
