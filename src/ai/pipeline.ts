@@ -91,10 +91,24 @@ export async function processKnowledgeSource(
     knowledgeSource.processingStatus ===
     KnowledgeSourceProcessingStatus.Processing
   ) {
-    throw new AIProcessingError(
-      "Elaborazione già in corso.",
-      "ALREADY_PROCESSING",
-      409
+    const jobs = await findAIJobsByKnowledgeSourceId(knowledgeSourceId);
+    const latestJob = jobs[0];
+    const hasActiveJob =
+      latestJob?.status === AIJobStatus.Running ||
+      latestJob?.status === AIJobStatus.Queued ||
+      latestJob?.status === AIJobStatus.Retry;
+
+    if (hasActiveJob) {
+      throw new AIProcessingError(
+        "Elaborazione già in corso.",
+        "ALREADY_PROCESSING",
+        409
+      );
+    }
+
+    await updateKnowledgeSourceStatus(
+      knowledgeSourceId,
+      KnowledgeSourceProcessingStatus.Uploaded
     );
   }
 

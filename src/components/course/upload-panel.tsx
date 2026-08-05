@@ -99,21 +99,12 @@ export function UploadPanel() {
 
       setState({ status: "uploading", progress: 80 });
 
-      if (result.processingScheduled) {
-        setState({
-          status: "processing",
-          knowledgeSourceId: result.knowledgeSourceId,
-        });
-        router.push(
-          `/processing?knowledgeSourceId=${result.knowledgeSourceId}`
-        );
-        return;
-      }
-
-      setState({
-        status: "completed",
-        knowledgeSourceId: result.knowledgeSourceId,
-      });
+      router.push(
+        `/processing?knowledgeSourceId=${result.knowledgeSourceId}${
+          result.processingScheduled ? "&autoStart=1" : ""
+        }`
+      );
+      return;
     } catch (error) {
       setState({
         status: "error",
