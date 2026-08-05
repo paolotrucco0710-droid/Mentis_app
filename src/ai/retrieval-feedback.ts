@@ -192,7 +192,7 @@ Rispondi SOLO con JSON valido:
   "gaps": ["..."],
   "suggestion": "...",
   "summary": "..."
-}`; 
+}`;
 }
 
 async function requestAiEvaluation(
@@ -253,7 +253,10 @@ export async function evaluateRetrievalAnswer(
       try {
         return await requestAiEvaluation(input, tracker);
       } catch (retryError) {
-        if (retryError instanceof z.ZodError || retryError instanceof SyntaxError) {
+        if (
+          retryError instanceof z.ZodError ||
+          retryError instanceof SyntaxError
+        ) {
           return buildHeuristicRetrievalFeedback(input);
         }
 
