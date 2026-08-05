@@ -29,13 +29,59 @@ export interface RetrievalFeedback {
 }
 
 const retrievalFeedbackSchema = z.object({
-  isCorrect: z.boolean(),
-  score: z.number().min(0).max(100),
-  strengths: z.array(z.string().min(1).max(80)).max(1),
-  gaps: z.array(z.string().min(1).max(80)).max(1),
-  suggestion: z.string().min(1).max(100),
-  summary: z.string().min(1).max(120),
+  isCorrect: z.coerce.boolean(),
+  score: z.coerce.number().min(0).max(100),
+  strengths: z
+    .union([z.array(z.string()), z.string(), z.null()])
+    .optional(),
+  gaps: z.union([z.array(z.string()), z.string(), z.null()]).optional(),
+  suggestion: z.union([z.string(), z.null()]).optional(),
+  summary: z.string().min(1).max(240),
 });
+
+function toStringList(value: string | string[] | null | undefined): string[] {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => item.trim()).filter(Boolean);
+  }
+
+  const trimmed = value.trim();
+  return trimmed ? [trimmed] : [];
+}
+
+function normalizeAiFeedback(
+  parsed: z.infer<typeof retrievalFeedbackSchema>
+): RetrievalFeedback {
+  const strengths = toStringList(parsed.strengths).slice(0, 1);
+  const gaps = toStringList(parsed.gaps).slice(0, 1);
+  const suggestion = parsed.suggestion?.trim() ?? "";
+
+  return {
+    isCorrect: parsed.isCorrect,
+    score: Math.round(parsed.score),
+    strengths: parsed.isCorrect ? [] : strengths,
+    gaps: parsed.isCorrect ? [] : gaps,
+    suggestion: parsed.isCorrect ? "" : suggestion,
+    summary: parsed.summary.trim(),
+    source: "ai",
+  };
+}
+
+function parseEvaluationContent(content: string): RetrievalFeedback {
+  const parsed = retrievalFeedbackSchema.parse(
+    JSON.parse(extractJsonPayload(content))
+  );
+
+  return normalizeAiFeedback(parsed);
+}
+
+/** @internal Exported for unit tests. */
+export function parseRetrievalFeedbackContent(content: string): RetrievalFeedback {
+  return parseEvaluationContent(content);
+}
 
 const MAX_USER_ANSWER_CHARS = 2_500;
 
@@ -132,7 +178,7 @@ Regole:
 - Tono incoraggiante e diretto. Niente "è corretta ma...".
 - Ignora errori marginali (date esatte, traslitterazioni, refusi) se l'idea centrale è giusta.
 - isCorrect=true se la risposta coglie l'idea centrale, anche senza tutti i dettagli.
-- Se isCorrect=true: strengths, gaps e suggestion devono essere array/stringa vuoti.
+- Se isCorrect=true: strengths=[], gaps=[], suggestion="" (stringa vuota).
 - summary: UNA frase breve e positiva se corretto; altrimenti cosa manca in concreto.
 - strengths: al massimo 1 elemento breve (vuoto se corretto o nulla di utile).
 - gaps: al massimo 1 lacuna (vuoto se corretto).
@@ -146,18 +192,7 @@ Rispondi SOLO con JSON valido:
   "gaps": ["..."],
   "suggestion": "...",
   "summary": "..."
-}`;
-}
-
-function parseEvaluationContent(content: string): RetrievalFeedback {
-  const parsed = retrievalFeedbackSchema.parse(
-    JSON.parse(extractJsonPayload(content))
-  );
-
-  return {
-    ...parsed,
-    source: "ai",
-  };
+}`; 
 }
 
 async function requestAiEvaluation(
@@ -218,16 +253,16 @@ export async function evaluateRetrievalAnswer(
       try {
         return await requestAiEvaluation(input, tracker);
       } catch (retryError) {
-        if (retryError instanceof z.ZodError) {
-          throw new AIProcessingError(
-            "La valutazione AI non è stata interpretata correttamente. Riprova.",
-            "INVALID_AI_RESPONSE",
-            502
-          );
+        if (retryError instanceof z.ZodError || retryError instanceof SyntaxError) {
+          return buildHeuristicRetrievalFeedback(input);
         }
 
         throw toUserFacingAIError(retryError);
       }
+    }
+
+    if (error instanceof SyntaxError) {
+      return buildHeuristicRetrievalFeedback(input);
     }
 
     throw toUserFacingAIError(error);

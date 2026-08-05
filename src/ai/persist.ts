@@ -244,15 +244,18 @@ function buildCardsForAtom(
     aiVersion: env.aiPromptVersion,
   });
 
-  const { flawedText, correction } = buildErrorDetectionContent({
-    title: atom.title,
-    summary: atom.summary,
-    explanation: atom.explanation,
-    misconceptions: atom.misconceptions,
-    commonMistakes: atom.commonMistakes,
-    definitions: atom.definitions,
-    counterExamples: atom.counterExamples,
-  });
+  const { flawedText, correction } = buildErrorDetectionContent(
+    {
+      title: atom.title,
+      summary: atom.summary,
+      explanation: atom.explanation,
+      misconceptions: atom.misconceptions,
+      commonMistakes: atom.commonMistakes,
+      definitions: atom.definitions,
+      counterExamples: atom.counterExamples,
+    },
+    { excludeStatements: [trueFalse.statement] }
+  );
 
   cards.push({
     atomId,
