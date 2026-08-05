@@ -5,12 +5,15 @@ import {
 import type { ErrorDetectionSource } from "./error-detection-options";
 import { misconceptionToFalseStatement } from "./error-detection-options";
 
-export function buildBlurtingKeyPoints(
-  atom: Pick<
-    ErrorDetectionSource,
-    "title" | "summary" | "definitions" | "examples"
-  > & { keywords?: string[] }
-): string[] {
+export interface BlurtingKeyPointSource {
+  title: string;
+  summary: string;
+  definitions?: string[];
+  examples?: string[];
+  keywords?: string[];
+}
+
+export function buildBlurtingKeyPoints(atom: BlurtingKeyPointSource): string[] {
   const points = [
     ...(atom.definitions ?? []).slice(0, 2),
     ...(atom.examples ?? []).slice(0, 1),

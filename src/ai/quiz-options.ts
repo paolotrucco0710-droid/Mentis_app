@@ -16,6 +16,7 @@ export interface QuizOptionSource {
   title: string;
   summary: string;
   definitions?: string[];
+  examples?: string[];
   quizDistractors?: string[];
   misconceptions?: string[];
   counterExamples?: string[];
