@@ -32,6 +32,11 @@ export {
   updateSubject,
   deleteSubject,
 } from "./subjects";
+export {
+  fetchDailyReview,
+  fetchReviewQueue,
+  syncReviews,
+} from "./reviews";
 export { fetchLibraryOverview } from "./library";
 export { searchLibrary } from "./search";
 export {
