@@ -713,6 +713,65 @@ describe("engine/session-variety", () => {
     expect(filtered[0]?.atom.id).toBe(productionDue.atom.id);
   });
 
+  it("keeps atoms with pending blurting available even when the session cap is reached", () => {
+    const atom = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
+      exposureCount: 2,
+    });
+    const atomCards = [
+      makeExplainCard(atom.atom.id, "00000000-0000-4000-8000-000000000201" as CardId),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000202" as CardId,
+        atomId: atom.atom.id,
+        type: CardType.Quiz,
+        order: 1,
+      }),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000203" as CardId,
+        atomId: atom.atom.id,
+        type: CardType.Blurting,
+        order: 2,
+      }),
+    ];
+
+    const filtered = filterCandidatesForSessionVariety([atom], {
+      recentAtomCounts: new Map([[atom.atom.id, 2]]),
+      recentAtomIds: [atom.atom.id],
+      recentCardTypes: [CardType.Explain, CardType.Quiz],
+      cardsByAtomId: new Map([[atom.atom.id, atomCards]]),
+      userCardStates: new Map([
+        [
+          atomCards[0]!.id,
+          {
+            userId: atom.state.userId,
+            cardId: atomCards[0]!.id,
+            viewCount: 1,
+            wrongAnswerCount: 0,
+            correctAnswerCount: 0,
+            lastViewedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+        [
+          atomCards[1]!.id,
+          {
+            userId: atom.state.userId,
+            cardId: atomCards[1]!.id,
+            viewCount: 1,
+            wrongAnswerCount: 0,
+            correctAnswerCount: 1,
+            lastViewedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+      ]),
+    });
+
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.atom.id).toBe(atom.atom.id);
+  });
+
   it("prioritizes image retrieval when the session window lacks visual cards", () => {
     const practiced = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
       exposureCount: 2,

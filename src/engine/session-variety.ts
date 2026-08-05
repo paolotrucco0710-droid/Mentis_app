@@ -72,15 +72,33 @@ function filterOutIntroductions(
   return withoutIntroductions.length > 0 ? withoutIntroductions : candidates;
 }
 
+function hasPendingDeepPractice(
+  candidate: ScoredAtomCandidate,
+  cardsByAtomId: Map<string, Card[]>,
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  const cards = getCardsForCandidate(candidate, cardsByAtomId);
+  return (
+    hasOpenProductionDue(cards, userCardStates) ||
+    hasImageRetrievalDue(cards, userCardStates)
+  );
+}
+
 function filterUnderSessionCap(
   candidates: ScoredAtomCandidate[],
-  recentAtomCounts: Map<string, number>
+  recentAtomCounts: Map<string, number>,
+  cardsByAtomId: Map<string, Card[]>,
+  userCardStates: Map<string, UserCardState>
 ): ScoredAtomCandidate[] {
-  return candidates.filter(
-    (candidate) =>
-      (recentAtomCounts.get(candidate.atom.id) ?? 0) <
-      MAX_SESSION_CARDS_PER_ATOM
-  );
+  return candidates.filter((candidate) => {
+    const count = recentAtomCounts.get(candidate.atom.id) ?? 0;
+
+    if (count < MAX_SESSION_CARDS_PER_ATOM) {
+      return true;
+    }
+
+    return hasPendingDeepPractice(candidate, cardsByAtomId, userCardStates);
+  });
 }
 
 function filterUntouchedIntroductions(
@@ -245,18 +263,28 @@ export function filterCandidatesForSessionVariety(
     }
   }
 
-  const cappedPool = filterUnderSessionCap(pool, recentAtomCounts);
+  const cappedPool = filterUnderSessionCap(
+    pool,
+    recentAtomCounts,
+    cardsByAtomId,
+    userCardStates
+  );
   if (cappedPool.length > 0) {
     pool = cappedPool;
   } else {
-    const globallyCapped = filterUnderSessionCap(candidates, recentAtomCounts);
+    const globallyCapped = filterUnderSessionCap(
+      candidates,
+      recentAtomCounts,
+      cardsByAtomId,
+      userCardStates
+    );
     if (globallyCapped.length > 0) {
       pool = globallyCapped;
     }
   }
 
   if (
-    recentCardTypes.length >= 5 &&
+    recentCardTypes.length >= 4 &&
     countRecentOpenResponseCards(recentCardTypes, OPEN_RESPONSE_SESSION_WINDOW) ===
       0
   ) {

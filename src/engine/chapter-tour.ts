@@ -1,6 +1,13 @@
 import type { Card, UserCardState } from "@/domain/entities";
 import type { CardType } from "@/domain/enums";
-import { EXPLANATION_CARD_TYPES, CHAPTER_INTRO_SPACING_EASY, CHAPTER_INTRO_SPACING_MEDIUM, CHAPTER_INTRO_SPACING_HARD } from "./constants";
+import {
+  CHAPTER_INTRO_SPACING_EASY,
+  CHAPTER_INTRO_SPACING_HARD,
+  CHAPTER_INTRO_SPACING_MEDIUM,
+  EXPLANATION_CARD_TYPES,
+  QUICK_RETRIEVAL_CARD_TYPES,
+  VISUAL_RETRIEVAL_CARD_TYPES,
+} from "./constants";
 import {
   hasImageRetrievalDue,
   hasOpenProductionDue,
@@ -9,6 +16,9 @@ import {
   needsRetrievalVerification,
 } from "./card-selector";
 import type { ScoredAtomCandidate, SessionVarietyContext } from "./types";
+
+const QUICK_RETRIEVAL_TYPES = new Set<string>(QUICK_RETRIEVAL_CARD_TYPES);
+const VISUAL_RETRIEVAL_TYPES = new Set<string>(VISUAL_RETRIEVAL_CARD_TYPES);
 
 /** Cards to show between chapter introductions, scaled by atom difficulty. */
 export function getIntroductionSpacing(difficulty: number): number {
@@ -184,9 +194,53 @@ function excludeUntouchedIntroductions(
   return withoutIntros.length > 0 ? withoutIntros : pool;
 }
 
+function isPostRetrievalCardType(cardType: CardType | undefined): boolean {
+  if (!cardType) {
+    return false;
+  }
+
+  return (
+    QUICK_RETRIEVAL_TYPES.has(cardType) ||
+    VISUAL_RETRIEVAL_TYPES.has(cardType)
+  );
+}
+
+/** After quiz/image practice, schedule blurting/feynman on the same atom. */
+export function resolvePostRetrievalFollowUp(
+  pool: ScoredAtomCandidate[],
+  context: SessionVarietyContext,
+  recentAtomId: string | undefined
+): ScoredAtomCandidate[] | null {
+  const { recentCardTypes = [], cardsByAtomId, userCardStates } = context;
+  const lastCardType = recentCardTypes[recentCardTypes.length - 1];
+
+  if (!recentAtomId || !isPostRetrievalCardType(lastCardType)) {
+    return null;
+  }
+
+  const recentCandidate = pool.find(
+    (candidate) => candidate.atom.id === recentAtomId
+  );
+  if (!recentCandidate) {
+    return null;
+  }
+
+  const cards = getCards(recentCandidate, cardsByAtomId);
+  if (
+    hasOpenProductionDue(cards, userCardStates) ||
+    hasImageRetrievalDue(cards, userCardStates)
+  ) {
+    return [recentCandidate];
+  }
+
+  return null;
+}
+
 function preferInterleavedPractice(
   practiceDue: ScoredAtomCandidate[],
-  recentAtomId: string | undefined
+  recentAtomId: string | undefined,
+  cardsByAtomId: Map<string, Card[]>,
+  userCardStates: Map<string, UserCardState>
 ): ScoredAtomCandidate[] {
   if (!recentAtomId) {
     return practiceDue;
@@ -196,7 +250,18 @@ function preferInterleavedPractice(
     (candidate) => candidate.atom.id !== recentAtomId
   );
 
-  return olderPractice.length > 0 ? olderPractice : practiceDue;
+  if (olderPractice.length === 0) {
+    return practiceDue;
+  }
+
+  const olderProduction = olderPractice.filter((candidate) =>
+    hasOpenProductionDue(
+      getCards(candidate, cardsByAtomId),
+      userCardStates
+    )
+  );
+
+  return olderProduction.length > 0 ? olderProduction : olderPractice;
 }
 
 export function applyChapterTourVariety(
@@ -211,10 +276,20 @@ export function applyChapterTourVariety(
     recentAtomCounts,
   } = context;
 
-  if (
-    !shouldApplyChapterTourPacing(pool, context) ||
-    pool.length <= 1
-  ) {
+  if (pool.length <= 1) {
+    return pool;
+  }
+
+  const postRetrievalFollowUp = resolvePostRetrievalFollowUp(
+    pool,
+    context,
+    recentAtomId
+  );
+  if (postRetrievalFollowUp) {
+    return postRetrievalFollowUp;
+  }
+
+  if (!shouldApplyChapterTourPacing(pool, context)) {
     return pool;
   }
 
@@ -252,7 +327,12 @@ export function applyChapterTourVariety(
       cardsByAtomId,
       userCardStates
     );
-    const interleaved = preferInterleavedPractice(practiceDue, recentAtomId);
+    const interleaved = preferInterleavedPractice(
+      practiceDue,
+      recentAtomId,
+      cardsByAtomId,
+      userCardStates
+    );
 
     if (interleaved.length > 0) {
       return interleaved;

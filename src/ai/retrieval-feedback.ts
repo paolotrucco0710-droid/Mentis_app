@@ -160,6 +160,42 @@ function parseEvaluationContent(content: string): RetrievalFeedback {
   };
 }
 
+async function requestAiEvaluation(
+  input: EvaluateRetrievalAnswerInput,
+  tracker: UsageTracker
+): Promise<RetrievalFeedback> {
+  const response = await runChatCompletion(
+    {
+      model: env.aiReasoningModel,
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Sei un tutor di Mentis. Valuta la comprensione reale dello studente e rispondi solo con JSON valido.",
+        },
+        {
+          role: "user",
+          content: buildEvaluationPrompt(input),
+        },
+      ],
+    },
+    tracker
+  );
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    throw new AIProcessingError(
+      "Il modello AI non ha restituito una valutazione.",
+      "EMPTY_RESPONSE",
+      502
+    );
+  }
+
+  return parseEvaluationContent(content);
+}
+
 export async function evaluateRetrievalAnswer(
   input: EvaluateRetrievalAnswerInput
 ): Promise<RetrievalFeedback> {
@@ -176,39 +212,22 @@ export async function evaluateRetrievalAnswer(
   const tracker = new UsageTracker();
 
   try {
-    const response = await runChatCompletion(
-      {
-        model: env.aiReasoningModel,
-        response_format: { type: "json_object" },
-        temperature: 0.2,
-        messages: [
-          {
-            role: "system",
-            content:
-              "Sei un tutor di Mentis. Feedback ultra-breve in italiano: una frase netta, niente liste lunghe.",
-          },
-          {
-            role: "user",
-            content: buildEvaluationPrompt(input),
-          },
-        ],
-      },
-      tracker
-    );
-
-    const content = response.choices[0]?.message?.content;
-    if (!content) {
-      throw new AIProcessingError(
-        "Il modello AI non ha restituito una valutazione.",
-        "EMPTY_RESPONSE",
-        502
-      );
-    }
-
-    return parseEvaluationContent(content);
+    return await requestAiEvaluation(input, tracker);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return buildHeuristicRetrievalFeedback(input);
+      try {
+        return await requestAiEvaluation(input, tracker);
+      } catch (retryError) {
+        if (retryError instanceof z.ZodError) {
+          throw new AIProcessingError(
+            "La valutazione AI non è stata interpretata correttamente. Riprova.",
+            "INVALID_AI_RESPONSE",
+            502
+          );
+        }
+
+        throw toUserFacingAIError(retryError);
+      }
     }
 
     throw toUserFacingAIError(error);
