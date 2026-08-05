@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { KnowledgeSourceProcessingStatus } from "@/domain/enums";
@@ -62,6 +62,7 @@ export function ProcessingPanel() {
   const searchParams = useSearchParams();
   const knowledgeSourceId = searchParams.get("knowledgeSourceId");
   const jobId = searchParams.get("jobId");
+  const autoStart = searchParams.get("autoStart") === "1";
   const [chapter, setChapter] = useState<ChapterWithSource | null>(null);
   const [title, setTitle] = useState("Capitolo");
   const [status, setStatus] = useState<KnowledgeSourceProcessingStatus>(
@@ -70,6 +71,31 @@ export function ProcessingPanel() {
   const [currentStep, setCurrentStep] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const autoStartAttempted = useRef(false);
+
+  const handleStart = useCallback(async () => {
+    if (!knowledgeSourceId) {
+      return;
+    }
+
+    try {
+      setStarting(true);
+      setError(null);
+      await startKnowledgeSourceProcessing(knowledgeSourceId);
+      setStatus(KnowledgeSourceProcessingStatus.Processing);
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "ALREADY_PROCESSING") {
+        setStatus(KnowledgeSourceProcessingStatus.Processing);
+        setError(null);
+        return;
+      }
+      setError(
+        err instanceof ApiError ? err.message : "Elaborazione non avviata."
+      );
+    } finally {
+      setStarting(false);
+    }
+  }, [knowledgeSourceId]);
 
   const poll = useCallback(async () => {
     if (!knowledgeSourceId) {
@@ -93,20 +119,37 @@ export function ProcessingPanel() {
           KnowledgeSourceProcessingStatus.Failed;
 
       if (shouldLoadJob) {
-        const { job } = jobId
-          ? await fetchProcessingJob(jobId)
-          : await fetchLatestProcessingJob(knowledgeSourceId);
-        setCurrentStep(job.currentStep);
-        if (job.status === "failed") {
-          setError(
-            job.errorMessage
-              ? simplifyProcessingError(job.errorMessage)
-              : "Elaborazione fallita."
-          );
-          setStatus(KnowledgeSourceProcessingStatus.Failed);
-        }
-        if (job.status === "completed") {
-          setStatus(KnowledgeSourceProcessingStatus.Completed);
+        try {
+          const { job } = jobId
+            ? await fetchProcessingJob(jobId)
+            : await fetchLatestProcessingJob(knowledgeSourceId);
+          setCurrentStep(job.currentStep);
+          if (job.status === "failed") {
+            setError(
+              job.errorMessage
+                ? simplifyProcessingError(job.errorMessage)
+                : "Elaborazione fallita."
+            );
+            setStatus(KnowledgeSourceProcessingStatus.Failed);
+          }
+          if (job.status === "completed") {
+            setStatus(KnowledgeSourceProcessingStatus.Completed);
+          }
+        } catch (jobError) {
+          if (
+            jobError instanceof ApiError &&
+            jobError.status === 404 &&
+            chapterData.knowledgeSource.processingStatus ===
+              KnowledgeSourceProcessingStatus.Processing
+          ) {
+            setStatus(KnowledgeSourceProcessingStatus.Failed);
+            setError(
+              "Elaborazione interrotta. Premi «Riprova elaborazione» per ricominciare."
+            );
+            return;
+          }
+
+          throw jobError;
         }
       } else if (
         chapterData.knowledgeSource.processingStatus ===
@@ -147,30 +190,19 @@ export function ProcessingPanel() {
     };
   }, [knowledgeSourceId, poll]);
 
-  async function handleStart() {
-    if (!knowledgeSourceId) {
+  useEffect(() => {
+    if (
+      !autoStart ||
+      autoStartAttempted.current ||
+      starting ||
+      status !== KnowledgeSourceProcessingStatus.Uploaded
+    ) {
       return;
     }
 
-    try {
-      setStarting(true);
-      await startKnowledgeSourceProcessing(knowledgeSourceId);
-      setStatus(KnowledgeSourceProcessingStatus.Processing);
-      await poll();
-    } catch (err) {
-      if (err instanceof ApiError && err.code === "ALREADY_PROCESSING") {
-        setStatus(KnowledgeSourceProcessingStatus.Processing);
-        setError(null);
-        await poll();
-        return;
-      }
-      setError(
-        err instanceof ApiError ? err.message : "Elaborazione non avviata."
-      );
-    } finally {
-      setStarting(false);
-    }
-  }
+    autoStartAttempted.current = true;
+    void handleStart();
+  }, [autoStart, handleStart, starting, status]);
 
   if (!knowledgeSourceId) {
     return (
@@ -190,7 +222,8 @@ export function ProcessingPanel() {
   const stepLabel = formatJobStep(currentStep);
   const isActive =
     status === KnowledgeSourceProcessingStatus.Processing ||
-    status === KnowledgeSourceProcessingStatus.Queued;
+    status === KnowledgeSourceProcessingStatus.Queued ||
+    starting;
   const studyReady = chapter ? canStudyChapter(chapter) : false;
 
   return (

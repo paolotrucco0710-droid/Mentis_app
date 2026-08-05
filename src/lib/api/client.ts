@@ -9,12 +9,22 @@ export class ApiError extends Error {
   }
 }
 
+async function refreshAccessToken(): Promise<boolean> {
+  const response = await fetch("/api/v1/auth/refresh", {
+    method: "POST",
+  });
+
+  return response.ok;
+}
+
 export async function apiFetch<T>(
   path: string,
-  init?: RequestInit
+  init?: RequestInit,
+  options?: { retryOnUnauthorized?: boolean }
 ): Promise<T> {
   const headers = new Headers(init?.headers);
-  const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
+  const isFormData =
+    typeof FormData !== "undefined" && init?.body instanceof FormData;
 
   if (!isFormData && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -29,6 +39,18 @@ export async function apiFetch<T>(
     error?: string;
     code?: string;
   };
+
+  if (
+    response.status === 401 &&
+    options?.retryOnUnauthorized !== false &&
+    path !== "/api/v1/auth/refresh" &&
+    path !== "/api/v1/auth/login"
+  ) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      return apiFetch<T>(path, init, { retryOnUnauthorized: false });
+    }
+  }
 
   if (!response.ok) {
     throw new ApiError(

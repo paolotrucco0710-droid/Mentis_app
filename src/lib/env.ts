@@ -1,5 +1,8 @@
 const nodeEnv = process.env.NODE_ENV ?? "development";
 
+const openaiApiKey =
+  process.env.OPENAI_API_KEY ?? process.env.OPENROUTER_API_KEY ?? "";
+
 function parsePositiveInt(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -23,8 +26,7 @@ export const env = {
     20
   ),
   maxUploadFiles: parsePositiveInt(process.env.MAX_UPLOAD_FILES, 50),
-  openaiApiKey:
-    process.env.OPENAI_API_KEY ?? process.env.OPENROUTER_API_KEY ?? "",
+  openaiApiKey,
   openaiBaseUrl: process.env.OPENAI_BASE_URL ?? "",
   openaiAppName: process.env.OPENAI_APP_NAME ?? "Mentis",
   openaiHttpReferer:
@@ -34,8 +36,7 @@ export const env = {
   knowledgeJsonVersion: process.env.KNOWLEDGE_JSON_VERSION ?? "1.0.0",
   aiPromptVersion: process.env.AI_PROMPT_VERSION ?? "1.0.0",
   autoProcessAfterUpload:
-    process.env.AUTO_PROCESS_AFTER_UPLOAD === "true" &&
-    Boolean(process.env.OPENAI_API_KEY),
+    process.env.AUTO_PROCESS_AFTER_UPLOAD === "true" && Boolean(openaiApiKey),
   authJwtSecret:
     process.env.AUTH_JWT_SECRET ?? "dev-only-change-in-production-mentis",
   authAccessTokenTtlMinutes: parsePositiveInt(
