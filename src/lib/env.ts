@@ -23,7 +23,8 @@ export const env = {
     20
   ),
   maxUploadFiles: parsePositiveInt(process.env.MAX_UPLOAD_FILES, 50),
-  openaiApiKey: process.env.OPENAI_API_KEY ?? "",
+  openaiApiKey:
+    process.env.OPENAI_API_KEY ?? process.env.OPENROUTER_API_KEY ?? "",
   openaiBaseUrl: process.env.OPENAI_BASE_URL ?? "",
   openaiAppName: process.env.OPENAI_APP_NAME ?? "Mentis",
   openaiHttpReferer:

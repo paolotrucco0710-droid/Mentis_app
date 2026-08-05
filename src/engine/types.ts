@@ -30,6 +30,14 @@ export interface ScoredAtomCandidate {
   unlocksCount: number;
 }
 
+export interface SessionVarietyContext {
+  recentAtomCounts: Map<string, number>;
+  recentAtomIds?: AtomId[];
+  recentCardTypes?: CardType[];
+  cardsByAtomId: Map<string, Card[]>;
+  userCardStates: Map<string, UserCardState>;
+}
+
 export interface AtomSelectionResult {
   candidate: ScoredAtomCandidate;
   card: Card;

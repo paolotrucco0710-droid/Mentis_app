@@ -14,21 +14,15 @@ import {
   hasImageRetrievalDue,
   hasOpenProductionDue,
   needsPrimaryIntroduction,
-  needsRetrievalVerification,
 } from "./card-selector";
-import type { ScoredAtomCandidate } from "./types";
+import type { ScoredAtomCandidate, SessionVarietyContext } from "./types";
+import { applyChapterTourVariety } from "./chapter-tour";
+
+export type { SessionVarietyContext } from "./types";
 
 const EXPLAIN_TYPES = new Set<string>(EXPLANATION_CARD_TYPES);
 const QUICK_RETRIEVAL_TYPES = new Set<string>(QUICK_RETRIEVAL_CARD_TYPES);
 const SESSION_RHYTHM_WINDOW = 6;
-
-export interface SessionVarietyContext {
-  recentAtomCounts: Map<string, number>;
-  recentAtomIds?: string[];
-  recentCardTypes?: CardType[];
-  cardsByAtomId: Map<string, Card[]>;
-  userCardStates: Map<string, UserCardState>;
-}
 
 function getCardsForCandidate(
   candidate: ScoredAtomCandidate,
@@ -78,15 +72,33 @@ function filterOutIntroductions(
   return withoutIntroductions.length > 0 ? withoutIntroductions : candidates;
 }
 
+function hasPendingDeepPractice(
+  candidate: ScoredAtomCandidate,
+  cardsByAtomId: Map<string, Card[]>,
+  userCardStates: Map<string, UserCardState>
+): boolean {
+  const cards = getCardsForCandidate(candidate, cardsByAtomId);
+  return (
+    hasOpenProductionDue(cards, userCardStates) ||
+    hasImageRetrievalDue(cards, userCardStates)
+  );
+}
+
 function filterUnderSessionCap(
   candidates: ScoredAtomCandidate[],
-  recentAtomCounts: Map<string, number>
+  recentAtomCounts: Map<string, number>,
+  cardsByAtomId: Map<string, Card[]>,
+  userCardStates: Map<string, UserCardState>
 ): ScoredAtomCandidate[] {
-  return candidates.filter(
-    (candidate) =>
-      (recentAtomCounts.get(candidate.atom.id) ?? 0) <
-      MAX_SESSION_CARDS_PER_ATOM
-  );
+  return candidates.filter((candidate) => {
+    const count = recentAtomCounts.get(candidate.atom.id) ?? 0;
+
+    if (count < MAX_SESSION_CARDS_PER_ATOM) {
+      return true;
+    }
+
+    return hasPendingDeepPractice(candidate, cardsByAtomId, userCardStates);
+  });
 }
 
 function filterUntouchedIntroductions(
@@ -209,29 +221,15 @@ export function filterCandidatesForSessionVariety(
     userCardStates,
   } = context;
 
+  const recentAtomId = recentAtomIds[0];
+
+  let pool = applyChapterTourVariety(candidates, context, recentAtomId);
+
   const lastCardType = recentCardTypes[recentCardTypes.length - 1];
   const lastWasExplain = lastCardType ? EXPLAIN_TYPES.has(lastCardType) : false;
   const lastWasQuickRetrieval = lastCardType
     ? QUICK_RETRIEVAL_TYPES.has(lastCardType)
     : false;
-  const recentAtomId = recentAtomIds[0];
-
-  if (lastWasExplain && recentAtomId) {
-    const recentCandidate = candidates.find(
-      (candidate) => candidate.atom.id === recentAtomId
-    );
-    if (
-      recentCandidate &&
-      needsRetrievalVerification(
-        getCardsForCandidate(recentCandidate, cardsByAtomId),
-        userCardStates
-      )
-    ) {
-      return [recentCandidate];
-    }
-  }
-
-  let pool = candidates;
 
   const recentLearnStreak = countRecentLearnCards(recentCardTypes);
   if (recentLearnStreak > 0) {
@@ -265,18 +263,28 @@ export function filterCandidatesForSessionVariety(
     }
   }
 
-  const cappedPool = filterUnderSessionCap(pool, recentAtomCounts);
+  const cappedPool = filterUnderSessionCap(
+    pool,
+    recentAtomCounts,
+    cardsByAtomId,
+    userCardStates
+  );
   if (cappedPool.length > 0) {
     pool = cappedPool;
   } else {
-    const globallyCapped = filterUnderSessionCap(candidates, recentAtomCounts);
+    const globallyCapped = filterUnderSessionCap(
+      candidates,
+      recentAtomCounts,
+      cardsByAtomId,
+      userCardStates
+    );
     if (globallyCapped.length > 0) {
       pool = globallyCapped;
     }
   }
 
   if (
-    recentCardTypes.length >= 5 &&
+    recentCardTypes.length >= 4 &&
     countRecentOpenResponseCards(recentCardTypes, OPEN_RESPONSE_SESSION_WINDOW) ===
       0
   ) {
