@@ -12,8 +12,8 @@ export function buildBlurtingKeyPoints(
   > & { keywords?: string[] }
 ): string[] {
   const points = [
-    ...atom.definitions.slice(0, 2),
-    ...atom.examples.slice(0, 1),
+    ...(atom.definitions ?? []).slice(0, 2),
+    ...(atom.examples ?? []).slice(0, 1),
     atom.summary,
     ...(atom.keywords ?? []).slice(0, 1).map((keyword) => `${atom.title}: ${keyword}`),
   ]
@@ -34,7 +34,7 @@ export function buildTrueFalseCards(
   const cards: TrueFalseCardContent[] = [];
   const used = new Set<string>();
 
-  for (const misconception of atom.misconceptions) {
+  for (const misconception of atom.misconceptions ?? []) {
     const statement = misconceptionToFalseStatement(misconception);
     if (!statement) {
       continue;
@@ -53,7 +53,7 @@ export function buildTrueFalseCards(
     break;
   }
 
-  for (const definition of atom.definitions) {
+  for (const definition of atom.definitions ?? []) {
     const statement = definition.trim();
     if (!statement) {
       continue;

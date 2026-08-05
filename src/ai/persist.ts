@@ -128,10 +128,11 @@ function buildCardsForAtom(
     title: atom.title,
     summary: atom.summary,
     explanation: atom.explanation,
-    misconceptions: atom.misconceptions,
-    commonMistakes: atom.commonMistakes,
-    definitions: atom.definitions,
-    counterExamples: atom.counterExamples,
+    misconceptions: atom.misconceptions ?? [],
+    commonMistakes: atom.commonMistakes ?? [],
+    definitions: atom.definitions ?? [],
+    examples: atom.examples ?? [],
+    counterExamples: atom.counterExamples ?? [],
   };
 
   cards.push({

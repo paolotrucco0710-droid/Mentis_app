@@ -20,6 +20,17 @@ describe("micro-cards", () => {
     expect(points.every((point) => point.length <= 90)).toBe(true);
   });
 
+  it("builds blurting key points when examples are omitted", () => {
+    const points = buildBlurtingKeyPoints({
+      title: "Fotosintesi",
+      summary: "Le piante convertono luce e CO₂ in energia chimica.",
+      definitions: ["La fotosintesi produce glucosio e ossigeno."],
+    });
+
+    expect(points.length).toBeGreaterThan(0);
+    expect(points.every((point) => point.length <= 90)).toBe(true);
+  });
+
   it("creates up to two distinct true/false cards", () => {
     const cards = buildTrueFalseCards({
       title: "Signorie cittadine",
