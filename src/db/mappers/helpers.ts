@@ -94,6 +94,7 @@ export function parsePreferences(value: unknown): UserPreferences {
     timezone: "Europe/Rome",
     notificationsEnabled: true,
     dailyGoalMinutes: null,
+    onboardingCompletedAt: null,
   };
   if (!value || typeof value !== "object") return defaults;
   return { ...defaults, ...(value as UserPreferences) };
