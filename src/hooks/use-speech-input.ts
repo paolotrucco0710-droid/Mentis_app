@@ -87,10 +87,11 @@ export function useSpeechInput({
   }, [isListening, startListening, stopListening]);
 
   useEffect(() => {
-    if (!enabled && isListening) {
-      stopListening();
+    if (!enabled && recognitionRef.current) {
+      recognitionRef.current.abort();
+      recognitionRef.current = null;
     }
-  }, [enabled, isListening, stopListening]);
+  }, [enabled]);
 
   useEffect(() => {
     return () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { TextArea } from "@/components/ui";
 import { IconButton } from "@/components/ui/icon-button";
 import { useSpeechInput } from "@/hooks/use-speech-input";
@@ -40,7 +40,10 @@ export function RetrievalVoiceInput({
   disabled?: boolean;
 }) {
   const valueRef = useRef(value);
-  valueRef.current = value;
+
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   const handleFinalTranscript = useCallback(
     (transcript: string) => {
