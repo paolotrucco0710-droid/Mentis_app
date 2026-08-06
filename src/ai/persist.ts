@@ -357,3 +357,10 @@ export function getGeneratedCardTypes(
 
   return types;
 }
+
+/** Persisted card order for an atom (used to validate Learn → Act micro-cycle). */
+export function getPersistedCardTypeSequence(
+  atom: KnowledgeJson["atoms"][number]
+): CardType[] {
+  return buildCardsForAtom(atom.id, atom).map((card) => card.type as CardType);
+}

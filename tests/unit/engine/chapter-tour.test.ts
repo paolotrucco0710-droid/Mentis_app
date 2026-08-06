@@ -4,6 +4,7 @@ import {
   applyChapterTourVariety,
   countCardsSinceLastIntroduction,
   getIntroductionSpacing,
+  resolvePostIntroductionVerification,
   resolvePostRetrievalFollowUp,
 } from "@/engine/chapter-tour";
 import { CognitiveAtomStage } from "@/domain/enums/cognitive";
@@ -43,7 +44,7 @@ describe("chapter-tour", () => {
     ).toBe(2);
   });
 
-  it("interleaves practice from earlier atoms before the next introduction", () => {
+  it("pins verification on the introduced atom before interleaving earlier practice", () => {
     const first = makeCandidate(
       "00000000-0000-4000-8000-000000000101" as AtomId,
       2,
@@ -121,7 +122,7 @@ describe("chapter-tour", () => {
     }, second.atom.id);
 
     expect(filtered).toHaveLength(1);
-    expect(filtered[0]?.atom.id).toBe(first.atom.id);
+    expect(filtered[0]?.atom.id).toBe(second.atom.id);
   });
 
   it("blocks new introductions until spacing is satisfied for hard atoms", () => {
@@ -177,6 +178,73 @@ describe("chapter-tour", () => {
       false
     );
     expect(filtered[0]?.atom.id).toBe(hard.atom.id);
+  });
+
+  it("keeps the same atom immediately after explain until verification", () => {
+    const first = makeCandidate(
+      "00000000-0000-4000-8000-000000000101" as AtomId,
+      2,
+      0
+    );
+    const second = makeCandidate(
+      "00000000-0000-4000-8000-000000000102" as AtomId,
+      2,
+      1
+    );
+    const firstCards = [
+      makeExplainCard(first.atom.id, "00000000-0000-4000-8000-000000000201" as CardId),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000202" as CardId,
+        atomId: first.atom.id,
+        type: CardType.Quiz,
+        order: 1,
+      }),
+    ];
+    const secondCards = [
+      makeExplainCard(second.atom.id, "00000000-0000-4000-8000-000000000203" as CardId),
+      makeCard({
+        id: "00000000-0000-4000-8000-000000000204" as CardId,
+        atomId: second.atom.id,
+        type: CardType.Quiz,
+        order: 1,
+      }),
+    ];
+    const context = {
+      recentAtomCounts: new Map([[first.atom.id, 1]]),
+      recentAtomIds: [first.atom.id],
+      recentCardTypes: [CardType.Explain],
+      cardsByAtomId: new Map([
+        [first.atom.id, firstCards],
+        [second.atom.id, secondCards],
+      ]),
+      userCardStates: new Map([
+        [
+          firstCards[0]!.id,
+          {
+            userId: first.state.userId,
+            cardId: firstCards[0]!.id,
+            viewCount: 1,
+            wrongAnswerCount: 0,
+            correctAnswerCount: 0,
+            lastViewedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+      ]),
+    };
+
+    const pinned = resolvePostIntroductionVerification(
+      [first, second],
+      context,
+      first.atom.id
+    );
+    expect(pinned).toHaveLength(1);
+    expect(pinned?.[0]?.atom.id).toBe(first.atom.id);
+
+    const filtered = applyChapterTourVariety([first, second], context, first.atom.id);
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.atom.id).toBe(first.atom.id);
   });
 
   it("schedules blurting on the same atom immediately after a quiz", () => {

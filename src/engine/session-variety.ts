@@ -14,6 +14,7 @@ import {
   hasImageRetrievalDue,
   hasOpenProductionDue,
   needsPrimaryIntroduction,
+  needsRetrievalVerification,
 } from "./card-selector";
 import type { ScoredAtomCandidate, SessionVarietyContext } from "./types";
 import { applyChapterTourVariety } from "./chapter-tour";
@@ -223,10 +224,23 @@ export function filterCandidatesForSessionVariety(
 
   const recentAtomId = recentAtomIds[0];
 
-  let pool = applyChapterTourVariety(candidates, context, recentAtomId);
-
   const lastCardType = recentCardTypes[recentCardTypes.length - 1];
   const lastWasExplain = lastCardType ? EXPLAIN_TYPES.has(lastCardType) : false;
+
+  if (lastWasExplain && recentAtomId) {
+    const recentCandidate = candidates.find(
+      (candidate) => candidate.atom.id === recentAtomId
+    );
+    if (recentCandidate) {
+      const recentCards = getCardsForCandidate(recentCandidate, cardsByAtomId);
+      if (needsRetrievalVerification(recentCards, userCardStates)) {
+        return [recentCandidate];
+      }
+    }
+  }
+
+  let pool = applyChapterTourVariety(candidates, context, recentAtomId);
+
   const lastWasQuickRetrieval = lastCardType
     ? QUICK_RETRIEVAL_TYPES.has(lastCardType)
     : false;

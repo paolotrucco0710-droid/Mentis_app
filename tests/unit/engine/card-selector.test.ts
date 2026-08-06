@@ -339,7 +339,7 @@ describe("engine/card-selector", () => {
     expect(selected?.type).toBe(CardType.Blurting);
   });
 
-  it("prefers true/false verification on easy atoms right after explain", () => {
+  it("selects the first micro-cycle verification card after explain", () => {
     const explain = makeCard({
       id: "00000000-0000-4000-8000-000000000201" as CardId,
       type: CardType.Explain,
@@ -370,7 +370,8 @@ describe("engine/card-selector", () => {
       atomDifficulty: 1,
     });
 
-    expect(selected?.type).toBe(CardType.TrueFalse);
+    expect(selected?.type).toBe(CardType.Quiz);
+    expect(selected?.id).toBe(quiz.id);
   });
 
   it("prefers quiz verification on hard atoms right after explain", () => {

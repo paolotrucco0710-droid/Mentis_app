@@ -82,3 +82,10 @@ export const QUICK_RETRIEVAL_CARD_TYPES = new Set([
   "error_detection",
   "image_explain",
 ]);
+
+/** First verification step after a learn card (micro-cycle Learn → Act). */
+export const MICRO_CYCLE_VERIFICATION_CARD_TYPES = new Set([
+  "quiz",
+  "multiple_choice",
+  "true_false",
+]);
