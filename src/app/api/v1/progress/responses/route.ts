@@ -5,6 +5,7 @@ import { SessionEventOutcome } from "@/domain/enums";
 import type {
   AtomId,
   CardId,
+  KnowledgeSourceId,
   StudySessionId,
 } from "@/domain/ids";
 import { resolveDevUserId } from "@/engine/dev";
@@ -27,6 +28,8 @@ export async function POST(request: Request) {
       durationMs?: number;
       declaredConfidence?: number;
       feedPosition?: number;
+      includeNextFeed?: boolean;
+      knowledgeSourceId?: string;
     }>(request);
 
     if (!parsedBody.ok) {
@@ -66,6 +69,10 @@ export async function POST(request: Request) {
       durationMs: body.durationMs,
       declaredConfidence: body.declaredConfidence,
       feedPosition: body.feedPosition,
+      includeNextFeed: body.includeNextFeed === true,
+      ...(body.knowledgeSourceId
+        ? { knowledgeSourceId: body.knowledgeSourceId as KnowledgeSourceId }
+        : {}),
     });
 
     return NextResponse.json(result, { status: 200 });

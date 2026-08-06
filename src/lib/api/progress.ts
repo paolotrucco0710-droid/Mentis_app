@@ -1,7 +1,9 @@
+import type { FeedResponse } from "@/domain/entities/feed-item";
 import type { SessionEventOutcome } from "@/domain/enums";
 import type {
   AtomId,
   CardId,
+  KnowledgeSourceId,
   SessionEventId,
   StudySessionId,
 } from "@/domain/ids";
@@ -18,6 +20,7 @@ export interface RecordCardResponseResult {
   masteryDelta: number;
   unlockedAtomIds: AtomId[];
   subjectProgress: Progress | null;
+  nextFeed?: FeedResponse;
 }
 
 export interface SubmitCardResponseInput {
@@ -29,6 +32,8 @@ export interface SubmitCardResponseInput {
   responseTimeMs?: number;
   durationMs?: number;
   feedPosition?: number;
+  includeNextFeed?: boolean;
+  knowledgeSourceId?: KnowledgeSourceId;
 }
 
 export async function submitCardResponse(
