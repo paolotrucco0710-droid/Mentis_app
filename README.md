@@ -79,6 +79,32 @@ curl http://localhost:3000/api/ready
 
 `/api/ready` risponde `503` se il database o la configurazione produzione non sono validi.
 
+## Test da telefono (Milestone 0)
+
+Per vedere le immagini nel feed da smartphone sulla stessa rete Wi‑Fi del PC:
+
+1. Trova l'IPv4 del PC (`ipconfig` su Windows → scheda Wi‑Fi).
+2. Nel file `.env` (non `.env.example`):
+
+   ```env
+   NEXT_PUBLIC_APP_URL=http://192.168.1.5:3000
+   OPENAI_HTTP_REFERER=http://192.168.1.5:3000
+   ```
+
+   Sostituisci `192.168.1.5` con il tuo IP reale.
+
+3. Avvia il server in ascolto su tutte le interfacce:
+
+   ```bash
+   npm run dev:mobile
+   ```
+
+4. Sul telefono apri `http://<IP-PC>:3000` (stessa Wi‑Fi).
+5. **Carica un capitolo nuovo** (i capitoli vecchi possono non avere card/immagini aggiornate).
+6. Dopo l'elaborazione, avvia lo studio: le card Explain e Immagine devono mostrare la foto del libro.
+
+Se l'immagine non compare, apri gli strumenti di rete del browser sul telefono (o prova l'URL immagine sul PC): l'host deve essere l'IP del PC, **mai** `localhost`.
+
 ### Deploy Docker
 
 ```bash
