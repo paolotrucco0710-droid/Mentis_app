@@ -34,8 +34,23 @@ export interface ErrorDetectionCardPayload {
   correction: string;
 }
 
+export interface ImageLabelRegion {
+  id: string;
+  label: string;
+  box: {
+    top: number;
+    left: number;
+    bottom: number;
+    right: number;
+  };
+}
+
 export interface ImageExplainCardPayload {
   imageId: string;
+  mode?: "quiz" | "tap-zone";
+  regions?: ImageLabelRegion[];
+  correctRegionId?: string;
+  targetLabel?: string;
   question?: string;
   options?: string[];
   correctOptionIndex?: number;
