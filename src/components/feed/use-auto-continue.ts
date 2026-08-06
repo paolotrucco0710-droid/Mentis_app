@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 export function useAutoContinue(
   active: boolean,
   onContinue: () => void,
-  delayMs = 1_100
+  delayMs = 400
 ): void {
   const fired = useRef(false);
 

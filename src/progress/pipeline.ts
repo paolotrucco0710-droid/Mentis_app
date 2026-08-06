@@ -14,7 +14,7 @@ import { PROGRESS_TRANSACTION_OPTIONS } from "@/db/transaction-options";
 import { assertSessionReadyForStudy } from "@/session";
 import {
   findUserAtomState,
-  findUserAtomStatesByUserId,
+  findUserAtomStatesByUserAndAtomIds,
   upsertUserAtomState,
 } from "@/db/repositories/user-atom-states";
 import {
@@ -22,16 +22,13 @@ import {
   upsertUserCardState,
 } from "@/db/repositories/user-card-states";
 import { findDailyStatistics } from "@/db/repositories/daily-statistics";
-import { ProgressScopeType } from "@/domain/entities/progress";
-import { SessionEventOutcome, SessionEventType } from "@/domain/enums";
-import { UserAtomLearningState } from "@/domain/enums";
 import type { SubjectId, UserId } from "@/domain/ids";
+import { SessionEventOutcome, SessionEventType, UserAtomLearningState } from "@/domain/enums";
 import { getNextFeedItem } from "@/engine/feed-engine";
 import { estimateNextReviewAt } from "@/engine/scheduler";
 import { MASTERY_STABLE_THRESHOLD } from "@/engine/constants";
 import { scheduleReviewForAtom } from "@/review";
 import { mergeRunningAverage } from "@/lib/math";
-import { getProgress } from "./aggregation";
 import { ProgressEngineError } from "./errors";
 import { applyMasteryUpdate, computeMasteryUpdate } from "./mastery";
 import {
@@ -199,9 +196,13 @@ export async function recordCardResponse(
     );
 
     const subjectAtoms = await findAtomsBySubjectId(atom.subjectId);
-    const allStates = await findUserAtomStatesByUserId(input.userId);
+    const subjectAtomIds = subjectAtoms.map((subjectAtom) => subjectAtom.id);
+    const scopedStates = await findUserAtomStatesByUserAndAtomIds(
+      input.userId,
+      subjectAtomIds
+    );
     const userAtomStates = new Map(
-      allStates.map((state) => [state.atomId, state])
+      scopedStates.map((state) => [state.atomId, state])
     );
     userAtomStates.set(atomState.atomId, atomState);
     const unlockedAtomIds = await unlockDependentAtoms({
@@ -219,14 +220,7 @@ export async function recordCardResponse(
     };
   }, PROGRESS_TRANSACTION_OPTIONS);
 
-  await scheduleReviewForAtom({
-    userId: input.userId,
-    atomId: input.atomId,
-    atomState,
-    now,
-  });
-
-  trackAnalyticsEvent({
+  void trackAnalyticsEvent({
     userId: input.userId,
     name: AnalyticsEvents.StudyCardAnswered,
     category: "learning",
@@ -240,18 +234,12 @@ export async function recordCardResponse(
       masteryDelta: atomState.mastery - masteryBefore,
     },
   });
-  trackFunnelMilestoneAsync({
+  void trackFunnelMilestoneAsync({
     userId: input.userId,
     name: AnalyticsEvents.FunnelFirstCardAnswered,
     category: "funnel",
     source: "engine",
     properties: { cardId: input.cardId },
-  });
-
-  const subjectProgress = await getProgress({
-    userId: input.userId,
-    scopeType: ProgressScopeType.Subject,
-    scopeId: session.subjectId as SubjectId,
   });
 
   const result: RecordCardResponseResult = {
@@ -262,19 +250,34 @@ export async function recordCardResponse(
     masteryAfter: atomState.mastery,
     masteryDelta: atomState.mastery - masteryBefore,
     unlockedAtomIds,
-    subjectProgress,
+    subjectProgress: null,
   };
 
-  if (input.includeNextFeed && session.subjectId) {
-    result.nextFeed = await getNextFeedItem({
+  const nextFeedPromise =
+    input.includeNextFeed && session.subjectId
+      ? getNextFeedItem({
+          userId: input.userId,
+          subjectId: session.subjectId as SubjectId,
+          sessionId: input.sessionId,
+          ...(input.knowledgeSourceId
+            ? { knowledgeSourceId: input.knowledgeSourceId }
+            : {}),
+        })
+      : Promise.resolve(undefined);
+
+  await Promise.all([
+    scheduleReviewForAtom({
       userId: input.userId,
-      subjectId: session.subjectId as SubjectId,
-      sessionId: input.sessionId,
-      ...(input.knowledgeSourceId
-        ? { knowledgeSourceId: input.knowledgeSourceId }
-        : {}),
-    });
-  }
+      atomId: input.atomId,
+      atomState,
+      now,
+    }),
+    nextFeedPromise.then((nextFeed) => {
+      if (nextFeed) {
+        result.nextFeed = nextFeed;
+      }
+    }),
+  ]);
 
   return result;
 }

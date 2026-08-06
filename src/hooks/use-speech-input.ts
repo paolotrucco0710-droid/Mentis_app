@@ -26,11 +26,9 @@ export function useSpeechInput({
   const [interimText, setInterimText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
-  const wantsListeningRef = useRef(false);
   const isSupported = isSpeechRecognitionSupported();
 
   const stopListening = useCallback(() => {
-    wantsListeningRef.current = false;
     recognitionRef.current?.stop();
     recognitionRef.current = null;
     setIsListening(false);
@@ -38,7 +36,7 @@ export function useSpeechInput({
   }, []);
 
   const startListening = useCallback(() => {
-    if (!enabled || !isSupported || recognitionRef.current) {
+    if (!enabled || !isSupported || isListening) {
       return;
     }
 
@@ -65,28 +63,17 @@ export function useSpeechInput({
         return;
       }
       setError(mapSpeechRecognitionError(event.error));
-      wantsListeningRef.current = false;
       setIsListening(false);
       recognitionRef.current = null;
       setInterimText("");
     };
     recognition.onend = () => {
-      recognitionRef.current = null;
-      if (wantsListeningRef.current) {
-        try {
-          recognition.start();
-          recognitionRef.current = recognition;
-          return;
-        } catch {
-          wantsListeningRef.current = false;
-        }
-      }
       setIsListening(false);
+      recognitionRef.current = null;
       setInterimText("");
     };
 
     recognitionRef.current = recognition;
-    wantsListeningRef.current = true;
 
     try {
       recognition.start();
@@ -95,10 +82,9 @@ export function useSpeechInput({
     } catch {
       setError(mapSpeechRecognitionError());
       recognitionRef.current = null;
-      wantsListeningRef.current = false;
       setIsListening(false);
     }
-  }, [enabled, isSupported, lang, onFinalTranscript]);
+  }, [enabled, isListening, isSupported, lang, onFinalTranscript]);
 
   const toggleListening = useCallback(() => {
     if (isListening) {
@@ -111,7 +97,6 @@ export function useSpeechInput({
 
   useEffect(() => {
     if (!enabled && recognitionRef.current) {
-      wantsListeningRef.current = false;
       recognitionRef.current.abort();
       recognitionRef.current = null;
       setInterimText("");
@@ -120,7 +105,6 @@ export function useSpeechInput({
 
   useEffect(() => {
     return () => {
-      wantsListeningRef.current = false;
       recognitionRef.current?.abort();
       recognitionRef.current = null;
     };

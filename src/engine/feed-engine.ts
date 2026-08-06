@@ -1,8 +1,4 @@
-import {
-  countAtomsBySubjectId,
-  findAtomsBySubjectId,
-} from "@/db/repositories/atoms";
-import { findImagesByKnowledgeSourceId } from "@/db/repositories/uploads";
+import { countAtomsBySubjectId, findAtomsBySubjectId } from "@/db/repositories/atoms";
 import { findCardsByAtomIds } from "@/db/repositories/cards";
 import { createSessionEvent } from "@/db/repositories/session-events";
 import {
@@ -13,7 +9,7 @@ import { findSubjectById } from "@/db/repositories/subjects";
 import { findSessionEventsBySessionId } from "@/db/repositories/session-events";
 import { assertSessionReadyForStudy } from "@/session";
 import {
-  findUserAtomStatesByUserId,
+  findUserAtomStatesByUserAndAtomIds,
   upsertUserAtomState,
 } from "@/db/repositories/user-atom-states";
 import { findUserCardStatesByUserAndCardIds } from "@/db/repositories/user-card-states";
@@ -21,8 +17,6 @@ import type { Atom, Card, FeedItem, FeedResponse, UserAtomState } from "@/domain
 import { CardType, SessionEventType } from "@/domain/enums";
 import type { AtomId, ImageId, KnowledgeSourceId, StudySessionId, SubjectId, UserId } from "@/domain/ids";
 import { env } from "@/lib/env";
-import { relinkImagesForKnowledgeSource } from "@/ai/relink-images";
-import { isStudyIllustrationImage } from "@/ai/image-study";
 import { getImageIdFromPayload } from "@/components/feed/card-utils";
 import { getImageSignedUrlForUser } from "@/storage/access-service";
 import { selectCardForAtom } from "./card-selector";
@@ -139,17 +133,6 @@ async function loadFeedContext(
     ? atoms.filter((atom) => atom.knowledgeSourceId === input.knowledgeSourceId)
     : atoms;
 
-  if (input.knowledgeSourceId && session.cardsViewed === 0) {
-    const atomsWithImages = scopedAtoms.filter((atom) => atom.images.length > 0).length;
-    const sourceImages = await findImagesByKnowledgeSourceId(input.knowledgeSourceId);
-    const hasStudyFigures = sourceImages.some(isStudyIllustrationImage);
-
-    await relinkImagesForKnowledgeSource(input.knowledgeSourceId, {
-      ownerId: input.userId,
-      force: hasStudyFigures && atomsWithImages === 0,
-    });
-  }
-
   const userAtomStates = await ensureUserAtomStates(input.userId, scopedAtoms);
 
   const cards = await findCardsByAtomIds(scopedAtoms.map((atom) => atom.id));
@@ -196,55 +179,72 @@ async function ensureUserAtomStates(
   userId: UserId,
   atoms: Atom[]
 ): Promise<Map<string, UserAtomState>> {
-  const existingStates = await findUserAtomStatesByUserId(userId);
+  const atomIds = atoms.map((atom) => atom.id);
+  const existingStates = await findUserAtomStatesByUserAndAtomIds(
+    userId,
+    atomIds
+  );
   const existingAtomIds = new Set(existingStates.map((state) => state.atomId));
   const stateByAtomId = new Map(
     existingStates.map((state) => [state.atomId, state])
   );
 
-  for (const atom of atoms) {
-    if (existingAtomIds.has(atom.id)) {
-      continue;
-    }
+  const missingAtoms = atoms.filter((atom) => !existingAtomIds.has(atom.id));
+  if (missingAtoms.length > 0) {
+    const createdStates = await Promise.all(
+      missingAtoms.map((atom) => {
+        const prerequisitesSatisfied = prerequisitesMet(
+          atom.prerequisites,
+          stateByAtomId
+        );
 
-    const prerequisitesSatisfied = prerequisitesMet(
-      atom.prerequisites,
-      stateByAtomId
+        return upsertUserAtomState({
+          userId,
+          atomId: atom.id,
+          currentStage: initialLearningStage(prerequisitesSatisfied),
+        });
+      })
     );
 
-    const created = await upsertUserAtomState({
-      userId,
-      atomId: atom.id,
-      currentStage: initialLearningStage(prerequisitesSatisfied),
-    });
-
-    stateByAtomId.set(atom.id, created);
-    existingAtomIds.add(atom.id);
+    for (const created of createdStates) {
+      stateByAtomId.set(created.atomId, created);
+      existingAtomIds.add(created.atomId);
+    }
   }
 
-  for (const atom of atoms) {
-    const state = stateByAtomId.get(atom.id);
-    if (!state) {
-      continue;
-    }
+  const stageUpdates = atoms
+    .map((atom) => {
+      const state = stateByAtomId.get(atom.id);
+      if (!state) {
+        return null;
+      }
 
-    const prerequisitesSatisfied = prerequisitesMet(
-      atom.prerequisites,
-      stateByAtomId
-    );
-    const desiredStage = initialLearningStage(prerequisitesSatisfied);
+      const prerequisitesSatisfied = prerequisitesMet(
+        atom.prerequisites,
+        stateByAtomId
+      );
+      const desiredStage = initialLearningStage(prerequisitesSatisfied);
 
-    if (
-      state.currentStage !== desiredStage &&
-      state.exposureCount === 0 &&
-      state.mastery === 0
-    ) {
-      const updated = await upsertUserAtomState({
-        userId,
-        atomId: atom.id,
-        currentStage: desiredStage,
-      });
-      stateByAtomId.set(atom.id, updated);
+      if (
+        state.currentStage !== desiredStage &&
+        state.exposureCount === 0 &&
+        state.mastery === 0
+      ) {
+        return upsertUserAtomState({
+          userId,
+          atomId: atom.id,
+          currentStage: desiredStage,
+        });
+      }
+
+      return null;
+    })
+    .filter((promise): promise is Promise<UserAtomState> => promise !== null);
+
+  if (stageUpdates.length > 0) {
+    const updatedStates = await Promise.all(stageUpdates);
+    for (const updated of updatedStates) {
+      stateByAtomId.set(updated.atomId, updated);
     }
   }
 

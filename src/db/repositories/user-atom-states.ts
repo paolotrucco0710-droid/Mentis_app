@@ -25,6 +25,23 @@ export async function findUserAtomStatesByUserId(
   return records.map(toUserAtomState);
 }
 
+export async function findUserAtomStatesByUserAndAtomIds(
+  userId: UserId,
+  atomIds: AtomId[]
+): Promise<UserAtomState[]> {
+  if (atomIds.length === 0) {
+    return [];
+  }
+
+  const records = await getDb().userAtomState.findMany({
+    where: {
+      userId,
+      atomId: { in: atomIds },
+    },
+  });
+  return records.map(toUserAtomState);
+}
+
 export async function findMostRecentlyViewedUserAtomState(
   userId: UserId
 ): Promise<UserAtomState | null> {

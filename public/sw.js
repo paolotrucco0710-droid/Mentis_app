@@ -1,4 +1,4 @@
-const CACHE_NAME = "mentis-shell-v1";
+const CACHE_NAME = "mentis-shell-v2";
 const PRECACHE_URLS = ["/icon.svg", "/offline.html"];
 
 self.addEventListener("install", (event) => {
@@ -21,12 +21,27 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") {
     return;
   }
 
   const request = event.request;
+  const url = new URL(request.url);
+
+  if (
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/_next/") ||
+    url.pathname.endsWith(".webmanifest")
+  ) {
+    return;
+  }
 
   if (request.mode === "navigate") {
     event.respondWith(
