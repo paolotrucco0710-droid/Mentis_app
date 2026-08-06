@@ -12,6 +12,7 @@ import {
   Loader,
   Section,
 } from "@/components/ui";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 import type { HomeContinueContext } from "@/home";
 import { fetchHomeContinueContext } from "@/lib/api";
 import { SessionStatus } from "@/session/types";
@@ -174,6 +175,8 @@ export function HomeDashboard() {
           ) : null}
         </div>
       </Section>
+
+      <InstallPrompt />
     </div>
   );
 }
