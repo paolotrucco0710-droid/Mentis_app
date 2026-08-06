@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { getGeneratedCardTypes } from "@/ai/persist";
+import { getGeneratedCardTypes, getPersistedCardTypeSequence } from "@/ai/persist";
 import { deterministicShuffle } from "@/ai/deterministic-shuffle";
 import { CardType } from "@/domain/enums";
 import { makeMvpKnowledgeJson } from "../../helpers/mvp-knowledge";
@@ -29,6 +29,21 @@ describe("ai/persist MVP card generation", () => {
       CardType.ErrorDetection,
       CardType.ImageExplain,
     ]);
+  });
+
+  it("orders learn before verification in the micro-cycle", () => {
+    const atom = makeMvpKnowledgeJson({
+      imageId: "00000000-0000-4000-8000-000000000301",
+      atomId: randomUUID(),
+    }).atoms[0];
+
+    const sequence = getPersistedCardTypeSequence(atom);
+    const explainIndex = sequence.indexOf(CardType.Explain);
+    const quizIndex = sequence.indexOf(CardType.Quiz);
+
+    expect(explainIndex).toBeGreaterThanOrEqual(0);
+    expect(quizIndex).toBeGreaterThan(explainIndex);
+    expect(sequence[explainIndex + 1]).toBe(CardType.Quiz);
   });
 
   it("omits image cards when no image reference is available", () => {

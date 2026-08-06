@@ -205,6 +205,38 @@ function isPostRetrievalCardType(cardType: CardType | undefined): boolean {
   );
 }
 
+/** After a learn card, keep the same atom until quick verification is done. */
+export function resolvePostIntroductionVerification(
+  pool: ScoredAtomCandidate[],
+  context: SessionVarietyContext,
+  recentAtomId: string | undefined
+): ScoredAtomCandidate[] | null {
+  const { recentCardTypes = [], cardsByAtomId, userCardStates } = context;
+  const lastCardType = recentCardTypes[recentCardTypes.length - 1];
+
+  if (
+    !recentAtomId ||
+    !lastCardType ||
+    !EXPLANATION_CARD_TYPES.has(lastCardType)
+  ) {
+    return null;
+  }
+
+  const recentCandidate = pool.find(
+    (candidate) => candidate.atom.id === recentAtomId
+  );
+  if (!recentCandidate) {
+    return null;
+  }
+
+  const cards = getCards(recentCandidate, cardsByAtomId);
+  if (!needsRetrievalVerification(cards, userCardStates)) {
+    return null;
+  }
+
+  return [recentCandidate];
+}
+
 /** After quiz/image practice, schedule blurting/feynman on the same atom. */
 export function resolvePostRetrievalFollowUp(
   pool: ScoredAtomCandidate[],
@@ -240,8 +272,27 @@ function preferInterleavedPractice(
   practiceDue: ScoredAtomCandidate[],
   recentAtomId: string | undefined,
   cardsByAtomId: Map<string, Card[]>,
-  userCardStates: Map<string, UserCardState>
+  userCardStates: Map<string, UserCardState>,
+  recentCardTypes: CardType[] = []
 ): ScoredAtomCandidate[] {
+  const lastCardType = recentCardTypes[recentCardTypes.length - 1];
+
+  if (recentAtomId && lastCardType && EXPLANATION_CARD_TYPES.has(lastCardType)) {
+    const recentCandidate = practiceDue.find(
+      (candidate) => candidate.atom.id === recentAtomId
+    );
+
+    if (
+      recentCandidate &&
+      needsRetrievalVerification(
+        getCards(recentCandidate, cardsByAtomId),
+        userCardStates
+      )
+    ) {
+      return [recentCandidate];
+    }
+  }
+
   if (!recentAtomId) {
     return practiceDue;
   }
@@ -289,6 +340,15 @@ export function applyChapterTourVariety(
     return postRetrievalFollowUp;
   }
 
+  const postIntroductionVerification = resolvePostIntroductionVerification(
+    pool,
+    context,
+    recentAtomId
+  );
+  if (postIntroductionVerification) {
+    return postIntroductionVerification;
+  }
+
   if (!shouldApplyChapterTourPacing(pool, context)) {
     return pool;
   }
@@ -331,7 +391,8 @@ export function applyChapterTourVariety(
       practiceDue,
       recentAtomId,
       cardsByAtomId,
-      userCardStates
+      userCardStates,
+      recentCardTypes
     );
 
     if (interleaved.length > 0) {

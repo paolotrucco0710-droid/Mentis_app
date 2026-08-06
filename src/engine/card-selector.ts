@@ -10,6 +10,7 @@ import {
   OPEN_RESPONSE_SESSION_WINDOW,
   IMAGE_EXPLAIN_MAX_VIEWS,
   IMAGE_SESSION_WINDOW,
+  MICRO_CYCLE_VERIFICATION_CARD_TYPES,
   QUICK_RETRIEVAL_CARD_TYPES,
   RETRIEVAL_CARD_TYPES,
   VISUAL_RETRIEVAL_CARD_TYPES,
@@ -22,6 +23,9 @@ const VISUAL_RETRIEVAL_TYPES = new Set<string>(VISUAL_RETRIEVAL_CARD_TYPES);
 const RETRIEVAL_TYPES = new Set<string>(RETRIEVAL_CARD_TYPES);
 const OPEN_RESPONSE_TYPES = new Set<string>(OPEN_RESPONSE_CARD_TYPES);
 const QUICK_RETRIEVAL_TYPES = new Set<string>(QUICK_RETRIEVAL_CARD_TYPES);
+const MICRO_CYCLE_VERIFICATION_TYPES = new Set<string>(
+  MICRO_CYCLE_VERIFICATION_CARD_TYPES
+);
 
 const SUPPRESSED_CARD_SCORE = -1000;
 
@@ -161,6 +165,23 @@ export function needsRetrievalVerification(
   );
 }
 
+/** Next card in the Learn → Act micro-cycle (first unviewed quiz/T-F by order). */
+export function getMicroCycleVerificationCard(
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>
+): Card | null {
+  if (!needsRetrievalVerification(cards, userCardStates)) {
+    return null;
+  }
+
+  return (
+    [...cards]
+      .filter((card) => MICRO_CYCLE_VERIFICATION_TYPES.has(card.type))
+      .filter((card) => (userCardStates.get(card.id)?.viewCount ?? 0) === 0)
+      .sort((left, right) => left.order - right.order)[0] ?? null
+  );
+}
+
 export function selectCardForAtom(input: {
   cards: Card[];
   atomState: UserAtomState;
@@ -180,6 +201,13 @@ export function selectCardForAtom(input: {
 
   if (needsPrimaryIntroduction(cards, userCardStates)) {
     return getPrimaryExplainCard(cards);
+  }
+
+  if (lastCardType && EXPLAIN_TYPES.has(lastCardType)) {
+    const microCycleCard = getMicroCycleVerificationCard(cards, userCardStates);
+    if (microCycleCard) {
+      return microCycleCard;
+    }
   }
 
   const scoringStage = resolveScoringStage({

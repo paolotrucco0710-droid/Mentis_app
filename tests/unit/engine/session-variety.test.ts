@@ -251,7 +251,7 @@ describe("engine/session-variety", () => {
     expect(filtered[0]?.atom.id).toBe(untouched.atom.id);
   });
 
-  it("prefers earlier atom practice when a hard atom was just introduced", () => {
+  it("pins verification on the introduced atom before earlier practice", () => {
     const introduced = makeCandidate("00000000-0000-4000-8000-000000000101" as AtomId, {
       exposureCount: 1,
       logicalOrder: 0,
@@ -331,7 +331,7 @@ describe("engine/session-variety", () => {
     );
 
     expect(filtered).toHaveLength(1);
-    expect(filtered[0]?.atom.id).toBe(practiced.atom.id);
+    expect(filtered[0]?.atom.id).toBe(introduced.atom.id);
   });
 
   it("keeps practice atoms available after a quick quiz instead of forcing only new introductions", () => {
