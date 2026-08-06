@@ -45,6 +45,7 @@ export const RETRIEVAL_CARD_TYPES = new Set([
   "blurting",
   "feynman",
   "error_detection",
+  "connection",
   "memory_recall",
 ]);
 
@@ -80,6 +81,7 @@ export const QUICK_RETRIEVAL_CARD_TYPES = new Set([
   "multiple_choice",
   "true_false",
   "error_detection",
+  "connection",
   "image_explain",
 ]);
 

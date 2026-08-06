@@ -2,6 +2,7 @@ import type {
   BlurtingCardPayload,
   Card,
   CardPayload,
+  ConnectionCardPayload,
   ErrorDetectionCardPayload,
   FeynmanCardPayload,
   ImageExplainCardPayload,
@@ -19,8 +20,28 @@ export function isQuizPayload(
     payload !== null &&
     "options" in payload &&
     Array.isArray(payload.options) &&
-    "correctOptionIndex" in payload
+    "correctOptionIndex" in payload &&
+    typeof payload.correctOptionIndex === "number"
   );
+}
+
+export function isConnectionPayload(
+  payload: CardPayload | null
+): payload is ConnectionCardPayload {
+  return (
+    isQuizPayload(payload) &&
+    "relatedAtomId" in payload &&
+    typeof payload.relatedAtomId === "string" &&
+    "relatedAtomTitle" in payload &&
+    typeof payload.relatedAtomTitle === "string" &&
+    payload.relationType === "prerequisite"
+  );
+}
+
+export function getConnectionPayload(
+  payload: CardPayload | null
+): ConnectionCardPayload | null {
+  return isConnectionPayload(payload) ? payload : null;
 }
 
 export function isTrueFalsePayload(
@@ -192,6 +213,8 @@ export function getCardTypeLabel(type: CardType): string {
       return "Feynman";
     case CardType.ErrorDetection:
       return "Trova l'errore";
+    case CardType.Connection:
+      return "Collegamento";
     default:
       return "Card";
   }

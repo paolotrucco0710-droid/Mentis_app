@@ -11,6 +11,7 @@ export enum CardType {
   Match = "match",
   Order = "order",
   ErrorDetection = "error_detection",
+  Connection = "connection",
   MemoryRecall = "memory_recall",
   VisualRecall = "visual_recall",
   Audio = "audio",

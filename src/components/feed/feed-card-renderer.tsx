@@ -40,6 +40,11 @@ const ErrorDetectionCard = dynamic(
     ),
   { loading: () => <Loader label="Caricamento card..." /> }
 );
+const ConnectionCard = dynamic(
+  () =>
+    import("./cards/connection-card").then((module) => module.ConnectionCard),
+  { loading: () => <Loader label="Caricamento card..." /> }
+);
 const FallbackCard = dynamic(
   () => import("./cards/fallback-card").then((module) => module.FallbackCard),
   { loading: () => <Loader label="Caricamento card..." /> }
@@ -94,6 +99,8 @@ function FeedCardRendererComponent({
       return <FeynmanCard {...props} />;
     case CardType.ErrorDetection:
       return <ErrorDetectionCard {...props} />;
+    case CardType.Connection:
+      return <ConnectionCard {...props} />;
     default:
       return <FallbackCard {...props} />;
   }

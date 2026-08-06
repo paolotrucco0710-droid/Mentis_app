@@ -1,4 +1,5 @@
 import type { Card, UserAtomState, UserCardState } from "@/domain/entities";
+import type { ConnectionCardPayload } from "@/domain/entities/card";
 import { CardType } from "@/domain/enums";
 import { CognitiveAtomStage } from "@/domain/enums/cognitive";
 import {
@@ -11,10 +12,12 @@ import {
   IMAGE_EXPLAIN_MAX_VIEWS,
   IMAGE_SESSION_WINDOW,
   MICRO_CYCLE_VERIFICATION_CARD_TYPES,
+  PREREQUISITE_INTRODUCTION_THRESHOLD,
   QUICK_RETRIEVAL_CARD_TYPES,
   RETRIEVAL_CARD_TYPES,
   VISUAL_RETRIEVAL_CARD_TYPES,
 } from "./constants";
+import { prerequisiteIntroductionMet } from "./stages";
 
 const EXPLAIN_TYPES = new Set<string>(EXPLANATION_CARD_TYPES);
 const IMAGE_EXPLAIN_TYPES = new Set<string>(IMAGE_EXPLAIN_CARD_TYPES);
@@ -187,11 +190,13 @@ export function selectCardForAtom(input: {
   atomState: UserAtomState;
   stage: CognitiveAtomStage;
   userCardStates: Map<string, UserCardState>;
+  userAtomStates?: Map<string, UserAtomState>;
   lastCardType: CardType | null;
   recentCardTypes?: CardType[];
   atomDifficulty?: number;
 }): Card | null {
   const { cards, atomState, stage, userCardStates, lastCardType } = input;
+  const userAtomStates = input.userAtomStates;
   const recentCardTypes = input.recentCardTypes ?? [];
   const atomDifficulty = input.atomDifficulty ?? 3;
 
@@ -221,6 +226,7 @@ export function selectCardForAtom(input: {
       atomState,
       stage: scoringStage,
       userCardStates,
+      userAtomStates,
       cards,
       lastCardType,
       recentCardTypes,
@@ -230,6 +236,7 @@ export function selectCardForAtom(input: {
       atomState,
       stage: scoringStage,
       userCardStates,
+      userAtomStates,
       cards,
       lastCardType,
       recentCardTypes,
@@ -280,6 +287,7 @@ function scoreCard(
     atomState: UserAtomState;
     stage: CognitiveAtomStage;
     userCardStates: Map<string, UserCardState>;
+    userAtomStates?: Map<string, UserAtomState>;
     cards: Card[];
     lastCardType: CardType | null;
     recentCardTypes: CardType[];
@@ -290,6 +298,7 @@ function scoreCard(
     atomState,
     stage,
     userCardStates,
+    userAtomStates,
     cards,
     lastCardType,
     recentCardTypes,
@@ -316,7 +325,33 @@ function scoreCard(
     return SUPPRESSED_CARD_SCORE;
   }
 
+  if (
+    shouldSuppressConnectionCard(
+      card,
+      atomState,
+      cards,
+      userCardStates,
+      userAtomStates
+    )
+  ) {
+    return SUPPRESSED_CARD_SCORE;
+  }
+
   score += Math.max(0, 30 - viewCount * 8);
+
+  if (
+    card.type === CardType.Connection &&
+    viewCount === 0 &&
+    !shouldSuppressConnectionCard(
+      card,
+      atomState,
+      cards,
+      userCardStates,
+      userAtomStates
+    )
+  ) {
+    score += 24;
+  }
 
   if (isImageExplain && viewCount === 0) {
     score += 18;
@@ -622,6 +657,76 @@ function shouldSuppressOpenResponse(
   }
 
   return viewCount >= 3;
+}
+
+function getConnectionPayload(
+  payload: Card["payload"]
+): ConnectionCardPayload | null {
+  if (
+    payload === null ||
+    typeof payload !== "object" ||
+    !("relatedAtomId" in payload) ||
+    typeof payload.relatedAtomId !== "string" ||
+    !("options" in payload) ||
+    !Array.isArray(payload.options) ||
+    !("correctOptionIndex" in payload) ||
+    typeof payload.correctOptionIndex !== "number"
+  ) {
+    return null;
+  }
+
+  return payload as ConnectionCardPayload;
+}
+
+function relatedAtomReadyForConnection(
+  relatedAtomId: string,
+  userAtomStates: Map<string, UserAtomState>
+): boolean {
+  const relatedState = userAtomStates.get(relatedAtomId);
+  if (!relatedState) {
+    return false;
+  }
+
+  return (
+    prerequisiteIntroductionMet(relatedState) &&
+    relatedState.exposureCount >= 1 &&
+    (relatedState.correctAnswerCount >= 1 ||
+      relatedState.mastery >= PREREQUISITE_INTRODUCTION_THRESHOLD)
+  );
+}
+
+function shouldSuppressConnectionCard(
+  card: Card,
+  atomState: UserAtomState,
+  cards: Card[],
+  userCardStates: Map<string, UserCardState>,
+  userAtomStates: Map<string, UserAtomState> | undefined
+): boolean {
+  if (card.type !== CardType.Connection) {
+    return false;
+  }
+
+  const payload = getConnectionPayload(card.payload);
+  if (!payload || !userAtomStates) {
+    return true;
+  }
+
+  if (!introductionSeen(cards, userCardStates)) {
+    return true;
+  }
+
+  if (!hasAtomRetrievalVerification(cards, userCardStates)) {
+    return true;
+  }
+
+  if (
+    atomState.mastery < PREREQUISITE_INTRODUCTION_THRESHOLD &&
+    atomState.correctAnswerCount < 1
+  ) {
+    return true;
+  }
+
+  return !relatedAtomReadyForConnection(payload.relatedAtomId, userAtomStates);
 }
 
 function isSameCategory(previous: CardType, current: CardType): boolean {
