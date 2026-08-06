@@ -1,15 +1,21 @@
 const MAX_IMAGE_DIMENSION = 2048;
-const JPEG_QUALITY = 0.85;
+const JPEG_QUALITY = 0.88;
 const SKIP_COMPRESSION_BELOW_BYTES = 800_000;
 
-function loadImageElement(file: File): Promise<HTMLImageElement> {
+async function loadImageBitmap(file: File): Promise<ImageBitmap> {
+  if (typeof createImageBitmap === "function") {
+    return createImageBitmap(file, { imageOrientation: "from-image" });
+  }
+
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
     const image = new Image();
 
     image.onload = () => {
       URL.revokeObjectURL(objectUrl);
-      resolve(image);
+      void createImageBitmap(image)
+        .then(resolve)
+        .catch(reject);
     };
 
     image.onerror = () => {
@@ -36,8 +42,8 @@ export async function compressImageForUpload(file: File): Promise<File> {
     return file;
   }
 
-  const image = await loadImageElement(file);
-  let { width, height } = image;
+  const bitmap = await loadImageBitmap(file);
+  let { width, height } = bitmap;
 
   if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
     const scale = MAX_IMAGE_DIMENSION / Math.max(width, height);
@@ -51,10 +57,12 @@ export async function compressImageForUpload(file: File): Promise<File> {
 
   const context = canvas.getContext("2d");
   if (!context) {
+    bitmap.close();
     return file;
   }
 
-  context.drawImage(image, 0, 0, width, height);
+  context.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
 
   const blob = await canvasToJpegBlob(canvas);
   if (!blob || blob.size >= file.size) {

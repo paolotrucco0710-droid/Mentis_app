@@ -88,8 +88,12 @@ export async function findActiveAuthSessionsByUserId(
 }
 
 export async function touchAuthSession(id: string): Promise<void> {
-  await prisma.authSession.update({
-    where: { id },
+  const staleBefore = new Date(Date.now() - 5 * 60 * 1000);
+  await prisma.authSession.updateMany({
+    where: {
+      id,
+      lastUsedAt: { lt: staleBefore },
+    },
     data: { lastUsedAt: new Date() },
   });
 }

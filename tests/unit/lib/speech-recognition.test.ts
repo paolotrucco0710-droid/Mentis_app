@@ -28,6 +28,12 @@ describe("speech recognition helpers", () => {
     });
   });
 
+  it("skips duplicate transcript chunks", () => {
+    expect(appendSpeechTranscript("la civiltà romana", "la civiltà romana")).toBe(
+      "la civiltà romana"
+    );
+  });
+
   it("maps microphone permission errors to user-facing copy", () => {
     expect(mapSpeechRecognitionError("not-allowed")).toContain("microfono");
     expect(mapSpeechRecognitionError("network")).toContain("offline");

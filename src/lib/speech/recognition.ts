@@ -56,6 +56,15 @@ export function appendSpeechTranscript(
     return chunk;
   }
 
+  const currentLower = current.toLowerCase();
+  const chunkLower = chunk.toLowerCase();
+  if (
+    currentLower.endsWith(chunkLower) ||
+    currentLower.includes(` ${chunkLower}`)
+  ) {
+    return current;
+  }
+
   const needsSpace = !current.endsWith(" ") && !chunk.startsWith(" ");
   return `${current}${needsSpace ? " " : ""}${chunk}`;
 }
