@@ -82,6 +82,7 @@ enum CardType {
   match
   order
   error_detection
+  connection
   memory_recall
   visual_recall
   audio

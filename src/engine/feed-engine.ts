@@ -299,6 +299,7 @@ function selectNextItem(context: FeedEngineContext) {
     atomState: bestCandidate.state,
     stage: bestCandidate.stage,
     userCardStates: context.userCardStates,
+    userAtomStates: context.userAtomStates,
     lastCardType: context.lastCardType,
     recentCardTypes: context.recentCardTypes,
     atomDifficulty: bestCandidate.atom.difficulty,

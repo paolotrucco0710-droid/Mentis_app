@@ -45,6 +45,15 @@ export interface ImageLabelRegion {
   };
 }
 
+export interface ConnectionCardPayload {
+  relatedAtomId: string;
+  relatedAtomTitle: string;
+  relationType: "prerequisite";
+  question: string;
+  options: string[];
+  correctOptionIndex: number;
+}
+
 export interface ImageExplainCardPayload {
   imageId: string;
   mode?: "quiz" | "tap-zone";
@@ -73,6 +82,7 @@ export type CardPayload =
   | BlurtingCardPayload
   | FeynmanCardPayload
   | ErrorDetectionCardPayload
+  | ConnectionCardPayload
   | ImageExplainCardPayload
   | MatchCardPayload
   | OrderCardPayload

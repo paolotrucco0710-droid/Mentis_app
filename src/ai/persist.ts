@@ -8,6 +8,7 @@ import { shouldCreateImageExplainCard } from "./image-study";
 import {
   buildErrorDetectionContent,
 } from "./error-detection-options";
+import { buildConnectionCardsForAtom } from "./connection-card-builder";
 import { buildImageExplainCardCreateInput } from "./image-explain-card-builder";
 import { deterministicShuffle } from "./deterministic-shuffle";
 import { buildBlurtingKeyPoints, buildTrueFalseCards } from "./micro-cards";
@@ -86,7 +87,7 @@ export async function persistKnowledgeGraph(input: {
   const atomRows = buildAtomRows(knowledge, knowledgeSourceId, subjectId);
   const prerequisiteRows = buildPrerequisiteRows(knowledge);
   const cardRows = knowledge.atoms.flatMap((atom) =>
-    buildCardsForAtom(atom.id, atom)
+    buildCardsForAtom(atom.id, atom, knowledge.atoms)
   );
 
   return prisma.$transaction(async (tx) => {
@@ -119,7 +120,8 @@ export async function persistKnowledgeGraph(input: {
 
 function buildCardsForAtom(
   atomId: AtomId,
-  atom: KnowledgeJson["atoms"][number]
+  atom: KnowledgeJson["atoms"][number],
+  allAtoms: KnowledgeJson["atoms"]
 ): Prisma.CardCreateManyInput[] {
   const cards: Prisma.CardCreateManyInput[] = [];
   let order = 0;
@@ -331,6 +333,16 @@ function buildCardsForAtom(
     );
   }
 
+  const atomsById = new Map(allAtoms.map((entry) => [entry.id, entry]));
+  const connectionCards = buildConnectionCardsForAtom(
+    atomId,
+    atom,
+    atomsById,
+    order
+  );
+  cards.push(...connectionCards.cards);
+  order = connectionCards.nextOrder;
+
   return cards;
 }
 
@@ -347,12 +359,16 @@ export const MVP_FEED_CARD_TYPES = [
 export function getGeneratedCardTypes(
   atom: KnowledgeJson["atoms"][number]
 ): CardType[] {
-  let types = atom.images[0]?.imageId
+  let types: CardType[] = atom.images[0]?.imageId
     ? [...MVP_FEED_CARD_TYPES]
     : MVP_FEED_CARD_TYPES.filter((type) => type !== CardType.ImageExplain);
 
   if (atom.difficulty < 3) {
     types = types.filter((type) => type !== CardType.Feynman);
+  }
+
+  if (atom.prerequisites.length > 0) {
+    types = [...types, CardType.Connection];
   }
 
   return types;
@@ -362,5 +378,5 @@ export function getGeneratedCardTypes(
 export function getPersistedCardTypeSequence(
   atom: KnowledgeJson["atoms"][number]
 ): CardType[] {
-  return buildCardsForAtom(atom.id, atom).map((card) => card.type as CardType);
+  return buildCardsForAtom(atom.id, atom, [atom]).map((card) => card.type as CardType);
 }
