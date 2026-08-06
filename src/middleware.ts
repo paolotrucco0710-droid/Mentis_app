@@ -21,7 +21,16 @@ const PUBLIC_PAGE_PREFIXES = [
   "/signup",
   "/forgot-password",
   "/reset-password",
+  "/onboarding",
 ];
+
+const STATIC_ASSET_PATHS = new Set([
+  "/favicon.ico",
+  "/favicon.png",
+  "/icon.svg",
+  "/sw.js",
+  "/offline.html",
+]);
 
 function isPublicPage(pathname: string): boolean {
   return PUBLIC_PAGE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
@@ -96,7 +105,7 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/api/") ||
     pathname.startsWith("/_next/") ||
-    pathname === "/favicon.ico"
+    STATIC_ASSET_PATHS.has(pathname)
   ) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set(REQUEST_ID_HEADER, requestId);
@@ -155,5 +164,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|favicon.png|icon.svg|sw.js|offline.html).*)",
+  ],
 };
