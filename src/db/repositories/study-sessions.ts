@@ -31,6 +31,18 @@ export async function findStudySessionsByUserId(
   return records.map(toStudySession);
 }
 
+export async function findOpenStudySessionsByUserId(
+  userId: UserId,
+  limit = 5
+): Promise<StudySession[]> {
+  const records = await getDb().studySession.findMany({
+    where: { userId, endedAt: null },
+    orderBy: { startedAt: "desc" },
+    take: limit,
+  });
+  return records.map(toStudySession);
+}
+
 export async function createStudySession(
   input: CreateStudySessionInput
 ): Promise<StudySession> {

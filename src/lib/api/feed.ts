@@ -34,6 +34,10 @@ export async function pauseSession(sessionId: StudySessionId): Promise<void> {
   await apiFetch(`/api/v1/sessions/${sessionId}/pause`, { method: "POST" });
 }
 
+export async function resumeSession(sessionId: StudySessionId): Promise<void> {
+  await apiFetch(`/api/v1/sessions/${sessionId}/resume`, { method: "POST" });
+}
+
 export async function endSession(sessionId: StudySessionId): Promise<void> {
   await apiFetch(`/api/v1/sessions/${sessionId}/end`, {
     method: "POST",

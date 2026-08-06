@@ -25,6 +25,19 @@ export async function findUserAtomStatesByUserId(
   return records.map(toUserAtomState);
 }
 
+export async function findMostRecentlyViewedUserAtomState(
+  userId: UserId
+): Promise<UserAtomState | null> {
+  const record = await getDb().userAtomState.findFirst({
+    where: {
+      userId,
+      lastViewedAt: { not: null },
+    },
+    orderBy: { lastViewedAt: "desc" },
+  });
+  return record ? toUserAtomState(record) : null;
+}
+
 export async function findDueUserAtomStates(
   userId: UserId,
   before: Date = new Date()

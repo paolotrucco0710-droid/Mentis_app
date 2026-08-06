@@ -14,6 +14,7 @@ import {
   fetchNextFeedItem,
   fetchSessionDetail,
   pauseSession,
+  resumeSession,
   submitCardResponse,
 } from "@/lib/api";
 import { useActiveSubjectId, useSwipeUp } from "@/hooks";
@@ -43,6 +44,9 @@ export function FeedStudy() {
   const knowledgeSourceId = searchParams.get(
     "knowledgeSourceId"
   ) as KnowledgeSourceId | null;
+  const requestedSessionId = searchParams.get(
+    "sessionId"
+  ) as StudySessionId | null;
   const { subjectId, loading: loadingSubject, error: subjectError } =
     useActiveSubjectId();
   const [state, setState] = useState<FeedState>({ status: "loading" });
@@ -143,18 +147,27 @@ export function FeedStudy() {
       }
 
       const storedSessionId = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      const sessionIdToResume = requestedSessionId ?? storedSessionId;
 
-      if (storedSessionId) {
+      if (sessionIdToResume) {
         try {
           const detail = await fetchSessionDetail(
-            storedSessionId as StudySessionId
+            sessionIdToResume as StudySessionId
           );
 
           if (
-            detail.status === SessionStatus.Active &&
+            detail.status !== SessionStatus.Ended &&
             detail.session.subjectId === subjectId
           ) {
-            await loadNext(storedSessionId as StudySessionId, detail.session);
+            if (detail.status === SessionStatus.Paused) {
+              await resumeSession(sessionIdToResume as StudySessionId);
+            }
+
+            sessionStorage.setItem(SESSION_STORAGE_KEY, sessionIdToResume);
+            await loadNext(
+              sessionIdToResume as StudySessionId,
+              detail.session
+            );
             return;
           }
         } catch {
@@ -179,7 +192,7 @@ export function FeedStudy() {
         code: error instanceof ApiError ? error.code : undefined,
       });
     }
-  }, [knowledgeSourceId, loadNext, subjectId]);
+  }, [knowledgeSourceId, loadNext, requestedSessionId, subjectId]);
 
   useEffect(() => {
     if (!subjectId || loadingSubject) {

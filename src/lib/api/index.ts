@@ -10,6 +10,7 @@ export {
   createStudySession,
   fetchNextFeedItem,
   pauseSession,
+  resumeSession,
   endSession,
 } from "./feed";
 export { fetchSessionDetail } from "./sessions";
@@ -33,6 +34,7 @@ export {
   deleteSubject,
 } from "./subjects";
 export { fetchLibraryOverview } from "./library";
+export { fetchHomeContinueContext } from "./home";
 export { searchLibrary } from "./search";
 export {
   deleteChapter,
