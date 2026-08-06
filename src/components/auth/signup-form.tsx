@@ -23,7 +23,7 @@ export function SignupForm() {
             setLoading(true);
             setError(null);
             await register({ firstName, email, password });
-            router.push("/home");
+            router.push("/onboarding");
             router.refresh();
           } catch (err) {
             setError(

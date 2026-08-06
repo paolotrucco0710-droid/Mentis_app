@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loginAsDevUser } from "./helpers/auth";
+import { loginAsDevUser, completeOnboardingIfNeeded } from "./helpers/auth";
 
 test.describe("MVP study cycle", () => {
   test.beforeEach(async ({ page }) => {
@@ -10,6 +10,7 @@ test.describe("MVP study cycle", () => {
     page,
   }) => {
     await page.goto("/feed");
+    await completeOnboardingIfNeeded(page);
 
     await expect(page.getByRole("progressbar", { name: "Progresso sessione" })).toBeVisible({
       timeout: 20_000,

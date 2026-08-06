@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/layout";
 import { AnalyticsPageTracker } from "@/components/analytics";
+import { OnboardingGate } from "@/components/onboarding/onboarding-gate";
 
 export default function MainGroupLayout({
   children,
@@ -9,7 +10,7 @@ export default function MainGroupLayout({
   return (
     <AppShell>
       <AnalyticsPageTracker />
-      {children}
+      <OnboardingGate>{children}</OnboardingGate>
     </AppShell>
   );
 }

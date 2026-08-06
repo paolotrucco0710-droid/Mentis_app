@@ -5,6 +5,7 @@ export interface UserPreferences {
   timezone: string;
   notificationsEnabled: boolean;
   dailyGoalMinutes: number | null;
+  onboardingCompletedAt: string | null;
 }
 
 export interface User {

@@ -16,6 +16,13 @@ async function main() {
     where: { id: DEV_USER_ID },
     update: {
       passwordHash,
+      preferences: {
+        language: "it",
+        timezone: "Europe/Rome",
+        notificationsEnabled: true,
+        dailyGoalMinutes: 30,
+        onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
+      },
     },
     create: {
       id: DEV_USER_ID,
@@ -30,6 +37,7 @@ async function main() {
         timezone: "Europe/Rome",
         notificationsEnabled: true,
         dailyGoalMinutes: 30,
+        onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
       },
     },
   });
