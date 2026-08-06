@@ -11,19 +11,17 @@ test.describe("MVP study cycle", () => {
   }) => {
     await page.goto("/feed");
 
-    await expect(page.getByText("Progresso sessione")).toBeVisible({
+    await expect(page.getByRole("progressbar", { name: "Progresso sessione" })).toBeVisible({
       timeout: 20_000,
     });
 
     await expect(
       page
         .getByText(
-          /spiegazione|quiz|blurting|feynman|vero o falso|trova l'errore|immagine/i
+          /blurting|feynman|vero o falso|trova l'errore|scegli la risposta|fissa l'idea|collega l'illustrazione/i
         )
         .first()
     ).toBeVisible();
-
-    await expect(page.locator("main").getByRole("heading").first()).toBeVisible();
 
     const continueButton = page
       .getByRole("button", {
@@ -31,15 +29,15 @@ test.describe("MVP study cycle", () => {
       })
       .first();
 
-    await expect(continueButton).toBeVisible();
-    await continueButton.click();
+    if (await continueButton.isVisible()) {
+      await continueButton.click();
+    } else {
+      const quizOption = page.locator("button").filter({ hasText: /./ }).nth(2);
+      await quizOption.click();
+    }
 
     await expect(
-      page
-        .getByText(
-          /sessione completata|progresso sessione|spiegazione|quiz|blurting|feynman|vero o falso|trova l'errore|immagine/i
-        )
-        .first()
+      page.getByText(/sessione completata|scorri verso l'alto|caricamento/i).first()
     ).toBeVisible({ timeout: 20_000 });
   });
 });

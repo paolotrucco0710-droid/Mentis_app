@@ -1,46 +1,54 @@
 "use client";
 
-import { memo, useState } from "react";
-import { Button, Card, CardDescription, CardHeader, CardTitle } from "@/components/ui";
+import { memo, useCallback, useState } from "react";
 import { SessionEventOutcome } from "@/domain/enums";
 import { cn } from "@/lib/utils";
 import type { FeedCardProps } from "../card-utils";
 import { isQuizPayload } from "../card-utils";
+import { FeedCardHint, FeedCardSurface, FeedCardTitle } from "../feed-card-surface";
+import { useAutoContinue } from "../use-auto-continue";
 
 export function QuizCardComponent({ card, disabled, onContinue }: FeedCardProps) {
   const payload = isQuizPayload(card.payload) ? card.payload : null;
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(false);
 
-  if (!payload) {
-    return null;
-  }
+  const isCorrect =
+    payload !== null && selectedIndex === payload.correctOptionIndex;
 
-  const isCorrect = selectedIndex === payload.correctOptionIndex;
-
-  function handleSubmit() {
-    if (selectedIndex === null) {
+  const continueWithResult = useCallback(() => {
+    if (selectedIndex === null || !payload) {
       return;
     }
 
-    setRevealed(true);
-  }
-
-  function handleContinue() {
     onContinue({
       outcome: isCorrect
         ? SessionEventOutcome.Success
         : SessionEventOutcome.Failure,
       isCorrect,
     });
+  }, [isCorrect, onContinue, payload, selectedIndex]);
+
+  useAutoContinue(revealed && selectedIndex !== null, continueWithResult);
+
+  if (!payload) {
+    return null;
+  }
+
+  function handleSelect(index: number) {
+    if (disabled || revealed) {
+      return;
+    }
+
+    setSelectedIndex(index);
+    setRevealed(true);
   }
 
   return (
-    <Card className="shadow-md">
-      <CardHeader>
-        <CardTitle>{payload.question}</CardTitle>
-        <CardDescription>Scegli la risposta corretta.</CardDescription>
-      </CardHeader>
+    <FeedCardSurface>
+      <FeedCardTitle>{payload.question}</FeedCardTitle>
+      <FeedCardHint>Scegli la risposta corretta.</FeedCardHint>
+
       <div className="space-y-2">
         {payload.options.map((option, index) => {
           const selected = selectedIndex === index;
@@ -52,13 +60,16 @@ export function QuizCardComponent({ card, disabled, onContinue }: FeedCardProps)
               key={`${option}-${index}`}
               type="button"
               disabled={disabled || revealed}
-              onClick={() => setSelectedIndex(index)}
+              onClick={() => handleSelect(index)}
               className={cn(
-                "w-full rounded-xl border px-4 py-3 text-left text-sm transition-colors",
+                "w-full rounded-2xl border px-4 py-3.5 text-left text-sm leading-relaxed whitespace-normal transition-colors",
                 selected && !revealed && "border-primary bg-accent",
-                showCorrect && "border-success bg-green-50 dark:bg-green-950/30",
+                showCorrect &&
+                  "border-success bg-green-50 dark:bg-green-950/30",
                 showWrong && "border-danger bg-red-50 dark:bg-red-950/30",
-                !selected && !revealed && "border-border hover:bg-accent/50"
+                !selected &&
+                  !revealed &&
+                  "border-border bg-surface hover:bg-accent/50"
               )}
             >
               {option}
@@ -66,29 +77,20 @@ export function QuizCardComponent({ card, disabled, onContinue }: FeedCardProps)
           );
         })}
       </div>
+
       {revealed ? (
-        <div className="mt-4 space-y-3">
+        <div className="space-y-2">
           <p className="text-sm font-medium">
-            {isCorrect ? card.correctFeedback ?? "Corretto!" : card.incorrectFeedback ?? "Riprova la prossima volta."}
+            {isCorrect
+              ? card.correctFeedback ?? "Corretto!"
+              : card.incorrectFeedback ?? "Riprova la prossima volta."}
           </p>
           {card.explanation ? (
             <p className="text-sm text-muted">{card.explanation}</p>
           ) : null}
-          <Button fullWidth disabled={disabled} onClick={handleContinue}>
-            Continua
-          </Button>
         </div>
-      ) : (
-        <Button
-          className="mt-6"
-          fullWidth
-          disabled={disabled || selectedIndex === null}
-          onClick={handleSubmit}
-        >
-          Verifica risposta
-        </Button>
-      )}
-    </Card>
+      ) : null}
+    </FeedCardSurface>
   );
 }
 

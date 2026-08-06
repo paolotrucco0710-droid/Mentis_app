@@ -1,12 +1,13 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import type { RetrievalFeedback } from "@/ai/retrieval-feedback";
-import { Button, Card, CardDescription, CardHeader, CardTitle, Loader, TextArea } from "@/components/ui";
+import { Button, Loader, TextArea } from "@/components/ui";
 import { SessionEventOutcome } from "@/domain/enums";
 import { ApiError, evaluateRetrievalResponse } from "@/lib/api";
 import type { FeedCardProps } from "../card-utils";
 import { isFeynmanPayload } from "../card-utils";
+import { FeedCardHint, FeedCardSurface, FeedCardTitle } from "../feed-card-surface";
 import { RetrievalFeedbackPanel } from "./retrieval-feedback-panel";
 
 export function FeynmanCardComponent({
@@ -14,12 +15,33 @@ export function FeynmanCardComponent({
   atomId,
   disabled,
   onContinue,
+  registerAdvance,
 }: FeedCardProps) {
   const payload = isFeynmanPayload(card.payload) ? card.payload : null;
   const [answer, setAnswer] = useState("");
   const [feedback, setFeedback] = useState<RetrievalFeedback | null>(null);
   const [evaluating, setEvaluating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleContinue = useCallback(() => {
+    if (!feedback) {
+      return;
+    }
+
+    onContinue({
+      outcome: SessionEventOutcome.Neutral,
+      isCorrect: feedback.isCorrect,
+    });
+  }, [feedback, onContinue]);
+
+  useEffect(() => {
+    if (!registerAdvance) {
+      return;
+    }
+
+    registerAdvance(feedback ? handleContinue : null);
+    return () => registerAdvance(null);
+  }, [feedback, handleContinue, registerAdvance]);
 
   if (!payload) {
     return null;
@@ -51,13 +73,11 @@ export function FeynmanCardComponent({
   }
 
   return (
-    <Card className="shadow-md">
-      <CardHeader>
-        <CardTitle>Tecnica Feynman</CardTitle>
-        <CardDescription>
-          {payload.prompt || "Spiega il concetto come se lo stessi insegnando a un amico."}
-        </CardDescription>
-      </CardHeader>
+    <FeedCardSurface>
+      <FeedCardTitle>Tecnica Feynman</FeedCardTitle>
+      <FeedCardHint>
+        {payload.prompt || "Spiega il concetto come se lo stessi insegnando a un amico."}
+      </FeedCardHint>
       <TextArea
         label="La tua spiegazione"
         value={answer}
@@ -84,16 +104,7 @@ export function FeynmanCardComponent({
               </p>
             </div>
           ) : null}
-          <Button
-            fullWidth
-            disabled={disabled}
-            onClick={() =>
-              onContinue({
-                outcome: SessionEventOutcome.Neutral,
-                isCorrect: feedback.isCorrect,
-              })
-            }
-          >
+          <Button fullWidth disabled={disabled} onClick={handleContinue}>
             Continua
           </Button>
         </div>
@@ -107,7 +118,7 @@ export function FeynmanCardComponent({
           Valuta spiegazione
         </Button>
       )}
-    </Card>
+    </FeedCardSurface>
   );
 }
 

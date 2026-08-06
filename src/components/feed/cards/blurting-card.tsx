@@ -1,12 +1,13 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import type { RetrievalFeedback } from "@/ai/retrieval-feedback";
-import { Button, Card, CardDescription, CardHeader, CardTitle, Loader, TextArea } from "@/components/ui";
+import { Button, Loader, TextArea } from "@/components/ui";
 import { SessionEventOutcome } from "@/domain/enums";
 import { ApiError, evaluateRetrievalResponse } from "@/lib/api";
 import type { FeedCardProps } from "../card-utils";
 import { isBlurtingPayload } from "../card-utils";
+import { FeedCardHint, FeedCardSurface, FeedCardTitle } from "../feed-card-surface";
 import { RetrievalFeedbackPanel } from "./retrieval-feedback-panel";
 
 export function BlurtingCardComponent({
@@ -14,12 +15,33 @@ export function BlurtingCardComponent({
   atomId,
   disabled,
   onContinue,
+  registerAdvance,
 }: FeedCardProps) {
   const payload = isBlurtingPayload(card.payload) ? card.payload : null;
   const [answer, setAnswer] = useState("");
   const [feedback, setFeedback] = useState<RetrievalFeedback | null>(null);
   const [evaluating, setEvaluating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleContinue = useCallback(() => {
+    if (!feedback) {
+      return;
+    }
+
+    onContinue({
+      outcome: SessionEventOutcome.Success,
+      isCorrect: feedback.isCorrect,
+    });
+  }, [feedback, onContinue]);
+
+  useEffect(() => {
+    if (!registerAdvance) {
+      return;
+    }
+
+    registerAdvance(feedback ? handleContinue : null);
+    return () => registerAdvance(null);
+  }, [feedback, handleContinue, registerAdvance]);
 
   if (!payload) {
     return null;
@@ -51,13 +73,11 @@ export function BlurtingCardComponent({
   }
 
   return (
-    <Card className="shadow-md">
-      <CardHeader>
-        <CardTitle>Blurting</CardTitle>
-        <CardDescription>
-          {payload.prompt || "Scrivi tutto ciò che ricordi senza guardare gli appunti."}
-        </CardDescription>
-      </CardHeader>
+    <FeedCardSurface>
+      <FeedCardTitle>Blurting</FeedCardTitle>
+      <FeedCardHint>
+        {payload.prompt || "Scrivi tutto ciò che ricordi senza guardare gli appunti."}
+      </FeedCardHint>
       <TextArea
         label="La tua risposta"
         value={answer}
@@ -85,12 +105,7 @@ export function BlurtingCardComponent({
           <Button
             fullWidth
             disabled={disabled}
-            onClick={() =>
-              onContinue({
-                outcome: SessionEventOutcome.Success,
-                isCorrect: feedback.isCorrect,
-              })
-            }
+            onClick={handleContinue}
           >
             Continua
           </Button>
@@ -105,7 +120,7 @@ export function BlurtingCardComponent({
           Valuta risposta
         </Button>
       )}
-    </Card>
+    </FeedCardSurface>
   );
 }
 
