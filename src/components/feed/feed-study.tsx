@@ -96,12 +96,12 @@ export function FeedStudy() {
           : "Impossibile chiudere la sessione.";
       setState({ status: "error", message });
     }
-  }, []);
+  }, [setState]);
 
   const registerAdvance = useCallback((action: (() => void) | null) => {
     advanceActionRef.current = action;
     setAdvanceReady(action !== null);
-  }, []);
+  }, [setAdvanceReady]);
 
   const applyFeedItem = useCallback(
     (session: StudySession | undefined, item: FeedItem) => {
@@ -115,7 +115,7 @@ export function FeedStudy() {
         item,
       });
     },
-    []
+    [setAdvanceReady, setState]
   );
 
   const applyFeedResponse = useCallback(
@@ -226,7 +226,7 @@ export function FeedStudy() {
         code: error instanceof ApiError ? error.code : undefined,
       });
     }
-  }, [knowledgeSourceId, loadNext, requestedSessionId, subjectId]);
+  }, [knowledgeSourceId, loadNext, requestedSessionId, setState, subjectId]);
 
   useEffect(() => {
     if (!subjectId || loadingSubject) {
@@ -288,7 +288,16 @@ export function FeedStudy() {
       answering.current = false;
       setSubmitting(false);
     }
-  }, [applyFeedResponse, knowledgeSourceId, loadNext, state, submitting]);
+  }, [
+    applyFeedResponse,
+    knowledgeSourceId,
+    loadNext,
+    setAdvanceReady,
+    setState,
+    setSubmitting,
+    state,
+    submitting,
+  ]);
 
   const handleSwipeAdvance = useCallback(() => {
     if (state.status !== "ready" || submitting) {

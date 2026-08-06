@@ -5,7 +5,6 @@ import type {
   ConnectionCardPayload,
   ErrorDetectionCardPayload,
   FeynmanCardPayload,
-  ImageExplainCardPayload,
   ImageLabelRegion,
   QuizCardPayload,
   TrueFalseCardPayload,
