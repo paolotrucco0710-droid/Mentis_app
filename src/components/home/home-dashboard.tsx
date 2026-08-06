@@ -12,9 +12,17 @@ import {
   Loader,
   Section,
 } from "@/components/ui";
+import { useActiveSubjectId } from "@/hooks";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { StudyReminderPrompt } from "@/components/pwa/study-reminder-prompt";
+import { HomeProgressStrip } from "@/components/home/home-progress-strip";
 import type { HomeContinueContext } from "@/home";
-import { fetchHomeContinueContext } from "@/lib/api";
+import {
+  fetchDailyReview,
+  fetchHomeContinueContext,
+  fetchProfileStatistics,
+} from "@/lib/api";
+import type { UserStatisticsView } from "@/profile/types";
 import { SessionStatus } from "@/session/types";
 
 function continueLabel(context: HomeContinueContext): string {
@@ -50,8 +58,11 @@ function continueDescription(context: HomeContinueContext): string {
 }
 
 export function HomeDashboard() {
+  const { subjectId } = useActiveSubjectId();
   const [loading, setLoading] = useState(true);
   const [context, setContext] = useState<HomeContinueContext | null>(null);
+  const [statistics, setStatistics] = useState<UserStatisticsView | null>(null);
+  const [reviewDue, setReviewDue] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,9 +70,18 @@ export function HomeDashboard() {
     async function load() {
       try {
         setLoading(true);
-        const data = await fetchHomeContinueContext();
+        const [continueContext, stats, review] = await Promise.all([
+          fetchHomeContinueContext(),
+          fetchProfileStatistics().catch(() => null),
+          subjectId
+            ? fetchDailyReview(subjectId).catch(() => null)
+            : Promise.resolve(null),
+        ]);
+
         if (!cancelled) {
-          setContext(data);
+          setContext(continueContext);
+          setStatistics(stats);
+          setReviewDue(review?.totalDue ?? 0);
         }
       } finally {
         if (!cancelled) {
@@ -75,7 +95,7 @@ export function HomeDashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [subjectId]);
 
   if (loading) {
     return <Loader label="Preparazione..." />;
@@ -96,6 +116,27 @@ export function HomeDashboard() {
             : "Carica materiale o apri la libreria per iniziare."}
         </p>
       </section>
+
+      {statistics ? <HomeProgressStrip statistics={statistics} /> : null}
+
+      {reviewDue > 0 ? (
+        <Card>
+          <CardHeader className="gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle>Ripasso in scadenza</CardTitle>
+              <Badge variant="warning">{reviewDue} concetti</Badge>
+            </div>
+            <CardDescription>
+              Rinforza la memoria prima che i concetti inizino a scivolare via.
+            </CardDescription>
+            <Link href="/review">
+              <Button fullWidth variant="secondary">
+                Vai al ripasso
+              </Button>
+            </Link>
+          </CardHeader>
+        </Card>
+      ) : null}
 
       <Card className="bg-gradient-to-br from-accent to-surface">
         <CardHeader>
@@ -177,6 +218,7 @@ export function HomeDashboard() {
       </Section>
 
       <InstallPrompt />
+      <StudyReminderPrompt />
     </div>
   );
 }

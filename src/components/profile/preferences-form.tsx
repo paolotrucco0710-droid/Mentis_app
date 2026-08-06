@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { UserProfileView } from "@/profile/types";
 import { Button, Input, Switch } from "@/components/ui";
 import { ApiError, updateProfile } from "@/lib/api";
+import { requestNotificationPermission } from "@/lib/notifications/browser-notifications";
 import { LANGUAGE_OPTIONS, TIMEZONE_OPTIONS } from "./profile-utils";
 
 export function PreferencesForm({
@@ -45,6 +46,9 @@ export function PreferencesForm({
                   : null,
               },
             });
+            if (notificationsEnabled) {
+              await requestNotificationPermission();
+            }
             onUpdated(updated);
             setMessage("Preferenze salvate.");
           } catch (err) {

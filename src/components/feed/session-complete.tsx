@@ -13,6 +13,8 @@ interface SessionCompleteProps {
 export function SessionComplete({ summary, feedHref = "/feed" }: SessionCompleteProps) {
   const reinforcedConcepts = summary.conceptsStudied.slice(0, 6);
   const extraConcepts = Math.max(summary.conceptsStudied.length - reinforcedConcepts.length, 0);
+  const sessionXp =
+    summary.cardsViewed * 10 + summary.atomsCompleted * 25 + summary.masteryGain;
 
   return (
     <div className="feed-safe-top feed-safe-bottom mx-auto flex w-full max-w-lg flex-col gap-6 overflow-y-auto px-4 py-6">
@@ -62,6 +64,7 @@ export function SessionComplete({ summary, feedHref = "/feed" }: SessionComplete
             {summary.masteryGain > 0
               ? ` · +${summary.masteryGain} punti padronanza`
               : null}
+            {sessionXp > 0 ? ` · +${sessionXp} XP` : null}
           </CardDescription>
         </CardHeader>
         {reinforcedConcepts.length > 0 ? (
