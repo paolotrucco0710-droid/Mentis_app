@@ -30,6 +30,7 @@ const STATIC_ASSET_PATHS = new Set([
   "/icon.svg",
   "/sw.js",
   "/offline.html",
+  "/manifest.webmanifest",
 ]);
 
 function isPublicPage(pathname: string): boolean {
@@ -165,6 +166,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|favicon.png|icon.svg|sw.js|offline.html).*)",
+    "/((?!_next/static|_next/image|favicon.ico|favicon.png|icon.svg|sw.js|offline.html|manifest.webmanifest).*)",
   ],
 };

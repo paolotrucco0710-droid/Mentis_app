@@ -26,6 +26,11 @@ import {
   Section,
 } from "@/components/ui";
 import { formatFileSize } from "./course-utils";
+import { prepareFilesForUpload } from "@/upload/client-image-compression";
+import {
+  formatVercelUploadLimitMessage,
+  isWithinVercelUploadLimit,
+} from "@/upload/vercel-upload-limit";
 
 type UploadState =
   | { status: "idle" }
@@ -90,11 +95,26 @@ export function UploadPanel() {
     }
 
     try {
-      setState({ status: "uploading", progress: 20 });
+      setState({ status: "uploading", progress: 10 });
+      const preparedFiles = await prepareFilesForUpload(selectedFiles);
+      const preparedSize = preparedFiles.reduce(
+        (sum, file) => sum + file.size,
+        0
+      );
+
+      if (!isWithinVercelUploadLimit(preparedSize)) {
+        throw new ApiError(
+          formatVercelUploadLimitMessage(preparedSize),
+          "PAYLOAD_TOO_LARGE",
+          413
+        );
+      }
+
+      setState({ status: "uploading", progress: 30 });
       const result = await uploadChapter({
         subjectId: subjectId as SubjectId,
         title,
-        files: selectedFiles,
+        files: preparedFiles,
       });
 
       setState({ status: "uploading", progress: 80 });
@@ -195,7 +215,8 @@ export function UploadPanel() {
           <div className="space-y-1">
             <CardTitle>Trascina qui i file</CardTitle>
             <CardDescription>
-              PDF, JPG o PNG. Fino a 50 pagine per capitolo.
+              PDF, JPG o PNG. Le foto vengono compresse automaticamente prima
+              dell&apos;upload (max ~4 MB per invio su Vercel).
             </CardDescription>
           </div>
           <div className="flex flex-wrap justify-center gap-2">

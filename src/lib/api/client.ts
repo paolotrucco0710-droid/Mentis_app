@@ -40,6 +40,14 @@ export async function apiFetch<T>(
     code?: string;
   };
 
+  if (response.status === 413) {
+    throw new ApiError(
+      "File troppo grandi per l'upload. Prova con meno foto o immagini più piccole.",
+      "PAYLOAD_TOO_LARGE",
+      413
+    );
+  }
+
   if (
     response.status === 401 &&
     options?.retryOnUnauthorized !== false &&
