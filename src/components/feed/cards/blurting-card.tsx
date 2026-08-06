@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { RetrievalFeedback } from "@/ai/retrieval-feedback";
-import { Button, Loader, TextArea } from "@/components/ui";
+import { Button, Loader } from "@/components/ui";
 import { SessionEventOutcome } from "@/domain/enums";
 import { ApiError, evaluateRetrievalResponse } from "@/lib/api";
 import {
@@ -16,6 +16,7 @@ import {
 import type { FeedCardProps } from "../card-utils";
 import { isBlurtingPayload } from "../card-utils";
 import { FeedCardHint, FeedCardSurface, FeedCardTitle } from "../feed-card-surface";
+import { RetrievalVoiceInput } from "../retrieval-voice-input";
 import { RetrievalFeedbackPanel } from "./retrieval-feedback-panel";
 
 export function BlurtingCardComponent({
@@ -168,11 +169,11 @@ export function BlurtingCardComponent({
         ))}
       </div>
       <FeedCardHint>{getBlurtingStepPrompt(stepIndex, totalSteps)}</FeedCardHint>
-      <TextArea
+      <RetrievalVoiceInput
         label={totalSteps === 1 ? "La tua risposta" : `Punto ${stepIndex + 1}`}
         value={currentAnswer}
-        onChange={(event) => setCurrentAnswer(event.target.value)}
-        placeholder="Scrivi liberamente..."
+        onChange={setCurrentAnswer}
+        placeholder="Scrivi o parla liberamente..."
         disabled={disabled || evaluating}
       />
       {evaluating ? (

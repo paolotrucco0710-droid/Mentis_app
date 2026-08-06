@@ -2,12 +2,13 @@
 
 import { memo, useCallback, useEffect, useState } from "react";
 import type { RetrievalFeedback } from "@/ai/retrieval-feedback";
-import { Button, Loader, TextArea } from "@/components/ui";
+import { Button, Loader } from "@/components/ui";
 import { SessionEventOutcome } from "@/domain/enums";
 import { ApiError, evaluateRetrievalResponse } from "@/lib/api";
 import type { FeedCardProps } from "../card-utils";
 import { isFeynmanPayload } from "../card-utils";
 import { FeedCardHint, FeedCardSurface, FeedCardTitle } from "../feed-card-surface";
+import { RetrievalVoiceInput } from "../retrieval-voice-input";
 import { RetrievalFeedbackPanel } from "./retrieval-feedback-panel";
 
 export function FeynmanCardComponent({
@@ -78,11 +79,11 @@ export function FeynmanCardComponent({
       <FeedCardHint>
         {payload.prompt || "Spiega il concetto come se lo stessi insegnando a un amico."}
       </FeedCardHint>
-      <TextArea
+      <RetrievalVoiceInput
         label="La tua spiegazione"
         value={answer}
-        onChange={(event) => setAnswer(event.target.value)}
-        placeholder="Usa parole semplici..."
+        onChange={setAnswer}
+        placeholder="Usa parole semplici, scrivi o parla..."
         disabled={disabled || evaluating || feedback !== null}
       />
       {evaluating ? (
