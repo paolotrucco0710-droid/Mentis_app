@@ -36,12 +36,13 @@ function ExplainCardComponent({
       </CardHeader>
       {imageUrl ? (
         <figure className="space-y-2">
-          <div className="relative aspect-video overflow-hidden rounded-2xl border border-border">
+          <div className="relative min-h-[180px] max-h-[min(52vh,420px)] w-full overflow-hidden rounded-2xl border border-border bg-muted/20">
             <OptimizedImage
               src={imageUrl}
               alt={imageCaption ?? conceptTitle}
               fill
               priority
+              objectFit="contain"
               sizes="(max-width: 768px) 100vw, 640px"
             />
           </div>

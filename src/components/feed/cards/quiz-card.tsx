@@ -54,7 +54,7 @@ export function QuizCardComponent({ card, disabled, onContinue }: FeedCardProps)
               disabled={disabled || revealed}
               onClick={() => setSelectedIndex(index)}
               className={cn(
-                "w-full rounded-xl border px-4 py-3 text-left text-sm transition-colors",
+                "w-full rounded-xl border px-4 py-3 text-left text-sm leading-relaxed whitespace-normal transition-colors",
                 selected && !revealed && "border-primary bg-accent",
                 showCorrect && "border-success bg-green-50 dark:bg-green-950/30",
                 showWrong && "border-danger bg-red-50 dark:bg-red-950/30",

@@ -10,6 +10,7 @@ const META_PHRASE_PREFIXES = [
 import { compactPhrase, firstSentence, normalizeForComparison } from "./text-snippets";
 
 const LENGTH_BALANCE_RATIO = 1.3;
+const QUIZ_OPTION_MAX_LENGTH = 160;
 
 export interface QuizOptionSource {
   id: string;
@@ -74,17 +75,7 @@ function shortenToTargetLength(value: string, targetLength: number): string {
     return sentence;
   }
 
-  const truncated = value.slice(0, targetLength);
-  const lastSpace = truncated.lastIndexOf(" ");
-
-  if (lastSpace > targetLength * 0.6) {
-    const chunk = truncated.slice(0, lastSpace).trim();
-    if (chunk.length >= 20) {
-      return chunk.endsWith(".") ? chunk : `${chunk}.`;
-    }
-  }
-
-  return compactPhrase(sentence, targetLength);
+  return compactPhrase(value, Math.max(targetLength, 96));
 }
 
 export function balanceQuizAnswerLength(
@@ -178,10 +169,10 @@ export function buildQuizOptions(
     );
   }
 
-  const compactCorrect = compactPhrase(correctAnswer, 120);
+  const compactCorrect = compactPhrase(correctAnswer, QUIZ_OPTION_MAX_LENGTH);
   const compactDistractors = filteredDistractors
     .slice(0, 3)
-    .map((option) => compactPhrase(option, 120));
+    .map((option) => compactPhrase(option, QUIZ_OPTION_MAX_LENGTH));
   const options = shuffle(
     [compactCorrect, ...compactDistractors],
     atom.id
@@ -235,10 +226,10 @@ export function buildSecondaryQuiz(
       );
     }
 
-    const compactCorrect = compactPhrase(correctAnswer, 120);
+    const compactCorrect = compactPhrase(correctAnswer, QUIZ_OPTION_MAX_LENGTH);
     const compactDistractors = distractors
       .slice(0, 3)
-      .map((option) => compactPhrase(option, 120));
+      .map((option) => compactPhrase(option, QUIZ_OPTION_MAX_LENGTH));
     const options = shuffle(
       [compactCorrect, ...compactDistractors],
       `${atom.id}:secondary`

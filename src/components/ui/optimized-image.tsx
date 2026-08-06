@@ -17,6 +17,7 @@ export function OptimizedImage({
   fill = false,
   priority = false,
   sizes,
+  objectFit = "cover",
 }: {
   src: string;
   alt: string;
@@ -26,6 +27,7 @@ export function OptimizedImage({
   fill?: boolean;
   priority?: boolean;
   sizes?: string;
+  objectFit?: "cover" | "contain";
 }) {
   const [loaded, setLoaded] = useState(false);
   const useUnoptimized = isSignedOrRemoteUrl(src);
@@ -59,7 +61,13 @@ export function OptimizedImage({
         sizes={sizes}
         unoptimized={useUnoptimized}
         className={cn(
-          fill ? "object-cover" : "h-full w-full object-cover",
+          fill
+            ? objectFit === "contain"
+              ? "object-contain"
+              : "object-cover"
+            : objectFit === "contain"
+              ? "h-full w-full object-contain"
+              : "h-full w-full object-cover",
           !loaded && "opacity-0",
           loaded && "opacity-100 transition-opacity duration-200"
         )}

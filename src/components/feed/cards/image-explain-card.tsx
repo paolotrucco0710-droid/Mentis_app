@@ -78,12 +78,13 @@ function ImageExplainCardComponent({
         </CardDescription>
       </CardHeader>
       {imageUrl ? (
-        <div className="relative aspect-video overflow-hidden rounded-2xl border border-border">
+        <div className="relative min-h-[180px] max-h-[min(52vh,420px)] w-full overflow-hidden rounded-2xl border border-border bg-muted/20">
           <OptimizedImage
             src={imageUrl}
             alt={conceptTitle}
             fill
             priority
+            objectFit="contain"
             sizes="(max-width: 768px) 100vw, 640px"
           />
         </div>
@@ -109,7 +110,7 @@ function ImageExplainCardComponent({
                   disabled={disabled || revealed}
                   onClick={() => setSelectedIndex(index)}
                   className={cn(
-                    "w-full rounded-xl border px-4 py-3 text-left text-sm transition-colors",
+                    "w-full rounded-xl border px-4 py-3 text-left text-sm leading-relaxed whitespace-normal transition-colors",
                     selected && !revealed && "border-primary bg-accent",
                     showCorrect &&
                       "border-success bg-green-50 dark:bg-green-950/30",

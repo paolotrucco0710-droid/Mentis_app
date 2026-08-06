@@ -12,4 +12,14 @@ describe("compactPhrase", () => {
     expect(phrase.endsWith(".")).toBe(true);
     expect(phrase.length).toBeLessThanOrEqual(121);
   });
+
+  it("does not end quiz options on dangling prepositions like in modo.", () => {
+    const phrase = compactPhrase(
+      "Il metodo scientifico è un procedimento strutturato per studiare la realtà in modo oggettivo e verificabile.",
+      120
+    );
+
+    expect(phrase).not.toMatch(/in modo\.$/);
+    expect(phrase).toMatch(/oggettivo|verificabile|…/);
+  });
 });
