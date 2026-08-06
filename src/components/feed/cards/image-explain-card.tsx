@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import type { FeedCardProps } from "../card-utils";
 import {
   getImageIdFromPayload,
+  getImageLabelingFromPayload,
   getImageQuestionFromPayload,
   getImageQuizOptionsFromPayload,
 } from "../card-utils";
@@ -24,16 +25,21 @@ function ImageExplainCardComponent({
 }: FeedCardProps) {
   const imageId = getImageIdFromPayload(card.payload);
   const conceptTitle = atomTitle?.trim() || "Illustrazione";
+  const labeling = getImageLabelingFromPayload(card.payload);
   const question =
     getImageQuestionFromPayload(card.payload) ??
-    `Quale affermazione su «${conceptTitle}» è corretta?`;
-  const quiz = getImageQuizOptionsFromPayload(card.payload);
+    (labeling?.targetLabel
+      ? `Tocca la zona che corrisponde a «${labeling.targetLabel}».`
+      : `Quale affermazione su «${conceptTitle}» è corretta?`);
+  const quiz = labeling ? null : getImageQuizOptionsFromPayload(card.payload);
   const [fetchedImageUrl, setFetchedImageUrl] = useState<string | null>(null);
   const imageUrl = initialImageUrl ?? fetchedImageUrl;
+  const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(false);
-  const isCorrect =
-    quiz !== null && selectedIndex === quiz.correctOptionIndex;
+  const isCorrect = labeling
+    ? selectedRegionId === labeling.correctRegionId
+    : quiz !== null && selectedIndex === quiz.correctOptionIndex;
 
   const continueWithResult = useCallback(() => {
     onContinue({
@@ -44,7 +50,7 @@ function ImageExplainCardComponent({
     });
   }, [isCorrect, onContinue]);
 
-  useAutoContinue(revealed && quiz !== null, continueWithResult);
+  useAutoContinue(revealed && (labeling !== null || quiz !== null), continueWithResult);
 
   useEffect(() => {
     if (initialImageUrl || !imageId) {
@@ -71,6 +77,15 @@ function ImageExplainCardComponent({
     };
   }, [imageId, initialImageUrl]);
 
+  function handleSelectRegion(regionId: string) {
+    if (disabled || revealed || !labeling) {
+      return;
+    }
+
+    setSelectedRegionId(regionId);
+    setRevealed(true);
+  }
+
   function handleSelect(index: number) {
     if (disabled || revealed || !quiz) {
       return;
@@ -86,11 +101,13 @@ function ImageExplainCardComponent({
       <FeedCardHint>
         {card.prompt && card.prompt !== conceptTitle
           ? card.prompt
-          : "Collega l'illustrazione al concetto."}
+          : labeling
+            ? "Individua la parte giusta dello schema."
+            : "Collega l'illustrazione al concetto."}
       </FeedCardHint>
 
       {imageUrl ? (
-        <div className="relative min-h-[200px] max-h-[min(50vh,420px)] w-full overflow-hidden rounded-2xl border border-border bg-muted/20">
+        <div className="relative min-h-[220px] max-h-[min(55vh,460px)] w-full overflow-hidden rounded-2xl border border-border bg-muted/20">
           <OptimizedImage
             src={imageUrl}
             alt={conceptTitle}
@@ -99,6 +116,53 @@ function ImageExplainCardComponent({
             objectFit="contain"
             sizes="(max-width: 768px) 100vw, 100vw"
           />
+          {labeling
+            ? labeling.regions.map((region, index) => {
+                const selected = selectedRegionId === region.id;
+                const isTarget = region.id === labeling.correctRegionId;
+                const showCorrect = revealed && isTarget;
+                const showWrong = revealed && selected && !isCorrect;
+
+                return (
+                  <button
+                    key={region.id}
+                    type="button"
+                    aria-label={
+                      revealed
+                        ? region.label
+                        : `Zona ${index + 1}`
+                    }
+                    disabled={disabled || revealed}
+                    onClick={() => handleSelectRegion(region.id)}
+                    className={cn(
+                      "absolute rounded-xl border-2 transition-colors",
+                      !revealed &&
+                        "border-primary/50 bg-primary/10 hover:bg-primary/20",
+                      showCorrect &&
+                        "border-success bg-green-500/25",
+                      showWrong &&
+                        "border-danger bg-red-500/25",
+                      revealed &&
+                        !showCorrect &&
+                        !showWrong &&
+                        "border-border/70 bg-black/5"
+                    )}
+                    style={{
+                      top: `${region.box.top * 100}%`,
+                      left: `${region.box.left * 100}%`,
+                      width: `${(region.box.right - region.box.left) * 100}%`,
+                      height: `${(region.box.bottom - region.box.top) * 100}%`,
+                    }}
+                  >
+                    {revealed ? (
+                      <span className="absolute inset-x-1 bottom-1 rounded-md bg-background/90 px-1.5 py-0.5 text-center text-[11px] font-medium leading-tight text-foreground">
+                        {region.label}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })
+            : null}
         </div>
       ) : (
         <div className="flex min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-border bg-accent/40 text-sm text-muted">
@@ -106,9 +170,29 @@ function ImageExplainCardComponent({
         </div>
       )}
 
-      {quiz ? (
+      <p className="text-sm font-medium leading-7">{question}</p>
+
+      {labeling ? (
+        revealed ? (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">
+              {isCorrect
+                ? card.correctFeedback ?? "Corretto!"
+                : card.incorrectFeedback ?? "Rileggi il concetto e riprova."}
+            </p>
+            {labeling.revealText ?? card.explanation ? (
+              <p className="text-sm text-muted">
+                {labeling.revealText ?? card.explanation}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-xs text-muted">
+            Tocca una zona dell&apos;immagine per rispondere.
+          </p>
+        )
+      ) : quiz ? (
         <>
-          <p className="text-sm font-medium leading-7">{question}</p>
           <div className="space-y-2">
             {quiz.options.map((option, index) => {
               const selected = selectedIndex === index;
@@ -152,18 +236,15 @@ function ImageExplainCardComponent({
           ) : null}
         </>
       ) : (
-        <>
-          <p className="text-sm leading-7">{question}</p>
-          <Button
-            fullWidth
-            disabled={disabled}
-            onClick={() =>
-              onContinue({ outcome: SessionEventOutcome.Neutral, isCorrect: true })
-            }
-          >
-            Ho collegato l&apos;immagine al concetto
-          </Button>
-        </>
+        <Button
+          fullWidth
+          disabled={disabled}
+          onClick={() =>
+            onContinue({ outcome: SessionEventOutcome.Neutral, isCorrect: true })
+          }
+        >
+          Ho collegato l&apos;immagine al concetto
+        </Button>
       )}
     </FeedCardSurface>
   );

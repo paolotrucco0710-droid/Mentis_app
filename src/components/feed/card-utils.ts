@@ -4,6 +4,8 @@ import type {
   CardPayload,
   ErrorDetectionCardPayload,
   FeynmanCardPayload,
+  ImageExplainCardPayload,
+  ImageLabelRegion,
   QuizCardPayload,
   TrueFalseCardPayload,
 } from "@/domain/entities/card";
@@ -113,6 +115,64 @@ export function getImageQuizOptionsFromPayload(
   }
 
   return null;
+}
+
+function isImageLabelRegion(value: unknown): value is ImageLabelRegion {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const region = value as ImageLabelRegion;
+  return (
+    typeof region.id === "string" &&
+    typeof region.label === "string" &&
+    typeof region.box === "object" &&
+    region.box !== null &&
+    typeof region.box.top === "number" &&
+    typeof region.box.left === "number" &&
+    typeof region.box.bottom === "number" &&
+    typeof region.box.right === "number"
+  );
+}
+
+export function getImageLabelingFromPayload(
+  payload: CardPayload | null
+): {
+  regions: ImageLabelRegion[];
+  correctRegionId: string;
+  targetLabel?: string;
+  revealText?: string;
+} | null {
+  if (
+    payload === null ||
+    typeof payload !== "object" ||
+    !("mode" in payload) ||
+    payload.mode !== "tap-zone" ||
+    !("regions" in payload) ||
+    !Array.isArray(payload.regions) ||
+    !("correctRegionId" in payload) ||
+    typeof payload.correctRegionId !== "string"
+  ) {
+    return null;
+  }
+
+  const regions = payload.regions.filter(isImageLabelRegion);
+  if (regions.length < 2) {
+    return null;
+  }
+
+  return {
+    regions,
+    correctRegionId: payload.correctRegionId,
+    targetLabel:
+      "targetLabel" in payload && typeof payload.targetLabel === "string"
+        ? payload.targetLabel
+        : undefined,
+    revealText:
+      "revealText" in payload && typeof payload.revealText === "string"
+        ? payload.revealText
+        : undefined,
+  };
 }
 
 export function getCardTypeLabel(type: CardType): string {
