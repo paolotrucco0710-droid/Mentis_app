@@ -52,10 +52,15 @@ export function RetrievalVoiceInput({
     [onChange]
   );
 
-  const { isSupported, isListening, error, toggleListening } = useSpeechInput({
+  const { isSupported, isListening, interimText, error, toggleListening } = useSpeechInput({
     enabled: !disabled,
     onFinalTranscript: handleFinalTranscript,
   });
+
+  const displayValue =
+    interimText && isListening
+      ? appendSpeechTranscript(value, interimText)
+      : value;
 
   return (
     <div className="space-y-2">
@@ -63,7 +68,7 @@ export function RetrievalVoiceInput({
         <div className="min-w-0 flex-1">
           <TextArea
             label={label}
-            value={value}
+            value={displayValue}
             onChange={(event) => onChange(event.target.value)}
             placeholder={placeholder}
             disabled={disabled}
@@ -84,7 +89,9 @@ export function RetrievalVoiceInput({
         ) : null}
       </div>
       {isListening ? (
-        <p className="text-xs text-primary">Ascolto in corso... parla ora.</p>
+        <p className="text-xs text-primary">
+          Ascolto in corso... parla ora. Tocca di nuovo il microfono per fermare.
+        </p>
       ) : null}
       {error ? <p className="text-xs text-muted">{error}</p> : null}
     </div>

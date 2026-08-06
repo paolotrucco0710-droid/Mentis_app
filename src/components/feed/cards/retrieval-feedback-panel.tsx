@@ -7,7 +7,8 @@ export function RetrievalFeedbackPanel({
 }: {
   feedback: RetrievalFeedback;
 }) {
-  const gap = feedback.gaps[0];
+  const gaps = feedback.gaps.filter(Boolean);
+  const strengths = feedback.strengths.filter(Boolean);
   const showTip = Boolean(feedback.suggestion?.trim());
 
   return (
@@ -26,12 +27,30 @@ export function RetrievalFeedbackPanel({
         {feedback.summary}
       </p>
 
-      {!feedback.isCorrect && gap ? (
-        <p className="mt-2 text-sm text-muted">{gap}</p>
+      {strengths.length > 0 ? (
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted">
+          {strengths.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : null}
+
+      {!feedback.isCorrect && gaps.length > 0 ? (
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted">
+          {gaps.map((gap) => (
+            <li key={gap}>{gap}</li>
+          ))}
+        </ul>
       ) : null}
 
       {!feedback.isCorrect && showTip ? (
         <p className="mt-2 text-sm text-muted">{feedback.suggestion}</p>
+      ) : null}
+
+      {feedback.source === "heuristic" ? (
+        <p className="mt-2 text-xs text-muted">
+          Valutazione rapida locale — per feedback più preciso configura OpenRouter.
+        </p>
       ) : null}
     </div>
   );

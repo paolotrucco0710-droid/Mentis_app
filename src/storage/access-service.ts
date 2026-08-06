@@ -1,6 +1,7 @@
 import { findImageById } from "@/db/repositories/uploads";
 import { findUserById } from "@/db/repositories/users";
 import type { ImageId, UserId } from "@/domain/ids";
+import { env } from "@/lib/env";
 import { getStorageSignedUrl, isStorageKey } from "@/storage";
 import { StorageError } from "@/storage/errors";
 
@@ -13,7 +14,7 @@ export async function getImageSignedUrlForUser(
     throw new StorageError("Immagine non trovata.", "IMAGE_NOT_FOUND", 404);
   }
 
-  const expiresInSeconds = 3600;
+  const expiresInSeconds = env.storageSignedUrlTtlSeconds;
   const url = await getStorageSignedUrl(image.storageKey, expiresInSeconds);
   return { url, expiresInSeconds };
 }
@@ -26,7 +27,7 @@ export async function getAvatarSignedUrlForUser(
     return null;
   }
 
-  const expiresInSeconds = 3600;
+  const expiresInSeconds = env.storageSignedUrlTtlSeconds;
   const url = await getStorageSignedUrl(
     user.profileImageUrl,
     expiresInSeconds

@@ -33,6 +33,8 @@ function ImageExplainCardComponent({
       : `Quale affermazione su «${conceptTitle}» è corretta?`);
   const quiz = labeling ? null : getImageQuizOptionsFromPayload(card.payload);
   const [fetchedImageUrl, setFetchedImageUrl] = useState<string | null>(null);
+  const [imageLoadError, setImageLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const imageUrl = initialImageUrl ?? fetchedImageUrl;
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -64,10 +66,12 @@ function ImageExplainCardComponent({
         const result = await fetchImageUrl(imageId);
         if (!cancelled) {
           setFetchedImageUrl(result.url);
+          setImageLoadError(false);
         }
       } catch (error) {
         if (!cancelled && !(error instanceof ApiError && error.status === 404)) {
           setFetchedImageUrl(null);
+          setImageLoadError(true);
         }
       }
     })();
@@ -75,7 +79,13 @@ function ImageExplainCardComponent({
     return () => {
       cancelled = true;
     };
-  }, [imageId, initialImageUrl]);
+  }, [imageId, initialImageUrl, reloadKey]);
+
+  function handleImageRetry() {
+    setImageLoadError(false);
+    setFetchedImageUrl(null);
+    setReloadKey((value) => value + 1);
+  }
 
   function handleSelectRegion(regionId: string) {
     if (disabled || revealed || !labeling) {
@@ -106,7 +116,9 @@ function ImageExplainCardComponent({
             : "Collega l'illustrazione al concetto."}
       </FeedCardHint>
 
-      {imageUrl ? (
+      <p className="text-sm font-medium leading-7">{question}</p>
+
+      {imageUrl && !imageLoadError ? (
         <div className="relative min-h-[220px] max-h-[min(55vh,460px)] w-full overflow-hidden rounded-2xl border border-border bg-muted/20">
           <OptimizedImage
             src={imageUrl}
@@ -115,6 +127,7 @@ function ImageExplainCardComponent({
             priority
             objectFit="contain"
             sizes="(max-width: 768px) 100vw, 100vw"
+            onError={() => setImageLoadError(true)}
           />
           {labeling
             ? labeling.regions.map((region, index) => {
@@ -165,12 +178,27 @@ function ImageExplainCardComponent({
             : null}
         </div>
       ) : (
-        <div className="flex min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-border bg-accent/40 text-sm text-muted">
-          {imageId ? "Caricamento immagine..." : "Immagine del concetto"}
+        <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-accent/40 px-4 text-center text-sm text-muted">
+          <p>
+            {imageLoadError
+              ? "Immagine non disponibile."
+              : imageId
+                ? "Caricamento immagine..."
+                : "Immagine del concetto"}
+          </p>
+          {imageLoadError ? (
+            <Button type="button" variant="secondary" onClick={handleImageRetry}>
+              Riprova caricamento
+            </Button>
+          ) : null}
         </div>
       )}
 
-      <p className="text-sm font-medium leading-7">{question}</p>
+      {imageUrl && imageLoadError ? (
+        <Button type="button" variant="secondary" onClick={handleImageRetry}>
+          Riprova caricamento immagine
+        </Button>
+      ) : null}
 
       {labeling ? (
         revealed ? (
