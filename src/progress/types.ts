@@ -1,9 +1,11 @@
+import type { FeedResponse } from "@/domain/entities/feed-item";
 import type { UserAtomState, UserCardState } from "@/domain/entities";
 import type { Progress } from "@/domain/entities/progress";
 import type { SessionEventOutcome } from "@/domain/enums";
 import type {
   AtomId,
   CardId,
+  KnowledgeSourceId,
   SessionEventId,
   StudySessionId,
   UserId,
@@ -20,6 +22,8 @@ export interface RecordCardResponseInput {
   durationMs?: number;
   declaredConfidence?: number;
   feedPosition?: number;
+  includeNextFeed?: boolean;
+  knowledgeSourceId?: KnowledgeSourceId;
 }
 
 export interface MasteryUpdate {
@@ -41,4 +45,5 @@ export interface RecordCardResponseResult {
   masteryDelta: number;
   unlockedAtomIds: AtomId[];
   subjectProgress: Progress | null;
+  nextFeed?: FeedResponse;
 }

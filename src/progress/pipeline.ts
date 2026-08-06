@@ -26,6 +26,7 @@ import { ProgressScopeType } from "@/domain/entities/progress";
 import { SessionEventOutcome, SessionEventType } from "@/domain/enums";
 import { UserAtomLearningState } from "@/domain/enums";
 import type { SubjectId, UserId } from "@/domain/ids";
+import { getNextFeedItem } from "@/engine/feed-engine";
 import { estimateNextReviewAt } from "@/engine/scheduler";
 import { MASTERY_STABLE_THRESHOLD } from "@/engine/constants";
 import { scheduleReviewForAtom } from "@/review";
@@ -253,7 +254,7 @@ export async function recordCardResponse(
     scopeId: session.subjectId as SubjectId,
   });
 
-  return {
+  const result: RecordCardResponseResult = {
     sessionEventId: sessionEvent.id,
     atomState,
     cardState,
@@ -263,6 +264,19 @@ export async function recordCardResponse(
     unlockedAtomIds,
     subjectProgress,
   };
+
+  if (input.includeNextFeed && session.subjectId) {
+    result.nextFeed = await getNextFeedItem({
+      userId: input.userId,
+      subjectId: session.subjectId as SubjectId,
+      sessionId: input.sessionId,
+      ...(input.knowledgeSourceId
+        ? { knowledgeSourceId: input.knowledgeSourceId }
+        : {}),
+    });
+  }
+
+  return result;
 }
 
 async function updateDailyStatistics(

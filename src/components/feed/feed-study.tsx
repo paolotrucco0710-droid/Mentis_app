@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, startTransition } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import type { FeedItem } from "@/domain/entities/feed-item";
+import type { FeedItem, FeedResponse } from "@/domain/entities/feed-item";
 import type { StudySession } from "@/domain/entities/study-session";
 import { CardType, SessionEventOutcome } from "@/domain/enums";
 import type { KnowledgeSourceId, StudySessionId } from "@/domain/ids";
@@ -74,6 +74,30 @@ export function FeedStudy() {
     []
   );
 
+  const applyFeedResponse = useCallback(
+    (
+      session: StudySession | undefined,
+      feed: FeedResponse,
+      sessionId: StudySessionId
+    ) => {
+      if (!feed.item || feed.sessionComplete) {
+        setState({
+          status: "complete",
+          session:
+            session ??
+            ({
+              id: sessionId,
+            } as StudySession),
+        });
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        return;
+      }
+
+      applyFeedItem(session, feed.item);
+    },
+    [applyFeedItem]
+  );
+
   const loadNext = useCallback(
     (sessionId: StudySessionId, session?: StudySession) => {
       if (!subjectId) {
@@ -95,25 +119,12 @@ export function FeedStudy() {
             return;
           }
 
-          if (!feed.item || feed.sessionComplete) {
-            setState({
-              status: "complete",
-              session:
-                session ??
-                ({
-                  id: sessionId,
-                } as StudySession),
-            });
-            sessionStorage.removeItem(SESSION_STORAGE_KEY);
-            return;
-          }
-
-          applyFeedItem(session, feed.item);
+          applyFeedResponse(session, feed, sessionId);
         });
 
       return loadQueue.current;
     },
-    [applyFeedItem, subjectId, knowledgeSourceId]
+    [applyFeedResponse, subjectId, knowledgeSourceId]
   );
 
   const bootstrap = useCallback(async () => {
@@ -180,7 +191,7 @@ export function FeedStudy() {
     });
   }, [bootstrap, loadingSubject, subjectId]);
 
-  const handleAnswer = useCallback(async (result: CardAnswerResult) => {
+  const handleAnswer = useCallback(async (answer: CardAnswerResult) => {
     if (state.status !== "ready" || submitting || answering.current) {
       return;
     }
@@ -196,18 +207,24 @@ export function FeedStudy() {
 
     try {
       setSubmitting(true);
-      await submitCardResponse({
+      const submission = await submitCardResponse({
         sessionId: session.id,
         cardId: item.card.id,
         atomId: item.atomId,
-        outcome: result.outcome,
-        isCorrect: result.isCorrect,
+        outcome: answer.outcome,
+        isCorrect: answer.isCorrect,
         responseTimeMs,
         durationMs,
         feedPosition: item.position,
+        includeNextFeed: true,
+        ...(knowledgeSourceId ? { knowledgeSourceId } : {}),
       });
 
-      await loadNext(session.id, session);
+      if (submission.nextFeed) {
+        applyFeedResponse(session, submission.nextFeed, session.id);
+      } else {
+        await loadNext(session.id, session);
+      }
     } catch (error) {
       const message =
         error instanceof ApiError
@@ -220,7 +237,7 @@ export function FeedStudy() {
       answering.current = false;
       setSubmitting(false);
     }
-  }, [loadNext, state, submitting]);
+  }, [applyFeedResponse, knowledgeSourceId, loadNext, state, submitting]);
 
   const handleSwipeAdvance = useCallback(() => {
     if (state.status !== "ready" || submitting) {
