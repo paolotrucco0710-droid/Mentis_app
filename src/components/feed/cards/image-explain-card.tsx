@@ -1,7 +1,7 @@
 "use client";
 
-import { memo, useEffect, useState } from "react";
-import { Button, Card, CardDescription, CardHeader, CardTitle } from "@/components/ui";
+import { memo, useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui";
 import { OptimizedImage } from "@/components/ui/optimized-image";
 import { SessionEventOutcome } from "@/domain/enums";
 import { ApiError, fetchImageUrl } from "@/lib/api";
@@ -12,6 +12,8 @@ import {
   getImageQuestionFromPayload,
   getImageQuizOptionsFromPayload,
 } from "../card-utils";
+import { FeedCardHint, FeedCardSurface, FeedCardTitle } from "../feed-card-surface";
+import { useAutoContinue } from "../use-auto-continue";
 
 function ImageExplainCardComponent({
   card,
@@ -32,6 +34,17 @@ function ImageExplainCardComponent({
   const [revealed, setRevealed] = useState(false);
   const isCorrect =
     quiz !== null && selectedIndex === quiz.correctOptionIndex;
+
+  const continueWithResult = useCallback(() => {
+    onContinue({
+      outcome: isCorrect
+        ? SessionEventOutcome.Success
+        : SessionEventOutcome.Failure,
+      isCorrect,
+    });
+  }, [isCorrect, onContinue]);
+
+  useAutoContinue(revealed && quiz !== null, continueWithResult);
 
   useEffect(() => {
     if (initialImageUrl || !imageId) {
@@ -58,44 +71,45 @@ function ImageExplainCardComponent({
     };
   }, [imageId, initialImageUrl]);
 
-  function handleContinue() {
-    onContinue({
-      outcome: isCorrect
-        ? SessionEventOutcome.Success
-        : SessionEventOutcome.Failure,
-      isCorrect,
-    });
+  function handleSelect(index: number) {
+    if (disabled || revealed || !quiz) {
+      return;
+    }
+
+    setSelectedIndex(index);
+    setRevealed(true);
   }
 
   return (
-    <Card className="shadow-md">
-      <CardHeader>
-        <CardTitle>{conceptTitle}</CardTitle>
-        <CardDescription>
-          {card.prompt && card.prompt !== conceptTitle
-            ? card.prompt
-            : "Collega l'illustrazione al concetto che stai studiando."}
-        </CardDescription>
-      </CardHeader>
+    <FeedCardSurface>
+      <FeedCardTitle>{conceptTitle}</FeedCardTitle>
+      <FeedCardHint>
+        {card.prompt && card.prompt !== conceptTitle
+          ? card.prompt
+          : "Collega l'illustrazione al concetto."}
+      </FeedCardHint>
+
       {imageUrl ? (
-        <div className="relative aspect-video overflow-hidden rounded-2xl border border-border">
+        <div className="relative min-h-[200px] max-h-[min(50vh,420px)] w-full overflow-hidden rounded-2xl border border-border bg-muted/20">
           <OptimizedImage
             src={imageUrl}
             alt={conceptTitle}
             fill
             priority
-            sizes="(max-width: 768px) 100vw, 640px"
+            objectFit="contain"
+            sizes="(max-width: 768px) 100vw, 100vw"
           />
         </div>
       ) : (
-        <div className="flex aspect-video items-center justify-center rounded-2xl border border-dashed border-border bg-accent/40 text-sm text-muted">
+        <div className="flex min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-border bg-accent/40 text-sm text-muted">
           {imageId ? "Caricamento immagine..." : "Immagine del concetto"}
         </div>
       )}
+
       {quiz ? (
         <>
-          <p className="mt-4 text-sm font-medium leading-7">{question}</p>
-          <div className="mt-3 space-y-2">
+          <p className="text-sm font-medium leading-7">{question}</p>
+          <div className="space-y-2">
             {quiz.options.map((option, index) => {
               const selected = selectedIndex === index;
               const showCorrect =
@@ -107,16 +121,16 @@ function ImageExplainCardComponent({
                   key={`${option}-${index}`}
                   type="button"
                   disabled={disabled || revealed}
-                  onClick={() => setSelectedIndex(index)}
+                  onClick={() => handleSelect(index)}
                   className={cn(
-                    "w-full rounded-xl border px-4 py-3 text-left text-sm transition-colors",
+                    "w-full rounded-2xl border px-4 py-3.5 text-left text-sm leading-relaxed whitespace-normal transition-colors",
                     selected && !revealed && "border-primary bg-accent",
                     showCorrect &&
                       "border-success bg-green-50 dark:bg-green-950/30",
                     showWrong && "border-danger bg-red-50 dark:bg-red-950/30",
                     !selected &&
                       !revealed &&
-                      "border-border hover:bg-accent/50"
+                      "border-border bg-surface hover:bg-accent/50"
                   )}
                 >
                   {option}
@@ -125,7 +139,7 @@ function ImageExplainCardComponent({
             })}
           </div>
           {revealed ? (
-            <div className="mt-4 space-y-3">
+            <div className="space-y-2">
               <p className="text-sm font-medium">
                 {isCorrect
                   ? card.correctFeedback ?? "Corretto!"
@@ -134,26 +148,13 @@ function ImageExplainCardComponent({
               {card.explanation ? (
                 <p className="text-sm text-muted">{card.explanation}</p>
               ) : null}
-              <Button fullWidth disabled={disabled} onClick={handleContinue}>
-                Continua
-              </Button>
             </div>
-          ) : (
-            <Button
-              className="mt-4"
-              fullWidth
-              disabled={disabled || selectedIndex === null}
-              onClick={() => setRevealed(true)}
-            >
-              Verifica
-            </Button>
-          )}
+          ) : null}
         </>
       ) : (
         <>
-          <p className="mt-4 text-sm leading-7">{question}</p>
+          <p className="text-sm leading-7">{question}</p>
           <Button
-            className="mt-6"
             fullWidth
             disabled={disabled}
             onClick={() =>
@@ -164,7 +165,7 @@ function ImageExplainCardComponent({
           </Button>
         </>
       )}
-    </Card>
+    </FeedCardSurface>
   );
 }
 

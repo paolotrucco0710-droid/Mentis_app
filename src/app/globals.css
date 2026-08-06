@@ -85,3 +85,33 @@ body {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
+
+.feed-safe-top {
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+}
+
+.feed-safe-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+@keyframes feed-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.feed-card-stage-enter {
+  animation: feed-card-enter 260ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feed-card-stage-enter {
+    animation: none;
+  }
+}

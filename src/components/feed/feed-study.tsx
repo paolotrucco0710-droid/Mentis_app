@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { FeedItem } from "@/domain/entities/feed-item";
 import type { StudySession } from "@/domain/entities/study-session";
-import { SessionEventOutcome } from "@/domain/enums";
+import { CardType, SessionEventOutcome } from "@/domain/enums";
 import type { KnowledgeSourceId, StudySessionId } from "@/domain/ids";
 import {
   ApiError,
@@ -16,17 +16,13 @@ import {
   pauseSession,
   submitCardResponse,
 } from "@/lib/api";
-import { useActiveSubjectId } from "@/hooks";
+import { useActiveSubjectId, useSwipeUp } from "@/hooks";
 import { SessionStatus } from "@/session/types";
-import {
-  Badge,
-  Button,
-  EmptyState,
-  Loader,
-  ProgressBar,
-} from "@/components/ui";
+import { Button, EmptyState, Loader } from "@/components/ui";
+import { IconButton } from "@/components/ui";
+import { ChevronRightIcon } from "@/components/ui/icons";
 import { FeedCardRenderer } from "./feed-card-renderer";
-import { getCardTypeLabel } from "./card-utils";
+import { FeedCardStage } from "./feed-card-stage";
 import type { CardAnswerResult } from "./card-utils";
 
 const SESSION_STORAGE_KEY = "mentis.activeSessionId";
@@ -38,6 +34,10 @@ type FeedState =
   | { status: "complete"; session: StudySession }
   | { status: "error"; message: string; code?: string };
 
+function allowsSwipeWithoutAdvance(type: CardType): boolean {
+  return type === CardType.Explain;
+}
+
 export function FeedStudy() {
   const searchParams = useSearchParams();
   const knowledgeSourceId = searchParams.get(
@@ -47,15 +47,24 @@ export function FeedStudy() {
     useActiveSubjectId();
   const [state, setState] = useState<FeedState>({ status: "loading" });
   const [submitting, setSubmitting] = useState(false);
+  const [advanceReady, setAdvanceReady] = useState(false);
   const cardStartedAt = useRef<number>(0);
   const feedRequestId = useRef(0);
   const loadQueue = useRef<Promise<void>>(Promise.resolve());
   const bootstrapStarted = useRef(false);
   const answering = useRef(false);
+  const advanceActionRef = useRef<(() => void) | null>(null);
+
+  const registerAdvance = useCallback((action: (() => void) | null) => {
+    advanceActionRef.current = action;
+    setAdvanceReady(action !== null);
+  }, []);
 
   const applyFeedItem = useCallback(
     (session: StudySession | undefined, item: FeedItem) => {
       cardStartedAt.current = Date.now();
+      advanceActionRef.current = null;
+      setAdvanceReady(false);
       setState({
         status: "ready",
         session: session ?? ({ id: item.sessionId } as StudySession),
@@ -171,7 +180,7 @@ export function FeedStudy() {
     });
   }, [bootstrap, loadingSubject, subjectId]);
 
-  async function handleAnswer(result: CardAnswerResult) {
+  const handleAnswer = useCallback(async (result: CardAnswerResult) => {
     if (state.status !== "ready" || submitting || answering.current) {
       return;
     }
@@ -182,6 +191,8 @@ export function FeedStudy() {
     const responseTimeMs = durationMs;
 
     answering.current = true;
+    advanceActionRef.current = null;
+    setAdvanceReady(false);
 
     try {
       setSubmitting(true);
@@ -209,7 +220,32 @@ export function FeedStudy() {
       answering.current = false;
       setSubmitting(false);
     }
-  }
+  }, [loadNext, state, submitting]);
+
+  const handleSwipeAdvance = useCallback(() => {
+    if (state.status !== "ready" || submitting) {
+      return;
+    }
+
+    if (advanceActionRef.current) {
+      advanceActionRef.current();
+      return;
+    }
+
+    if (allowsSwipeWithoutAdvance(state.item.card.type)) {
+      void handleAnswer({
+        outcome: SessionEventOutcome.Neutral,
+        isCorrect: true,
+      });
+    }
+  }, [handleAnswer, state, submitting]);
+
+  const swipeEnabled =
+    state.status === "ready" &&
+    !submitting &&
+    (advanceReady || allowsSwipeWithoutAdvance(state.item.card.type));
+
+  const swipeHandlers = useSwipeUp(handleSwipeAdvance, swipeEnabled);
 
   async function handleSkip() {
     await handleAnswer({
@@ -312,47 +348,72 @@ export function FeedStudy() {
   }
 
   const { item } = state;
-  const progressPercent = Math.round(item.sessionProgress * 100);
+  const progressPercent = Math.min(100, Math.round(item.sessionProgress * 100));
+  const cardKey = `${item.sessionId}-${item.card.id}-${item.position}`;
 
   return (
-    <div className="flex flex-1 flex-col gap-5">
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="accent">{getCardTypeLabel(item.card.type)}</Badge>
-          <Badge>{item.atomTitle}</Badge>
-          {item.masteryBefore !== null ? (
-            <Badge variant="default">Mastery {item.masteryBefore}%</Badge>
-          ) : null}
-        </div>
-        <ProgressBar value={progressPercent} label="Progresso sessione" />
+    <div className="flex h-full min-h-0 flex-1 flex-col">
+      <div
+        className="h-0.5 w-full bg-border"
+        role="progressbar"
+        aria-valuenow={progressPercent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Progresso sessione"
+      >
+        <div
+          className="h-full bg-primary transition-[width] duration-300 ease-out"
+          style={{ width: `${progressPercent}%` }}
+        />
       </div>
 
-      <FeedCardRenderer
-        key={`${item.sessionId}-${item.card.id}-${item.position}`}
-        card={item.card}
-        atomId={item.atomId}
-        atomTitle={item.atomTitle}
-        imageUrl={item.imageUrl}
-        imageCaption={item.imageCaption}
-        disabled={submitting}
-        onAnswer={handleAnswer}
-        onSkip={handleSkip}
-      />
-
-      <div className="flex flex-wrap gap-3">
-        <Link href="/home" onClick={() => void handlePause()}>
-          <Button variant="secondary" disabled={submitting}>
-            Pausa
-          </Button>
+      <header className="feed-safe-top flex shrink-0 items-center gap-3 px-4 pb-2 pt-1">
+        <Link href="/home" onClick={() => void handlePause()} aria-label="Pausa e torna alla home">
+          <IconButton label="Esci dalla sessione">
+            <ChevronRightIcon className="rotate-180" />
+          </IconButton>
         </Link>
-        <Button
-          variant="ghost"
+        <p className="min-w-0 flex-1 truncate text-center text-sm font-medium text-foreground">
+          {item.atomTitle}
+        </p>
+        <button
+          type="button"
+          className="shrink-0 text-xs font-medium text-muted transition-colors hover:text-foreground"
           disabled={submitting}
           onClick={() => void handleEndSession()}
         >
-          Termina sessione
-        </Button>
+          Fine
+        </button>
+      </header>
+
+      <div
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4"
+        {...swipeHandlers}
+      >
+        <FeedCardStage cardKey={cardKey}>
+          <FeedCardRenderer
+            card={item.card}
+            atomId={item.atomId}
+            atomTitle={item.atomTitle}
+            imageUrl={item.imageUrl}
+            imageCaption={item.imageCaption}
+            disabled={submitting}
+            onAnswer={handleAnswer}
+            onSkip={handleSkip}
+            registerAdvance={registerAdvance}
+          />
+        </FeedCardStage>
       </div>
+
+      <footer className="feed-safe-bottom shrink-0 px-4 pt-2 text-center">
+        <p className="text-xs text-muted">
+          {submitting
+            ? "Caricamento..."
+            : swipeEnabled
+              ? "Scorri verso l'alto per continuare"
+              : "\u00a0"}
+        </p>
+      </footer>
     </div>
   );
 }

@@ -1,33 +1,55 @@
 "use client";
 
-import { memo, useState } from "react";
-import { Button, Card, CardDescription, CardHeader, CardTitle } from "@/components/ui";
+import { memo, useCallback, useState } from "react";
 import { SessionEventOutcome } from "@/domain/enums";
 import { cn } from "@/lib/utils";
 import type { FeedCardProps } from "../card-utils";
 import { isTrueFalsePayload } from "../card-utils";
+import { FeedCardSurface, FeedCardTitle } from "../feed-card-surface";
+import { useAutoContinue } from "../use-auto-continue";
 
 export function TrueFalseCardComponent({ card, disabled, onContinue }: FeedCardProps) {
   const payload = isTrueFalsePayload(card.payload) ? card.payload : null;
   const [answer, setAnswer] = useState<boolean | null>(null);
   const [revealed, setRevealed] = useState(false);
 
+  const isCorrect = payload !== null && answer === payload.correctAnswer;
+
+  const continueWithResult = useCallback(() => {
+    if (answer === null) {
+      return;
+    }
+
+    onContinue({
+      outcome: isCorrect
+        ? SessionEventOutcome.Success
+        : SessionEventOutcome.Failure,
+      isCorrect,
+    });
+  }, [answer, isCorrect, onContinue]);
+
+  useAutoContinue(revealed, continueWithResult);
+
   if (!payload) {
     return null;
   }
 
-  const isCorrect = answer === payload.correctAnswer;
+  function handleSelect(value: boolean) {
+    if (disabled || revealed) {
+      return;
+    }
+
+    setAnswer(value);
+    setRevealed(true);
+  }
 
   return (
-    <Card className="shadow-md">
-      <CardHeader>
-        <CardTitle>Vero o falso?</CardTitle>
-        <CardDescription>Valuta l&apos;affermazione.</CardDescription>
-      </CardHeader>
-      <p className="rounded-xl bg-accent/50 p-4 text-base leading-7">
+    <FeedCardSurface>
+      <FeedCardTitle>Vero o falso?</FeedCardTitle>
+      <p className="rounded-2xl bg-accent/50 px-4 py-4 text-base leading-7">
         {payload.statement}
       </p>
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {[true, false].map((value) => {
           const label = value ? "Vero" : "Falso";
           const selected = answer === value;
@@ -39,13 +61,13 @@ export function TrueFalseCardComponent({ card, disabled, onContinue }: FeedCardP
               key={label}
               type="button"
               disabled={disabled || revealed}
-              onClick={() => setAnswer(value)}
+              onClick={() => handleSelect(value)}
               className={cn(
-                "rounded-xl border px-4 py-3 text-sm font-medium transition-colors",
+                "rounded-2xl border px-4 py-4 text-sm font-semibold transition-colors",
                 selected && !revealed && "border-primary bg-accent",
                 showCorrect && "border-success bg-green-50 dark:bg-green-950/30",
                 showWrong && "border-danger bg-red-50 dark:bg-red-950/30",
-                !selected && !revealed && "border-border hover:bg-accent/50"
+                !selected && !revealed && "border-border bg-surface hover:bg-accent/50"
               )}
             >
               {label}
@@ -54,39 +76,16 @@ export function TrueFalseCardComponent({ card, disabled, onContinue }: FeedCardP
         })}
       </div>
       {revealed ? (
-        <div className="mt-4 space-y-3">
+        <div className="space-y-2">
           <p className="text-sm font-medium">
             {isCorrect ? "Esatto!" : "Non proprio."}
           </p>
           {card.explanation ? (
             <p className="text-sm text-muted">{card.explanation}</p>
           ) : null}
-          <Button
-            fullWidth
-            disabled={disabled}
-            onClick={() =>
-              onContinue({
-                outcome: isCorrect
-                  ? SessionEventOutcome.Success
-                  : SessionEventOutcome.Failure,
-                isCorrect,
-              })
-            }
-          >
-            Continua
-          </Button>
         </div>
-      ) : (
-        <Button
-          className="mt-6"
-          fullWidth
-          disabled={disabled || answer === null}
-          onClick={() => setRevealed(true)}
-        >
-          Verifica
-        </Button>
-      )}
-    </Card>
+      ) : null}
+    </FeedCardSurface>
   );
 }
 

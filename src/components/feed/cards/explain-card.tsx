@@ -1,10 +1,11 @@
 "use client";
 
-import { memo, useState } from "react";
-import { Button, Card, CardDescription, CardHeader, CardTitle } from "@/components/ui";
+import { memo, useCallback, useState } from "react";
+import { Button } from "@/components/ui";
 import { OptimizedImage } from "@/components/ui/optimized-image";
-import type { FeedCardProps } from "../card-utils";
 import { SessionEventOutcome } from "@/domain/enums";
+import type { FeedCardProps } from "../card-utils";
+import { FeedCardHint, FeedCardSurface, FeedCardTitle } from "../feed-card-surface";
 
 function hasExpandableExplanation(card: FeedCardProps["card"]): boolean {
   const summary = card.text?.trim() ?? "";
@@ -25,24 +26,25 @@ function ExplainCardComponent({
   const canExpand = hasExpandableExplanation(card);
   const conceptTitle = atomTitle?.trim() || card.prompt || "Concetto";
 
+  const handleContinue = useCallback(() => {
+    onContinue({ outcome: SessionEventOutcome.Neutral, isCorrect: true });
+  }, [onContinue]);
+
   return (
-    <Card className="shadow-md">
-      <CardHeader>
-        <CardTitle>{conceptTitle}</CardTitle>
-        <CardDescription>
-          Spiegazione · fissa l&apos;idea in una frase. Approfondisci solo se ti
-          serve.
-        </CardDescription>
-      </CardHeader>
+    <FeedCardSurface className="pb-4">
+      <FeedCardTitle>{conceptTitle}</FeedCardTitle>
+      <FeedCardHint>Fissa l&apos;idea in una frase. Scorri su quando sei pronto.</FeedCardHint>
+
       {imageUrl ? (
         <figure className="space-y-2">
-          <div className="relative aspect-video overflow-hidden rounded-2xl border border-border">
+          <div className="relative min-h-[180px] max-h-[min(48vh,400px)] w-full overflow-hidden rounded-2xl border border-border bg-muted/20">
             <OptimizedImage
               src={imageUrl}
               alt={imageCaption ?? conceptTitle}
               fill
               priority
-              sizes="(max-width: 768px) 100vw, 640px"
+              objectFit="contain"
+              sizes="(max-width: 768px) 100vw, 100vw"
             />
           </div>
           {imageCaption ? (
@@ -52,7 +54,8 @@ function ExplainCardComponent({
           ) : null}
         </figure>
       ) : null}
-      <div className="space-y-4 text-sm leading-7 text-foreground">
+
+      <div className="space-y-4 text-base leading-7 text-foreground">
         <p className="text-lg font-medium leading-8">{card.text}</p>
         {canExpand && !expanded ? (
           <Button
@@ -66,7 +69,7 @@ function ExplainCardComponent({
         ) : null}
         {canExpand && expanded ? (
           <div className="space-y-3">
-            <p className="rounded-xl bg-accent/60 p-4 text-muted">
+            <p className="rounded-2xl bg-accent/60 p-4 text-sm text-muted">
               {card.explanation}
             </p>
             <Button
@@ -80,17 +83,13 @@ function ExplainCardComponent({
           </div>
         ) : null}
       </div>
-      <Button
-        className="mt-6"
-        fullWidth
-        disabled={disabled}
-        onClick={() =>
-          onContinue({ outcome: SessionEventOutcome.Neutral, isCorrect: true })
-        }
-      >
-        Ho capito
-      </Button>
-    </Card>
+
+      <div className="mt-auto pt-2">
+        <Button fullWidth disabled={disabled} onClick={handleContinue}>
+          Ho capito
+        </Button>
+      </div>
+    </FeedCardSurface>
   );
 }
 

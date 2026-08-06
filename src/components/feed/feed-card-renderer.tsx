@@ -54,6 +54,7 @@ function FeedCardRendererComponent({
   disabled,
   onAnswer,
   onSkip,
+  registerAdvance,
 }: {
   card: Card;
   atomId?: AtomId;
@@ -63,6 +64,7 @@ function FeedCardRendererComponent({
   disabled?: boolean;
   onAnswer: (result: CardAnswerResult) => void;
   onSkip: () => void;
+  registerAdvance?: (action: (() => void) | null) => void;
 }) {
   const props = {
     card,
@@ -73,6 +75,7 @@ function FeedCardRendererComponent({
     disabled,
     onContinue: onAnswer,
     onSkip,
+    registerAdvance,
   };
 
   switch (card.type) {
