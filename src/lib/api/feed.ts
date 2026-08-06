@@ -1,6 +1,7 @@
 import type { FeedResponse } from "@/domain/entities/feed-item";
 import type { StudySession } from "@/domain/entities/study-session";
 import type { KnowledgeSourceId, StudySessionId, SubjectId } from "@/domain/ids";
+import type { EndSessionResult } from "@/session/types";
 import { apiFetch } from "./client";
 
 export async function createStudySession(
@@ -38,8 +39,10 @@ export async function resumeSession(sessionId: StudySessionId): Promise<void> {
   await apiFetch(`/api/v1/sessions/${sessionId}/resume`, { method: "POST" });
 }
 
-export async function endSession(sessionId: StudySessionId): Promise<void> {
-  await apiFetch(`/api/v1/sessions/${sessionId}/end`, {
+export async function endSession(
+  sessionId: StudySessionId
+): Promise<EndSessionResult> {
+  return apiFetch<EndSessionResult>(`/api/v1/sessions/${sessionId}/end`, {
     method: "POST",
     body: JSON.stringify({}),
   });

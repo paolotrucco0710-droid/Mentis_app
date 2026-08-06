@@ -24,6 +24,11 @@ import { IconButton } from "@/components/ui";
 import { ChevronRightIcon } from "@/components/ui/icons";
 import { FeedCardRenderer } from "./feed-card-renderer";
 import { FeedCardStage } from "./feed-card-stage";
+import { SessionComplete } from "./session-complete";
+import {
+  buildSessionSummaryView,
+  type SessionSummaryView,
+} from "./session-summary";
 import type { CardAnswerResult } from "./card-utils";
 
 const SESSION_STORAGE_KEY = "mentis.activeSessionId";
@@ -32,7 +37,7 @@ const CHAPTER_SCOPE_KEY = "mentis.activeKnowledgeSourceId";
 type FeedState =
   | { status: "loading" }
   | { status: "ready"; session: StudySession; item: FeedItem }
-  | { status: "complete"; session: StudySession }
+  | { status: "complete"; summary: SessionSummaryView }
   | { status: "error"; message: string; code?: string };
 
 function allowsSwipeWithoutAdvance(type: CardType): boolean {
@@ -58,6 +63,40 @@ export function FeedStudy() {
   const bootstrapStarted = useRef(false);
   const answering = useRef(false);
   const advanceActionRef = useRef<(() => void) | null>(null);
+  const conceptsStudiedRef = useRef<Map<string, string>>(new Map());
+  const masteryGainRef = useRef(0);
+
+  const feedHref = (() => {
+    const params = new URLSearchParams();
+    if (subjectId) {
+      params.set("subjectId", subjectId);
+    }
+    if (knowledgeSourceId) {
+      params.set("knowledgeSourceId", knowledgeSourceId);
+    }
+    const query = params.toString();
+    return query ? `/feed?${query}` : "/feed";
+  })();
+
+  const finalizeSession = useCallback(async (sessionId: StudySessionId) => {
+    try {
+      const result = await endSession(sessionId);
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      setState({
+        status: "complete",
+        summary: buildSessionSummaryView(result, {
+          conceptsStudied: [...conceptsStudiedRef.current.values()],
+          masteryGain: masteryGainRef.current,
+        }),
+      });
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : "Impossibile chiudere la sessione.";
+      setState({ status: "error", message });
+    }
+  }, []);
 
   const registerAdvance = useCallback((action: (() => void) | null) => {
     advanceActionRef.current = action;
@@ -69,6 +108,7 @@ export function FeedStudy() {
       cardStartedAt.current = Date.now();
       advanceActionRef.current = null;
       setAdvanceReady(false);
+      conceptsStudiedRef.current.set(item.atomId, item.atomTitle);
       setState({
         status: "ready",
         session: session ?? ({ id: item.sessionId } as StudySession),
@@ -79,27 +119,19 @@ export function FeedStudy() {
   );
 
   const applyFeedResponse = useCallback(
-    (
+    async (
       session: StudySession | undefined,
       feed: FeedResponse,
       sessionId: StudySessionId
     ) => {
       if (!feed.item || feed.sessionComplete) {
-        setState({
-          status: "complete",
-          session:
-            session ??
-            ({
-              id: sessionId,
-            } as StudySession),
-        });
-        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        await finalizeSession(sessionId);
         return;
       }
 
       applyFeedItem(session, feed.item);
     },
-    [applyFeedItem]
+    [applyFeedItem, finalizeSession]
   );
 
   const loadNext = useCallback(
@@ -123,7 +155,7 @@ export function FeedStudy() {
             return;
           }
 
-          applyFeedResponse(session, feed, sessionId);
+          await applyFeedResponse(session, feed, sessionId);
         });
 
       return loadQueue.current;
@@ -137,6 +169,8 @@ export function FeedStudy() {
     }
 
     bootstrapStarted.current = true;
+    conceptsStudiedRef.current = new Map();
+    masteryGainRef.current = 0;
 
     try {
       const storedScope = sessionStorage.getItem(CHAPTER_SCOPE_KEY) ?? "";
@@ -233,8 +267,12 @@ export function FeedStudy() {
         ...(knowledgeSourceId ? { knowledgeSourceId } : {}),
       });
 
+      if (submission.masteryDelta > 0) {
+        masteryGainRef.current += submission.masteryDelta;
+      }
+
       if (submission.nextFeed) {
-        applyFeedResponse(session, submission.nextFeed, session.id);
+        await applyFeedResponse(session, submission.nextFeed, session.id);
       } else {
         await loadNext(session.id, session);
       }
@@ -302,17 +340,7 @@ export function FeedStudy() {
       return;
     }
 
-    try {
-      await endSession(state.session.id);
-      sessionStorage.removeItem(SESSION_STORAGE_KEY);
-      setState({ status: "complete", session: state.session });
-    } catch (error) {
-      const message =
-        error instanceof ApiError
-          ? error.message
-          : "Impossibile chiudere la sessione.";
-      setState({ status: "error", message });
-    }
+    await finalizeSession(state.session.id);
   }
 
   function handleRetry() {
@@ -365,15 +393,7 @@ export function FeedStudy() {
 
   if (state.status === "complete") {
     return (
-      <EmptyState
-        title="Sessione completata"
-        description="Ottimo lavoro! Hai completato questa sessione di studio."
-        action={
-          <Link href="/home">
-            <Button>Torna alla home</Button>
-          </Link>
-        }
-      />
+      <SessionComplete summary={state.summary} feedHref={feedHref} />
     );
   }
 
