@@ -35,6 +35,11 @@ export {
 } from "./subjects";
 export { fetchLibraryOverview } from "./library";
 export { fetchHomeContinueContext } from "./home";
+export {
+  fetchDailyReview,
+  fetchReviewQueue,
+  syncReviews,
+} from "./reviews";
 export { searchLibrary } from "./search";
 export {
   deleteChapter,
