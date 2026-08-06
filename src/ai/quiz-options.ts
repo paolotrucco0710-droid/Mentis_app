@@ -178,10 +178,10 @@ export function buildQuizOptions(
     );
   }
 
-  const compactCorrect = compactPhrase(correctAnswer, 120);
+  const compactCorrect = compactPhrase(correctAnswer, 180);
   const compactDistractors = filteredDistractors
     .slice(0, 3)
-    .map((option) => compactPhrase(option, 120));
+    .map((option) => compactPhrase(option, 180));
   const options = shuffle(
     [compactCorrect, ...compactDistractors],
     atom.id
@@ -235,10 +235,10 @@ export function buildSecondaryQuiz(
       );
     }
 
-    const compactCorrect = compactPhrase(correctAnswer, 120);
-    const compactDistractors = distractors
-      .slice(0, 3)
-      .map((option) => compactPhrase(option, 120));
+  const compactCorrect = compactPhrase(correctAnswer, 180);
+  const compactDistractors = distractors
+    .slice(0, 3)
+    .map((option) => compactPhrase(option, 180));
     const options = shuffle(
       [compactCorrect, ...compactDistractors],
       `${atom.id}:secondary`

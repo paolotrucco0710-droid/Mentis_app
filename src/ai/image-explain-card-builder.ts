@@ -3,10 +3,6 @@ import type { KnowledgeJson } from "@/domain/knowledge";
 import type { AtomId } from "@/domain/ids";
 import type { Prisma } from "@prisma/client";
 import { env } from "@/lib/env";
-import {
-  buildImageLabelingTask,
-  buildImageLabelPrompt,
-} from "./image-label-regions";
 import { buildQuizOptions } from "./quiz-options";
 import { deterministicShuffle } from "./deterministic-shuffle";
 
@@ -28,29 +24,8 @@ export function buildImageExplainCardFields(
   cognitiveObjective: CognitiveObjective;
   payload: Prisma.InputJsonValue;
 } {
-  const labeling = buildImageLabelingTask(atomId, atom, imageReference);
-
-  if (labeling) {
-    return {
-      prompt: imageReference.caption ?? `Illustrazione: ${atom.title}`,
-      text: imageReference.caption ?? "",
-      explanation: atom.explanation,
-      correctFeedback: "Hai individuato la zona giusta.",
-      incorrectFeedback: imageReference.description ?? atom.summary,
-      estimatedDurationSeconds: 50,
-      cognitiveObjective: CognitiveObjective.Connection,
-      payload: {
-        imageId: imageReference.imageId,
-        mode: labeling.mode,
-        regions: labeling.regions,
-        correctRegionId: labeling.correctRegionId,
-        targetLabel: labeling.targetLabel,
-        question: buildImageLabelPrompt(labeling.targetLabel),
-        revealText: imageReference.description ?? atom.summary,
-      } as unknown as Prisma.InputJsonValue,
-    };
-  }
-
+  // Tap-zone overlays use synthetic grids, not real diagram regions — quiz mode
+  // gives clearer questions and answers until vision bbox labeling ships.
   const quiz = buildQuizOptions(
     {
       id: atomId,

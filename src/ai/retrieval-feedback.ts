@@ -36,7 +36,7 @@ const retrievalFeedbackSchema = z.object({
     .optional(),
   gaps: z.union([z.array(z.string()), z.string(), z.null()]).optional(),
   suggestion: z.union([z.string(), z.null()]).optional(),
-  summary: z.string().min(1).max(240),
+  summary: z.string().min(1).max(400),
 });
 
 function toStringList(value: string | string[] | null | undefined): string[] {
@@ -55,8 +55,8 @@ function toStringList(value: string | string[] | null | undefined): string[] {
 function normalizeAiFeedback(
   parsed: z.infer<typeof retrievalFeedbackSchema>
 ): RetrievalFeedback {
-  const strengths = toStringList(parsed.strengths).slice(0, 1);
-  const gaps = toStringList(parsed.gaps).slice(0, 1);
+  const strengths = toStringList(parsed.strengths).slice(0, 2);
+  const gaps = toStringList(parsed.gaps).slice(0, 3);
   const suggestion = parsed.suggestion?.trim() ?? "";
 
   return {
@@ -180,8 +180,8 @@ Regole:
 - isCorrect=true se la risposta coglie l'idea centrale, anche senza tutti i dettagli.
 - Se isCorrect=true: strengths=[], gaps=[], suggestion="" (stringa vuota).
 - summary: UNA frase breve e positiva se corretto; altrimenti cosa manca in concreto.
-- strengths: al massimo 1 elemento breve (vuoto se corretto o nulla di utile).
-- gaps: al massimo 1 lacuna (vuoto se corretto).
+- strengths: al massimo 2 elementi brevi (vuoto se corretto o nulla di utile).
+- gaps: al massimo 3 lacune concrete (vuoto se corretto).
 - suggestion: solo se isCorrect=false, una frase pratica max 12 parole.
 
 Rispondi SOLO con JSON valido:

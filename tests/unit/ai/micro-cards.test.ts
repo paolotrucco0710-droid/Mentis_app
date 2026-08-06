@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { buildBlurtingKeyPoints, buildTrueFalseCards } from "@/ai/micro-cards";
+import { buildBlurtingKeyPoints, buildBlurtingMainPrompt, buildTrueFalseCards } from "@/ai/micro-cards";
 
 describe("micro-cards", () => {
-  it("builds short blurting key points", () => {
+  it("builds a user-facing blurting prompt", () => {
+    expect(
+      buildBlurtingMainPrompt({
+        title: "Civiltà romana",
+        summary: "La civiltà romana si sviluppò nel Mediterraneo.",
+        keywords: ["legione"],
+      })
+    ).toContain("Civiltà romana");
+  });
+
+  it("builds evaluation key points without arbitrary keyword suffixes", () => {
     const points = buildBlurtingKeyPoints({
       title: "Pellegrinaggi",
       summary:
@@ -16,8 +26,11 @@ describe("micro-cards", () => {
       keywords: ["Crociate"],
     });
 
-    expect(points.length).toBeLessThanOrEqual(3);
-    expect(points.every((point) => point.length <= 90)).toBe(true);
+    expect(points.length).toBeLessThanOrEqual(4);
+    expect(points.every((point) => point.length <= 160)).toBe(true);
+    expect(points.some((point) => point.includes("Pellegrinaggi: Crociate"))).toBe(
+      false
+    );
   });
 
   it("builds blurting key points when examples are omitted", () => {
@@ -28,7 +41,7 @@ describe("micro-cards", () => {
     });
 
     expect(points.length).toBeGreaterThan(0);
-    expect(points.every((point) => point.length <= 90)).toBe(true);
+    expect(points.every((point) => point.length <= 160)).toBe(true);
   });
 
   it("creates up to two distinct true/false cards", () => {

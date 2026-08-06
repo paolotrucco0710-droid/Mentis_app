@@ -13,17 +13,28 @@ export interface BlurtingKeyPointSource {
   keywords?: string[];
 }
 
+export function buildBlurtingMainPrompt(atom: BlurtingKeyPointSource): string {
+  const title = atom.title.trim();
+  const keyword = atom.keywords?.[0]?.trim();
+
+  if (keyword) {
+    return `Con parole tue: cosa ricordi su «${title}» e sul legame con «${keyword}»?`;
+  }
+
+  return `Cosa ricordi su «${title}»? Scrivi o parla liberamente, senza guardare gli appunti.`;
+}
+
+/** Reference points for AI evaluation — not shown as progressive steps. */
 export function buildBlurtingKeyPoints(atom: BlurtingKeyPointSource): string[] {
   const points = [
     ...(atom.definitions ?? []).slice(0, 2),
     ...(atom.examples ?? []).slice(0, 1),
     atom.summary,
-    ...(atom.keywords ?? []).slice(0, 1).map((keyword) => `${atom.title}: ${keyword}`),
   ]
     .filter(Boolean)
-    .map((point) => compactPhrase(point, 90));
+    .map((point) => compactPhrase(point, 160));
 
-  return [...new Set(points)].slice(0, 3);
+  return [...new Set(points)].slice(0, 4);
 }
 
 export interface TrueFalseCardContent {

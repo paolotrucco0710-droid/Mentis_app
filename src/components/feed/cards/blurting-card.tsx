@@ -1,13 +1,11 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import type { RetrievalFeedback } from "@/ai/retrieval-feedback";
 import { Button, Loader } from "@/components/ui";
 import { SessionEventOutcome } from "@/domain/enums";
 import { ApiError, evaluateRetrievalResponse } from "@/lib/api";
 import {
-  buildBlurtingSteps,
-  canAdvanceBlurtingStep,
   combineBlurtingAnswers,
   getBlurtingContinueLabel,
   getBlurtingStepPrompt,
@@ -27,17 +25,13 @@ export function BlurtingCardComponent({
   registerAdvance,
 }: FeedCardProps) {
   const payload = isBlurtingPayload(card.payload) ? card.payload : null;
-  const steps = useMemo(
-    () => buildBlurtingSteps(payload?.keyPoints ?? []),
-    [payload?.keyPoints]
-  );
   const [phase, setPhase] = useState<BlurtingFlowPhase>("ready");
-  const [stepIndex, setStepIndex] = useState(0);
-  const [answers, setAnswers] = useState<string[]>([]);
-  const [currentAnswer, setCurrentAnswer] = useState("");
+  const [answer, setAnswer] = useState("");
   const [feedback, setFeedback] = useState<RetrievalFeedback | null>(null);
   const [evaluating, setEvaluating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const recallPrompt = payload?.prompt ?? "";
 
   const handleContinue = useCallback(() => {
     if (!feedback) {
@@ -63,8 +57,7 @@ export function BlurtingCardComponent({
     return null;
   }
 
-  const totalSteps = steps.length;
-  const canAdvance = canAdvanceBlurtingStep(currentAnswer, stepIndex, totalSteps);
+  const canAdvance = answer.trim().length >= 5;
 
   async function handleEvaluate(combinedAnswer: string) {
     if (!atomId) {
@@ -94,27 +87,9 @@ export function BlurtingCardComponent({
 
   function handleStart() {
     setPhase("recall");
-    setStepIndex(0);
-    setAnswers([]);
-    setCurrentAnswer("");
+    setAnswer("");
     setFeedback(null);
     setError(null);
-  }
-
-  function handleStepAdvance() {
-    const nextAnswers = [...answers];
-    nextAnswers[stepIndex] = currentAnswer;
-    setAnswers(nextAnswers);
-
-    if (stepIndex >= totalSteps - 1) {
-      void handleEvaluate(
-        combineBlurtingAnswers(steps, nextAnswers)
-      );
-      return;
-    }
-
-    setStepIndex(stepIndex + 1);
-    setCurrentAnswer(nextAnswers[stepIndex + 1] ?? "");
   }
 
   if (phase === "ready") {
@@ -122,8 +97,7 @@ export function BlurtingCardComponent({
       <FeedCardSurface>
         <FeedCardTitle>Blurting</FeedCardTitle>
         <FeedCardHint>
-          {payload.prompt ||
-            "Richiama il concetto a mente, un passo alla volta."}
+          {recallPrompt || "Richiama il concetto a mente, poi premi Fine."}
         </FeedCardHint>
         <div className="flex flex-1 flex-col justify-end">
           <Button fullWidth disabled={disabled} onClick={handleStart}>
@@ -139,10 +113,14 @@ export function BlurtingCardComponent({
       <FeedCardSurface>
         <FeedCardTitle>Blurting</FeedCardTitle>
         <RetrievalFeedbackPanel feedback={feedback} />
-        {!feedback.isCorrect ? (
+        {!feedback.isCorrect && payload.keyPoints.length > 0 ? (
           <div>
-            <p className="text-sm font-medium">Da ricordare:</p>
-            <p className="mt-1 text-sm text-muted">{payload.keyPoints[0]}</p>
+            <p className="text-sm font-medium">Punti di riferimento:</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted">
+              {payload.keyPoints.map((point) => (
+                <li key={point}>{point}</li>
+              ))}
+            </ul>
           </div>
         ) : null}
         <Button fullWidth disabled={disabled} onClick={handleContinue}>
@@ -155,24 +133,11 @@ export function BlurtingCardComponent({
   return (
     <FeedCardSurface>
       <FeedCardTitle>Blurting</FeedCardTitle>
-      <div
-        className="flex items-center gap-2"
-        aria-label={`Passo ${stepIndex + 1} di ${totalSteps}`}
-      >
-        {steps.map((_, index) => (
-          <div
-            key={index}
-            className={`h-1.5 flex-1 rounded-full transition-colors ${
-              index <= stepIndex ? "bg-primary" : "bg-border"
-            }`}
-          />
-        ))}
-      </div>
-      <FeedCardHint>{getBlurtingStepPrompt(stepIndex, totalSteps)}</FeedCardHint>
+      <FeedCardHint>{getBlurtingStepPrompt(recallPrompt)}</FeedCardHint>
       <RetrievalVoiceInput
-        label={totalSteps === 1 ? "La tua risposta" : `Punto ${stepIndex + 1}`}
-        value={currentAnswer}
-        onChange={setCurrentAnswer}
+        label="La tua risposta"
+        value={answer}
+        onChange={setAnswer}
         placeholder="Scrivi o parla liberamente..."
         disabled={disabled || evaluating}
       />
@@ -186,9 +151,9 @@ export function BlurtingCardComponent({
         className="mt-2"
         fullWidth
         disabled={disabled || evaluating || !canAdvance}
-        onClick={handleStepAdvance}
+        onClick={() => void handleEvaluate(combineBlurtingAnswers([answer]))}
       >
-        {getBlurtingContinueLabel(stepIndex, totalSteps)}
+        {getBlurtingContinueLabel()}
       </Button>
     </FeedCardSurface>
   );

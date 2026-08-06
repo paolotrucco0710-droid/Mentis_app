@@ -11,7 +11,7 @@ import {
 import { buildConnectionCardsForAtom } from "./connection-card-builder";
 import { buildImageExplainCardCreateInput } from "./image-explain-card-builder";
 import { deterministicShuffle } from "./deterministic-shuffle";
-import { buildBlurtingKeyPoints, buildTrueFalseCards } from "./micro-cards";
+import { buildBlurtingKeyPoints, buildBlurtingMainPrompt, buildTrueFalseCards } from "./micro-cards";
 import { buildQuizOptions, buildSecondaryQuiz } from "./quiz-options";
 import { compactPhrase } from "./text-snippets";
 
@@ -274,19 +274,23 @@ function buildCardsForAtom(
     ...sourceContext,
     keywords: atom.keywords,
   });
+  const blurtingPrompt = buildBlurtingMainPrompt({
+    ...sourceContext,
+    keywords: atom.keywords,
+  });
 
   cards.push({
     atomId,
     type: CardType.Blurting,
     order: order++,
     cognitiveObjective: CognitiveObjective.Retrieval,
-    prompt: `Cosa ricordi su "${atom.title}"?`,
+    prompt: blurtingPrompt,
     text: `Blurting: ${atom.title}`,
     explanation: compactPhrase(atom.explanation, 200),
     correctFeedback: "Ottimo recupero attivo.",
     estimatedDurationSeconds: 45,
     payload: {
-      prompt: `Scrivi i punti chiave su "${atom.title}" con parole tue.`,
+      prompt: blurtingPrompt,
       keyPoints: blurtingKeyPoints,
     } as Prisma.InputJsonValue,
     aiVersion: env.aiPromptVersion,

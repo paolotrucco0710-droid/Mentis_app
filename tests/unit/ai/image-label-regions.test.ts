@@ -74,7 +74,7 @@ describe("image-label-regions", () => {
 });
 
 describe("image-explain-card-builder", () => {
-  it("prefers tap-zone payload when labeling data is available", () => {
+  it("uses quiz payload for image explain cards until real bbox labeling ships", () => {
     const fields = buildImageExplainCardFields(
       atomId,
       {
@@ -104,8 +104,8 @@ describe("image-explain-card-builder", () => {
       correctRegionId?: string;
     };
 
-    expect(payload.mode).toBe("tap-zone");
-    expect(payload.regions?.length).toBeGreaterThanOrEqual(2);
-    expect(payload.correctRegionId).toBeTruthy();
+    expect(payload.mode).toBe("quiz");
+    expect(payload.options?.length).toBeGreaterThanOrEqual(2);
+    expect(payload.correctOptionIndex).toBeGreaterThanOrEqual(0);
   });
 });
