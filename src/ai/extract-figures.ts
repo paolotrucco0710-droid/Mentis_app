@@ -20,15 +20,18 @@ import {
   writeCacheResult,
 } from "./optimization";
 
-const FIGURE_DETECTION_PROMPT_VERSION = "v2";
+const FIGURE_DETECTION_PROMPT_VERSION = "v3";
 const MIN_FIGURE_AREA_RATIO = 0.04;
 const MAX_FIGURE_AREA_RATIO = 0.55;
-const MIN_FIGURE_ASPECT_RATIO = 0.35;
+const MIN_FIGURE_ASPECT_RATIO = 0.5;
 const MAX_FIGURE_ASPECT_RATIO = 1 / MIN_FIGURE_ASPECT_RATIO;
+const MAX_FIGURE_HEIGHT_RATIO = 0.68;
 const MIN_FIGURE_DIMENSION_PX = 48;
 const PAGE_EDGE_INSET = 0.025;
 const MAX_PAGE_EDGE_TOUCHES = 2;
 const MAX_SINGLE_AXIS_SPAN = 0.82;
+const TALL_BOTTOM_BLEED_HEIGHT_RATIO = 0.55;
+const CROP_PADDING_RATIO = 0.025;
 
 const rawFigureDetectionSchema = z.object({
   figures: z
@@ -124,6 +127,22 @@ function countNearPageEdges(bbox: NormalizedBoundingBox): number {
   return touches;
 }
 
+export function applyCropPadding(
+  bbox: NormalizedBoundingBox
+): NormalizedBoundingBox {
+  const widthFrac = bbox.right - bbox.left;
+  const heightFrac = bbox.bottom - bbox.top;
+  const padX = widthFrac * CROP_PADDING_RATIO;
+  const padY = heightFrac * CROP_PADDING_RATIO;
+
+  return {
+    top: Math.max(0, bbox.top - padY),
+    left: Math.max(0, bbox.left - padX),
+    bottom: Math.min(1, bbox.bottom + padY),
+    right: Math.min(1, bbox.right + padX),
+  };
+}
+
 export function isValidFigureCrop(
   bbox: NormalizedBoundingBox,
   pageWidth: number,
@@ -138,6 +157,17 @@ export function isValidFigureCrop(
   }
 
   if (widthFrac > MAX_SINGLE_AXIS_SPAN || heightFrac > MAX_SINGLE_AXIS_SPAN) {
+    return false;
+  }
+
+  if (heightFrac > MAX_FIGURE_HEIGHT_RATIO) {
+    return false;
+  }
+
+  if (
+    bbox.bottom >= 1 - PAGE_EDGE_INSET &&
+    heightFrac > TALL_BOTTOM_BLEED_HEIGHT_RATIO
+  ) {
     return false;
   }
 
@@ -181,6 +211,30 @@ export function toPixelBoundingBox(
 
   const areaRatio = (width * height) / (pageWidth * pageHeight);
   if (areaRatio < MIN_FIGURE_AREA_RATIO) {
+    return null;
+  }
+
+  return { left, top, width, height };
+}
+
+function toPixelBoundingBoxWithPadding(
+  bbox: NormalizedBoundingBox,
+  pageWidth: number,
+  pageHeight: number
+): PixelBoundingBox | null {
+  if (!isValidFigureCrop(bbox, pageWidth, pageHeight)) {
+    return null;
+  }
+
+  const padded = applyCropPadding(bbox);
+  const left = Math.floor(Math.max(0, padded.left) * pageWidth);
+  const top = Math.floor(Math.max(0, padded.top) * pageHeight);
+  const right = Math.ceil(Math.min(1, padded.right) * pageWidth);
+  const bottom = Math.ceil(Math.min(1, padded.bottom) * pageHeight);
+  const width = right - left;
+  const height = bottom - top;
+
+  if (width < MIN_FIGURE_DIMENSION_PX || height < MIN_FIGURE_DIMENSION_PX) {
     return null;
   }
 
@@ -255,14 +309,20 @@ async function detectFiguresOnPage(
             {
               type: "text",
               text: `Analizza questa pagina di libro scolastico in italiano.
-Identifica SOLO illustrazioni didattiche utili allo studio: dipinti, mappe, diagrammi, grafici, tavole, foto storiche, schemi.
-NON includere:
-- blocchi o colonne di testo
-- margini o bordi della pagina
-- la pagina intera o più del 60% della pagina
+Identifica SOLO la parte visiva di illustrazioni didattiche: foto, dipinti, mappe, diagrammi, grafici, tavole, schemi.
+
+NON includere MAI:
+- colonne, paragrafi o blocchi di testo (nemmeno parzialmente)
+- didascalie, legende o caption sotto/sopra l'illustrazione
+- margini o bordi bianchi della pagina
+- la pagina intera o più del 55% della pagina
 - decorazioni minime senza valore didattico
 
-Il riquadro deve aderire strettamente all'illustrazione, con margini minimi attorno.
+REGOLE per il riquadro:
+- Ritaglia SOLO l'illustrazione/fotografia, completa e non tagliata ai bordi
+- Se foto e testo sono affiancati, seleziona esclusivamente la foto
+- Resta aderente all'illustrazione con margini minimi (2-3%)
+- Non estendere il riquadro fino al testo sottostante
 
 Per ogni illustrazione restituisci JSON:
 {
@@ -279,7 +339,7 @@ Per ogni illustrazione restituisci JSON:
 }
 
 Le coordinate top/left/bottom/right devono essere normalizzate tra 0.0 e 1.0 (frazione dell'immagine), NON in pixel.
-Esempio: un riquadro al centro può essere top=0.2, left=0.55, bottom=0.75, right=0.95.
+Esempio: una foto al centro-destra può essere top=0.2, left=0.55, bottom=0.62, right=0.95.
 Massimo 3 figure. Se non ci sono illustrazioni didattiche, restituisci {"figures":[]}.`,
             },
             {
@@ -411,7 +471,7 @@ export async function extractFiguresFromPageImages(input: {
           continue;
         }
 
-        const pixelBox = toPixelBoundingBox(
+        const pixelBox = toPixelBoundingBoxWithPadding(
           normalized,
           pageWidth,
           pageHeight
