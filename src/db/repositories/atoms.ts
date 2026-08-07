@@ -55,6 +55,20 @@ export async function findAtomsBySubjectId(
   return records.map(toAtom);
 }
 
+export async function findAtomsDependingOnPrerequisite(
+  prerequisiteAtomId: AtomId
+): Promise<Atom[]> {
+  const records = await prisma.atom.findMany({
+    where: {
+      prerequisites: {
+        some: { prerequisiteAtomId },
+      },
+    },
+    include: atomInclude,
+  });
+  return records.map(toAtom);
+}
+
 export async function countAtomsBySubjectId(
   subjectId: SubjectId
 ): Promise<number> {

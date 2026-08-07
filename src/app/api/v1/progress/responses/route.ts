@@ -12,6 +12,7 @@ import { resolveDevUserId } from "@/engine/dev";
 import { recordCardResponse } from "@/progress";
 
 export const runtime = "nodejs";
+export const preferredRegion = "fra1";
 
 const VALID_OUTCOMES = new Set<string>(Object.values(SessionEventOutcome));
 

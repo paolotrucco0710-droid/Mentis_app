@@ -3,7 +3,7 @@ import {
   trackAnalyticsEvent,
   trackFunnelMilestoneAsync,
 } from "@/analytics";
-import { findAtomById, findAtomsBySubjectId } from "@/db/repositories/atoms";
+import { findAtomById } from "@/db/repositories/atoms";
 import { findCardById } from "@/db/repositories/cards";
 import { upsertDailyStatistics } from "@/db/repositories/daily-statistics";
 import { createSessionEvent } from "@/db/repositories/session-events";
@@ -14,7 +14,6 @@ import { PROGRESS_TRANSACTION_OPTIONS } from "@/db/transaction-options";
 import { assertSessionReadyForStudy } from "@/session";
 import {
   findUserAtomState,
-  findUserAtomStatesByUserAndAtomIds,
   upsertUserAtomState,
 } from "@/db/repositories/user-atom-states";
 import {
@@ -38,7 +37,7 @@ import {
   startOfDay,
 } from "./statistics";
 import type { RecordCardResponseInput, RecordCardResponseResult } from "./types";
-import { unlockDependentAtoms } from "./unlock";
+import { unlockAtomsUnlockedByPrerequisite } from "./unlock";
 
 export async function recordCardResponse(
   input: RecordCardResponseInput
@@ -108,7 +107,7 @@ export async function recordCardResponse(
     atomState,
     cardState,
     sessionEvent,
-    unlockedAtomIds,
+    updatedSession,
   } = await prisma.$transaction(async (tx) => {
     const atomState = await upsertUserAtomState(
       {
@@ -172,7 +171,7 @@ export async function recordCardResponse(
       tx
     );
 
-    await recordSessionAnswer(
+    const updatedSession = await recordSessionAnswer(
       {
         id: input.sessionId,
         wasCorrect,
@@ -195,30 +194,25 @@ export async function recordCardResponse(
       tx
     );
 
-    const subjectAtoms = await findAtomsBySubjectId(atom.subjectId);
-    const subjectAtomIds = subjectAtoms.map((subjectAtom) => subjectAtom.id);
-    const scopedStates = await findUserAtomStatesByUserAndAtomIds(
-      input.userId,
-      subjectAtomIds
-    );
-    const userAtomStates = new Map(
-      scopedStates.map((state) => [state.atomId, state])
-    );
-    userAtomStates.set(atomState.atomId, atomState);
-    const unlockedAtomIds = await unlockDependentAtoms({
-      userId: input.userId,
-      atoms: subjectAtoms,
-      userAtomStates,
-      tx,
-    });
-
     return {
       atomState,
       cardState,
       sessionEvent,
-      unlockedAtomIds,
+      updatedSession,
     };
   }, PROGRESS_TRANSACTION_OPTIONS);
+
+  void unlockAtomsUnlockedByPrerequisite({
+    userId: input.userId,
+    prerequisiteAtomId: input.atomId,
+  }).catch(() => undefined);
+
+  void scheduleReviewForAtom({
+    userId: input.userId,
+    atomId: input.atomId,
+    atomState,
+    now,
+  }).catch(() => undefined);
 
   void trackAnalyticsEvent({
     userId: input.userId,
@@ -249,35 +243,21 @@ export async function recordCardResponse(
     masteryBefore,
     masteryAfter: atomState.mastery,
     masteryDelta: atomState.mastery - masteryBefore,
-    unlockedAtomIds,
+    unlockedAtomIds: [],
     subjectProgress: null,
   };
 
-  const nextFeedPromise =
-    input.includeNextFeed && session.subjectId
-      ? getNextFeedItem({
-          userId: input.userId,
-          subjectId: session.subjectId as SubjectId,
-          sessionId: input.sessionId,
-          ...(input.knowledgeSourceId
-            ? { knowledgeSourceId: input.knowledgeSourceId }
-            : {}),
-        })
-      : Promise.resolve(undefined);
-
-  await Promise.all([
-    scheduleReviewForAtom({
+  if (input.includeNextFeed && updatedSession.subjectId) {
+    result.nextFeed = await getNextFeedItem({
       userId: input.userId,
-      atomId: input.atomId,
-      atomState,
-      now,
-    }),
-    nextFeedPromise.then((nextFeed) => {
-      if (nextFeed) {
-        result.nextFeed = nextFeed;
-      }
-    }),
-  ]);
+      subjectId: updatedSession.subjectId as SubjectId,
+      sessionId: input.sessionId,
+      session: updatedSession,
+      ...(input.knowledgeSourceId
+        ? { knowledgeSourceId: input.knowledgeSourceId }
+        : {}),
+    });
+  }
 
   return result;
 }

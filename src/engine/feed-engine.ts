@@ -1,19 +1,18 @@
-import { countAtomsBySubjectId, findAtomsBySubjectId } from "@/db/repositories/atoms";
+import { countAtomsBySubjectId, findAtomsByKnowledgeSourceId, findAtomsBySubjectId } from "@/db/repositories/atoms";
 import { findCardsByAtomIds } from "@/db/repositories/cards";
-import { createSessionEvent } from "@/db/repositories/session-events";
+import { createSessionEvent, findRecentSessionEventsBySessionId } from "@/db/repositories/session-events";
 import {
   AnalyticsEvents,
   trackAnalyticsEvent,
 } from "@/analytics";
 import { findSubjectById } from "@/db/repositories/subjects";
-import { findSessionEventsBySessionId } from "@/db/repositories/session-events";
 import { assertSessionReadyForStudy } from "@/session";
 import {
   findUserAtomStatesByUserAndAtomIds,
   upsertUserAtomState,
 } from "@/db/repositories/user-atom-states";
 import { findUserCardStatesByUserAndCardIds } from "@/db/repositories/user-card-states";
-import type { Atom, Card, FeedItem, FeedResponse, UserAtomState } from "@/domain/entities";
+import type { Atom, Card, FeedItem, FeedResponse, SessionEvent, StudySession, UserAtomState } from "@/domain/entities";
 import { CardType, SessionEventType } from "@/domain/enums";
 import type { AtomId, ImageId, KnowledgeSourceId, StudySessionId, SubjectId, UserId } from "@/domain/ids";
 import { env } from "@/lib/env";
@@ -32,6 +31,7 @@ export interface GetNextFeedItemInput {
   subjectId: SubjectId;
   sessionId: StudySessionId;
   knowledgeSourceId?: KnowledgeSourceId;
+  session?: StudySession;
 }
 
 export async function getNextFeedItem(
@@ -67,7 +67,7 @@ export async function getNextFeedItem(
     timestamp: now,
   });
 
-  trackAnalyticsEvent({
+  void trackAnalyticsEvent({
     userId: input.userId,
     name: AnalyticsEvents.StudyCardOpened,
     category: "study",
@@ -98,10 +98,9 @@ export async function getNextFeedItem(
 async function loadFeedContext(
   input: GetNextFeedItemInput
 ): Promise<FeedEngineContext> {
-  const session = await assertSessionReadyForStudy(
-    input.userId,
-    input.sessionId
-  );
+  const session =
+    input.session ??
+    (await assertSessionReadyForStudy(input.userId, input.sessionId));
 
   if (session.subjectId && session.subjectId !== input.subjectId) {
     throw new FeedEngineError(
@@ -111,7 +110,14 @@ async function loadFeedContext(
     );
   }
 
-  const subject = await findSubjectById(input.subjectId);
+  const [subject, atoms, sessionEvents] = await Promise.all([
+    findSubjectById(input.subjectId),
+    input.knowledgeSourceId
+      ? findAtomsByKnowledgeSourceId(input.knowledgeSourceId)
+      : findAtomsBySubjectId(input.subjectId),
+    findRecentSessionEventsBySessionId(session.id, 50),
+  ]);
+
   if (!subject) {
     throw new FeedEngineError(
       "Materia non trovata.",
@@ -128,14 +134,13 @@ async function loadFeedContext(
     );
   }
 
-  const atoms = await findAtomsBySubjectId(input.subjectId);
-  const scopedAtoms = input.knowledgeSourceId
-    ? atoms.filter((atom) => atom.knowledgeSourceId === input.knowledgeSourceId)
-    : atoms;
+  const scopedAtoms = atoms;
 
-  const userAtomStates = await ensureUserAtomStates(input.userId, scopedAtoms);
+  const [userAtomStates, cards] = await Promise.all([
+    ensureUserAtomStates(input.userId, scopedAtoms),
+    findCardsByAtomIds(scopedAtoms.map((atom) => atom.id)),
+  ]);
 
-  const cards = await findCardsByAtomIds(scopedAtoms.map((atom) => atom.id));
   const cardsByAtomId = groupCardsByAtom(cards);
   const cardsById = new Map(cards.map((card) => [card.id, card]));
 
@@ -147,7 +152,6 @@ async function loadFeedContext(
     userCardStatesList.map((state) => [state.cardId, state])
   );
 
-  const sessionEvents = await findSessionEventsBySessionId(session.id);
   const lastCardType = resolveLastCardType(sessionEvents, cardsById);
   const recentCardTypes = resolveRecentCardTypes(sessionEvents, cardsById);
   const recentAtomIds = resolveRecentAtomIds(sessionEvents);
@@ -398,7 +402,7 @@ function groupCardsByAtom(cards: Card[]): Map<string, Card[]> {
 }
 
 function resolveLastCardType(
-  events: Awaited<ReturnType<typeof findSessionEventsBySessionId>>,
+  events: SessionEvent[],
   cardsById: Map<string, Card>
 ): CardType | null {
   for (let index = events.length - 1; index >= 0; index -= 1) {
@@ -415,7 +419,7 @@ function resolveLastCardType(
 }
 
 function resolveRecentCardTypes(
-  events: Awaited<ReturnType<typeof findSessionEventsBySessionId>>,
+  events: SessionEvent[],
   cardsById: Map<string, Card>,
   limit = 4
 ): CardType[] {
@@ -443,7 +447,7 @@ function resolveRecentCardTypes(
 }
 
 function resolveRecentAtomCounts(
-  events: Awaited<ReturnType<typeof findSessionEventsBySessionId>>
+  events: SessionEvent[]
 ): Map<string, number> {
   const counts = new Map<string, number>();
 
@@ -459,7 +463,7 @@ function resolveRecentAtomCounts(
 }
 
 function resolveRecentAtomIds(
-  events: Awaited<ReturnType<typeof findSessionEventsBySessionId>>,
+  events: SessionEvent[],
   limit = 5
 ): AtomId[] {
   const recent: AtomId[] = [];
