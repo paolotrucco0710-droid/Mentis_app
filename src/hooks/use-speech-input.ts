@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  appendSpeechTranscript,
-  collectSpeechTranscript,
   DEFAULT_SPEECH_LANG,
   getSpeechRecognitionConstructor,
   isSpeechRecognitionSupported,
@@ -26,11 +24,13 @@ export function useSpeechInput({
   const [interimText, setInterimText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const processedUntilRef = useRef(0);
   const isSupported = isSpeechRecognitionSupported();
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();
     recognitionRef.current = null;
+    processedUntilRef.current = 0;
     setIsListening(false);
     setInterimText("");
   }, []);
@@ -50,13 +50,32 @@ export function useSpeechInput({
     recognition.lang = lang;
     recognition.continuous = true;
     recognition.interimResults = true;
+    processedUntilRef.current = 0;
+
     recognition.onresult = (event) => {
-      const { finalText, interimText: interim } = collectSpeechTranscript(event);
-      setInterimText(interim);
-      if (finalText) {
-        onFinalTranscript?.(finalText);
-        setInterimText("");
+      let interim = "";
+
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        if (!result) {
+          continue;
+        }
+
+        const transcript = result[0]?.transcript ?? "";
+        if (result.isFinal) {
+          if (index >= processedUntilRef.current) {
+            const finalChunk = transcript.trim();
+            if (finalChunk) {
+              onFinalTranscript?.(finalChunk);
+            }
+            processedUntilRef.current = index + 1;
+          }
+        } else {
+          interim += transcript;
+        }
       }
+
+      setInterimText(interim.trim());
     };
     recognition.onerror = (event) => {
       if (event.error === "no-speech") {
@@ -65,11 +84,13 @@ export function useSpeechInput({
       setError(mapSpeechRecognitionError(event.error));
       setIsListening(false);
       recognitionRef.current = null;
+      processedUntilRef.current = 0;
       setInterimText("");
     };
     recognition.onend = () => {
       setIsListening(false);
       recognitionRef.current = null;
+      processedUntilRef.current = 0;
       setInterimText("");
     };
 
@@ -82,6 +103,7 @@ export function useSpeechInput({
     } catch {
       setError(mapSpeechRecognitionError());
       recognitionRef.current = null;
+      processedUntilRef.current = 0;
       setIsListening(false);
     }
   }, [enabled, isListening, isSupported, lang, onFinalTranscript]);
@@ -99,6 +121,7 @@ export function useSpeechInput({
     if (!enabled && recognitionRef.current) {
       recognitionRef.current.abort();
       recognitionRef.current = null;
+      processedUntilRef.current = 0;
       setInterimText("");
     }
   }, [enabled]);
@@ -107,6 +130,7 @@ export function useSpeechInput({
     return () => {
       recognitionRef.current?.abort();
       recognitionRef.current = null;
+      processedUntilRef.current = 0;
     };
   }, []);
 
@@ -118,6 +142,5 @@ export function useSpeechInput({
     startListening,
     stopListening,
     toggleListening,
-    appendTranscript: appendSpeechTranscript,
   };
 }

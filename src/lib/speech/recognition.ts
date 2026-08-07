@@ -43,30 +43,80 @@ export function isSpeechRecognitionSupported(): boolean {
   return getSpeechRecognitionConstructor() !== null;
 }
 
+function normalizeSpeechText(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function findSuffixPrefixWordOverlap(left: string, right: string): number {
+  const leftWords = left.trim().split(/\s+/).filter(Boolean);
+  const rightWords = right.trim().split(/\s+/).filter(Boolean);
+
+  if (leftWords.length === 0 || rightWords.length === 0) {
+    return 0;
+  }
+
+  const maxSize = Math.min(leftWords.length, rightWords.length);
+  for (let size = maxSize; size > 0; size -= 1) {
+    const suffix = leftWords.slice(-size).join(" ").toLowerCase();
+    const prefix = rightWords.slice(0, size).join(" ").toLowerCase();
+    if (suffix !== prefix) {
+      continue;
+    }
+
+    let overlapLength = 0;
+    for (let index = 0; index < size; index += 1) {
+      if (index > 0) {
+        overlapLength += 1;
+      }
+      overlapLength += rightWords[index]?.length ?? 0;
+    }
+
+    return overlapLength;
+  }
+
+  return 0;
+}
+
 export function appendSpeechTranscript(
   current: string,
   transcript: string
 ): string {
-  const chunk = transcript.trim();
+  const chunk = transcript.trim().replace(/\s+/g, " ");
   if (!chunk) {
     return current;
   }
 
-  if (!current.trim()) {
+  const currentTrimmed = current.trim().replace(/\s+/g, " ");
+  if (!currentTrimmed) {
     return chunk;
   }
 
-  const currentLower = current.toLowerCase();
-  const chunkLower = chunk.toLowerCase();
-  if (
-    currentLower.endsWith(chunkLower) ||
-    currentLower.includes(` ${chunkLower}`)
-  ) {
-    return current;
+  const currentNormalized = normalizeSpeechText(currentTrimmed);
+  const chunkNormalized = normalizeSpeechText(chunk);
+
+  if (currentNormalized === chunkNormalized) {
+    return currentTrimmed;
   }
 
-  const needsSpace = !current.endsWith(" ") && !chunk.startsWith(" ");
-  return `${current}${needsSpace ? " " : ""}${chunk}`;
+  if (chunkNormalized.startsWith(currentNormalized)) {
+    return chunk;
+  }
+
+  if (currentNormalized.startsWith(chunkNormalized)) {
+    return currentTrimmed;
+  }
+
+  if (currentNormalized.includes(chunkNormalized)) {
+    return currentTrimmed;
+  }
+
+  const overlap = findSuffixPrefixWordOverlap(currentTrimmed, chunk);
+  if (overlap > 0) {
+    const merged = `${currentTrimmed}${chunk.slice(overlap)}`;
+    return merged.replace(/\s+/g, " ").trim();
+  }
+
+  return `${currentTrimmed} ${chunk}`;
 }
 
 export function collectSpeechTranscript(
