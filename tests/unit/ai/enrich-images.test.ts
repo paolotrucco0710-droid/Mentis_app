@@ -273,6 +273,29 @@ describe("enrichKnowledgeWithImages", () => {
     expect(enriched.atoms[0]?.images[0]?.imageId).toBe(imageId);
   });
 
+  it("links extracted figures to same-page atoms without caption overlap", async () => {
+    const knowledge = makeKnowledge();
+    knowledge.atoms[0] = {
+      ...knowledge.atoms[0]!,
+      title: "Le signorie cittadine in Italia",
+      summary: "Nel XIV secolo le città italiane si organizzarono in signorie.",
+      keywords: ["signoria", "comune", "tiranno"],
+      pageReferences: [1],
+      images: [],
+    };
+
+    const imageId = randomUUID();
+    const enriched = await enrichKnowledgeWithImages(knowledge, [
+      makeImage({
+        id: imageId,
+        pageNumber: 1,
+        caption: "Mappa dell'area mediterranea nel XIV secolo",
+      }),
+    ]);
+
+    expect(enriched.atoms[0]?.images[0]?.imageId).toBe(imageId);
+  });
+
   it("assigns same-page illustrations to the best matching atom", async () => {
     const knowledge = makeKnowledge(2);
     knowledge.atoms[0] = {
