@@ -9,7 +9,11 @@ import {
   shouldCreateImageExplainCard,
 } from "./image-study";
 import {
+  isImageLinkSemanticallyValid,
   resolveSemanticImageLinks,
+  scoreSemanticImageMatch,
+  selectGreedySemanticLinks,
+  MIN_PAGE_IMAGE_LINK_SCORE,
   type SemanticImageLinkTarget,
 } from "./link-images-semantically";
 import type { UsageTracker } from "./optimization";
@@ -100,6 +104,18 @@ function primaryPageForAtom(atom: KnowledgeJsonAtom, atomIndex: number): number 
   return atom.pageReferences[0] ?? atomIndex + 1;
 }
 
+function atomReferencesPage(
+  atom: KnowledgeJsonAtom,
+  atomIndex: number,
+  page: number
+): boolean {
+  if (atom.pageReferences.length > 0) {
+    return atom.pageReferences.includes(page);
+  }
+
+  return primaryPageForAtom(atom, atomIndex) === page;
+}
+
 function getUnassignedStudyImages(
   studyImages: Image[],
   assignedImageIds: Set<string>
@@ -124,28 +140,63 @@ function linkByExactPage(
   imagesByPage: Map<number, Image[]>,
   assignedImageIds: Set<string>
 ): KnowledgeJsonAtom[] {
-  return atoms.map((atom, atomIndex) => {
-    if (atom.images.length > 0) {
-      return atom;
+  const updated = [...atoms];
+  const pageNumbers = [...imagesByPage.keys()].sort((left, right) => left - right);
+
+  for (const page of pageNumbers) {
+    const pageImages = (imagesByPage.get(page) ?? []).filter(
+      (image) => !assignedImageIds.has(image.id)
+    );
+    if (pageImages.length === 0) {
+      continue;
     }
 
-    const pages =
-      atom.pageReferences.length > 0
-        ? atom.pageReferences
-        : [primaryPageForAtom(atom, atomIndex)];
+    const scoredLinks: Array<{
+      atomIndex: number;
+      imageIndex: number;
+      confidence: number;
+    }> = [];
 
-    for (const page of pages) {
-      const candidate = (imagesByPage.get(page) ?? []).find(
-        (image) => !assignedImageIds.has(image.id)
-      );
-
-      if (candidate && canLinkImageToAtom(candidate, atom)) {
-        return assignImageToAtom(atom, candidate, assignedImageIds);
+    updated.forEach((atom, atomIndex) => {
+      if (atom.images.length > 0 || !atomReferencesPage(atom, atomIndex, page)) {
+        return;
       }
-    }
 
-    return atom;
-  });
+      pageImages.forEach((image, imageIndex) => {
+        if (!isImageLinkSemanticallyValid(atom, image, updated)) {
+          return;
+        }
+
+        const confidence = scoreSemanticImageMatch(atom, image);
+        if (confidence < MIN_PAGE_IMAGE_LINK_SCORE) {
+          return;
+        }
+
+        if (!canLinkImageToAtom(image, atom)) {
+          return;
+        }
+
+        scoredLinks.push({ atomIndex, imageIndex, confidence });
+      });
+    });
+
+    for (const link of selectGreedySemanticLinks(scoredLinks)) {
+      const atom = updated[link.atomIndex];
+      const image = pageImages[link.imageIndex];
+      if (
+        !atom ||
+        atom.images.length > 0 ||
+        !image ||
+        assignedImageIds.has(image.id)
+      ) {
+        continue;
+      }
+
+      updated[link.atomIndex] = assignImageToAtom(atom, image, assignedImageIds);
+    }
+  }
+
+  return updated;
 }
 
 async function linkBySemanticMatch(
@@ -179,7 +230,8 @@ async function linkBySemanticMatch(
       atom.images.length > 0 ||
       !image ||
       assignedImageIds.has(image.id) ||
-      !canLinkImageToAtom(image, atom)
+      !canLinkImageToAtom(image, atom) ||
+      !isImageLinkSemanticallyValid(atom, image, updated)
     ) {
       continue;
     }

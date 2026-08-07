@@ -264,4 +264,36 @@ describe("enrichKnowledgeWithImages", () => {
 
     expect(enriched.atoms[0]?.images[0]?.imageId).toBe(imageId);
   });
+
+  it("assigns same-page illustrations to the best matching atom", async () => {
+    const knowledge = makeKnowledge(2);
+    knowledge.atoms[0] = {
+      ...knowledge.atoms[0]!,
+      title: "Adriano",
+      summary: "Imperatore romano legato alla Villa Adriana.",
+      keywords: ["villa adriana", "imperatore"],
+      pageReferences: [2],
+      images: [],
+    };
+    knowledge.atoms[1] = {
+      ...knowledge.atoms[1]!,
+      title: "Antonino Pio",
+      summary: "Imperatore romano noto per la pace.",
+      keywords: ["pace", "stabilità"],
+      pageReferences: [2],
+      images: [],
+    };
+
+    const villaImageId = randomUUID();
+    const enriched = await enrichKnowledgeWithImages(knowledge, [
+      makeImage({
+        id: villaImageId,
+        pageNumber: 2,
+        caption: "Dettaglio della Villa Adriana",
+      }),
+    ]);
+
+    expect(enriched.atoms[0]?.images[0]?.imageId).toBe(villaImageId);
+    expect(enriched.atoms[1]?.images).toEqual([]);
+  });
 });

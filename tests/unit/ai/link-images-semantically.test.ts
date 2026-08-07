@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  captionReferencesDifferentAtom,
   findHeuristicSemanticImageLinks,
+  hasCaptionTitleOverlap,
+  isImageLinkSemanticallyValid,
   parseSemanticImageLinks,
   scoreSemanticImageMatch,
   selectGreedySemanticLinks,
@@ -112,5 +115,44 @@ describe("link-images-semantically", () => {
 
     expect(links).toHaveLength(1);
     expect(links[0]?.imageIndex).toBe(0);
+  });
+
+  it("links Hadrian's villa caption to Adriano, not Antonino Pio", () => {
+    const adriano = makeAtom({
+      id: "00000000-0000-4000-8000-000000000111",
+      title: "Adriano",
+      summary: "Imperatore romano costruttore della Villa Adriana.",
+      keywords: ["villa adriana", "imperatore"],
+      pageReferences: [3],
+    });
+    const antonino = makeAtom({
+      id: "00000000-0000-4000-8000-000000000112",
+      title: "Antonino Pio",
+      summary: "Imperatore romano noto per pace e stabilità.",
+      keywords: ["pace", "stabilità"],
+      pageReferences: [3],
+    });
+    const villaImage = makeImage("Dettaglio della Villa Adriana");
+
+    expect(hasCaptionTitleOverlap(adriano, villaImage)).toBe(true);
+    expect(isImageLinkSemanticallyValid(adriano, villaImage, [adriano, antonino])).toBe(
+      true
+    );
+    expect(isImageLinkSemanticallyValid(antonino, villaImage, [adriano, antonino])).toBe(
+      false
+    );
+    expect(
+      captionReferencesDifferentAtom(antonino, villaImage, [adriano, antonino])
+    ).toBe(true);
+
+    const links = findHeuristicSemanticImageLinks(
+      [
+        { atom: adriano, atomIndex: 0 },
+        { atom: antonino, atomIndex: 1 },
+      ],
+      [{ image: villaImage, imageIndex: 0 }]
+    );
+
+    expect(links).toEqual([{ atomIndex: 0, imageIndex: 0, confidence: expect.any(Number) }]);
   });
 });

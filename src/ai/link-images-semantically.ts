@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Image } from "@/domain/entities/image";
 import type { KnowledgeJsonAtom } from "@/domain/knowledge/knowledge-json";
 import { env } from "@/lib/env";
+import { normalizeForComparison } from "./text-snippets";
 import {
   buildSemanticImageLinkCacheKey,
   estimateModelCost,
@@ -90,6 +91,9 @@ const ITALIAN_STOP_WORDS = new Set([
 ]);
 
 export const SEMANTIC_IMAGE_LINK_MIN_CONFIDENCE = 0.58;
+export const MIN_PAGE_IMAGE_LINK_SCORE = 0.12;
+const MIN_TITLE_TOKEN_OVERLAP_RATIO = 0.45;
+const MIN_KEYWORD_TOKEN_OVERLAP_RATIO = 0.5;
 
 function tokenize(value: string): Set<string> {
   return new Set(
@@ -166,6 +170,128 @@ export function scoreSemanticImageMatch(
   return Math.min(1, jaccard + titleBoost);
 }
 
+export function hasCaptionTitleOverlap(
+  atom: KnowledgeJsonAtom,
+  image: Image
+): boolean {
+  const caption = image.caption?.trim() ?? "";
+  if (!caption) {
+    return false;
+  }
+
+  const captionNorm = normalizeForComparison(caption);
+  const titleNorm = normalizeForComparison(atom.title);
+
+  if (titleNorm.length >= 4 && captionNorm.includes(titleNorm)) {
+    return true;
+  }
+
+  for (const alias of atom.aliases) {
+    const aliasNorm = normalizeForComparison(alias);
+    if (aliasNorm.length >= 4 && captionNorm.includes(aliasNorm)) {
+      return true;
+    }
+  }
+
+  const titleTerms = tokenize(atom.title);
+  const captionTerms = tokenize(caption);
+  if (titleTerms.size === 0) {
+    return false;
+  }
+
+  const titleOverlap = scoreTermOverlap(titleTerms, captionTerms);
+  return titleOverlap / titleTerms.size >= MIN_TITLE_TOKEN_OVERLAP_RATIO;
+}
+
+export function hasCaptionKeywordOverlap(
+  atom: KnowledgeJsonAtom,
+  image: Image
+): boolean {
+  const captionTerms = tokenize(image.caption?.trim() ?? "");
+  const keywordTerms = tokenize(atom.keywords.join(" "));
+  if (keywordTerms.size === 0 || captionTerms.size === 0) {
+    return false;
+  }
+
+  const overlap = scoreTermOverlap(keywordTerms, captionTerms);
+  return overlap / keywordTerms.size >= MIN_KEYWORD_TOKEN_OVERLAP_RATIO;
+}
+
+export function captionReferencesDifferentAtom(
+  atom: KnowledgeJsonAtom,
+  image: Image,
+  peers: KnowledgeJsonAtom[]
+): boolean {
+  const caption = image.caption?.trim() ?? "";
+  if (!caption) {
+    return false;
+  }
+
+  const captionNorm = normalizeForComparison(caption);
+  const captionTerms = tokenize(caption);
+  const selfTitleTerms = tokenize(atom.title);
+  const selfOverlap = scoreTermOverlap(selfTitleTerms, captionTerms);
+  const selfOverlapRatio =
+    selfTitleTerms.size > 0 ? selfOverlap / selfTitleTerms.size : 0;
+  const selfInCaption =
+    normalizeForComparison(atom.title).length >= 4 &&
+    captionNorm.includes(normalizeForComparison(atom.title));
+
+  for (const peer of peers) {
+    if (peer.id === atom.id) {
+      continue;
+    }
+
+    const peerNorm = normalizeForComparison(peer.title);
+    if (peerNorm.length >= 4 && captionNorm.includes(peerNorm) && !selfInCaption) {
+      return true;
+    }
+
+    const peerTitleTerms = tokenize(peer.title);
+    if (peerTitleTerms.size === 0) {
+      continue;
+    }
+
+    const peerOverlap = scoreTermOverlap(peerTitleTerms, captionTerms);
+    const peerOverlapRatio = peerOverlap / peerTitleTerms.size;
+    if (
+      peerOverlapRatio >= MIN_TITLE_TOKEN_OVERLAP_RATIO &&
+      peerOverlapRatio > selfOverlapRatio + 0.1
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function isImageLinkSemanticallyValid(
+  atom: KnowledgeJsonAtom,
+  image: Image,
+  peers: KnowledgeJsonAtom[] = []
+): boolean {
+  if (captionReferencesDifferentAtom(atom, image, peers)) {
+    return false;
+  }
+
+  return hasCaptionTitleOverlap(atom, image) || hasCaptionKeywordOverlap(atom, image);
+}
+
+function isValidSemanticLink(
+  link: SemanticImageLink,
+  atoms: SemanticImageLinkCandidate[],
+  images: SemanticImageLinkTarget[]
+): boolean {
+  const atom = atoms[link.atomIndex]?.atom;
+  const image = images[link.imageIndex]?.image;
+  if (!atom || !image) {
+    return false;
+  }
+
+  const peers = atoms.map((candidate) => candidate.atom);
+  return isImageLinkSemanticallyValid(atom, image, peers);
+}
+
 export function parseSemanticImageLinks(content: string): SemanticImageLink[] {
   try {
     const payload = JSON.parse(content) as unknown;
@@ -186,10 +312,15 @@ export function findHeuristicSemanticImageLinks(
   images: SemanticImageLinkTarget[],
   minConfidence = SEMANTIC_IMAGE_LINK_MIN_CONFIDENCE
 ): SemanticImageLink[] {
+  const peers = atoms.map((candidate) => candidate.atom);
   const scored: SemanticImageLink[] = [];
 
   for (const { atom, atomIndex } of atoms) {
     for (const { image, imageIndex } of images) {
+      if (!isImageLinkSemanticallyValid(atom, image, peers)) {
+        continue;
+      }
+
       const confidence = scoreSemanticImageMatch(atom, image);
       if (confidence >= minConfidence) {
         scored.push({ atomIndex, imageIndex, confidence });
@@ -242,6 +373,8 @@ function buildSemanticLinkingPrompt(
 
 Regole:
 - Usa solo abbinamenti davvero pertinenti.
+- La didascalia dell'illustrazione deve riferirsi al concetto scelto (nome, alias o keyword visibile).
+- Non collegare un'illustrazione che nomina chiaramente un altro concetto della lista.
 - Ogni atomo può ricevere al massimo 1 immagine.
 - Ogni immagine può essere usata al massimo 1 volta.
 - Se un abbinamento è incerto, omettilo.
@@ -296,7 +429,9 @@ async function fetchSemanticImageLinksViaLlm(
   if (cached) {
     tracker.recordCacheHit();
     return parseSemanticImageLinks(cached.value).filter(
-      (link) => link.confidence >= SEMANTIC_IMAGE_LINK_MIN_CONFIDENCE
+      (link) =>
+        link.confidence >= SEMANTIC_IMAGE_LINK_MIN_CONFIDENCE &&
+        isValidSemanticLink(link, atoms, images)
     );
   }
 
@@ -346,7 +481,9 @@ async function fetchSemanticImageLinksViaLlm(
   });
 
   return parseSemanticImageLinks(content).filter(
-    (link) => link.confidence >= SEMANTIC_IMAGE_LINK_MIN_CONFIDENCE
+    (link) =>
+      link.confidence >= SEMANTIC_IMAGE_LINK_MIN_CONFIDENCE &&
+      isValidSemanticLink(link, atoms, images)
   );
 }
 
