@@ -1,17 +1,17 @@
 "use client";
 
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui";
 import { SessionEventOutcome } from "@/domain/enums";
 import type { FeedCardProps } from "../card-utils";
 import { isErrorDetectionPayload } from "../card-utils";
 import { FeedCardHint, FeedCardSurface, FeedCardTitle } from "../feed-card-surface";
-import { useAutoContinue } from "../use-auto-continue";
 
 export function ErrorDetectionCardComponent({
   card,
   disabled,
   onContinue,
+  registerAdvance,
 }: FeedCardProps) {
   const payload = isErrorDetectionPayload(card.payload) ? card.payload : null;
   const [revealed, setRevealed] = useState(false);
@@ -29,7 +29,14 @@ export function ErrorDetectionCardComponent({
     });
   }, [isCorrect, onContinue]);
 
-  useAutoContinue(revealed, continueWithResult);
+  useEffect(() => {
+    if (!registerAdvance) {
+      return;
+    }
+
+    registerAdvance(revealed ? continueWithResult : null);
+    return () => registerAdvance(null);
+  }, [continueWithResult, registerAdvance, revealed]);
 
   if (!payload) {
     return null;

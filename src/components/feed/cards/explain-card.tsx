@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui";
 import { OptimizedImage } from "@/components/ui/optimized-image";
 import { SessionEventOutcome } from "@/domain/enums";
@@ -21,6 +21,7 @@ function ExplainCardComponent({
   imageCaption,
   disabled,
   onContinue,
+  registerAdvance,
 }: FeedCardProps) {
   const [expanded, setExpanded] = useState(false);
   const canExpand = hasExpandableExplanation(card);
@@ -29,6 +30,15 @@ function ExplainCardComponent({
   const handleContinue = useCallback(() => {
     onContinue({ outcome: SessionEventOutcome.Neutral, isCorrect: true });
   }, [onContinue]);
+
+  useEffect(() => {
+    if (!registerAdvance) {
+      return;
+    }
+
+    registerAdvance(handleContinue);
+    return () => registerAdvance(null);
+  }, [handleContinue, registerAdvance]);
 
   return (
     <FeedCardSurface className="pb-4">
@@ -82,12 +92,6 @@ function ExplainCardComponent({
             </Button>
           </div>
         ) : null}
-      </div>
-
-      <div className="mt-auto pt-2">
-        <Button fullWidth disabled={disabled} onClick={handleContinue}>
-          Ho capito
-        </Button>
       </div>
     </FeedCardSurface>
   );

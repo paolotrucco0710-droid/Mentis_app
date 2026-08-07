@@ -44,14 +44,31 @@ export function BlurtingCardComponent({
     });
   }, [feedback, onContinue]);
 
+  const handleStart = useCallback(() => {
+    setPhase("recall");
+    setAnswer("");
+    setFeedback(null);
+    setError(null);
+  }, []);
+
   useEffect(() => {
     if (!registerAdvance) {
       return;
     }
 
-    registerAdvance(phase === "feedback" && feedback ? handleContinue : null);
+    if (phase === "feedback" && feedback) {
+      registerAdvance(handleContinue);
+      return () => registerAdvance(null);
+    }
+
+    if (phase === "ready") {
+      registerAdvance(handleStart);
+      return () => registerAdvance(null);
+    }
+
+    registerAdvance(null);
     return () => registerAdvance(null);
-  }, [feedback, handleContinue, phase, registerAdvance]);
+  }, [feedback, handleContinue, handleStart, phase, registerAdvance]);
 
   if (!payload) {
     return null;
@@ -85,25 +102,13 @@ export function BlurtingCardComponent({
     }
   }
 
-  function handleStart() {
-    setPhase("recall");
-    setAnswer("");
-    setFeedback(null);
-    setError(null);
-  }
-
   if (phase === "ready") {
     return (
       <FeedCardSurface>
         <FeedCardTitle>Blurting</FeedCardTitle>
         <FeedCardHint>
-          {recallPrompt || "Richiama il concetto a mente, poi premi Fine."}
+          {recallPrompt || "Richiama il concetto a mente. Scorri su quando sei pronto."}
         </FeedCardHint>
-        <div className="flex flex-1 flex-col justify-end">
-          <Button fullWidth disabled={disabled} onClick={handleStart}>
-            Inizia
-          </Button>
-        </div>
       </FeedCardSurface>
     );
   }
@@ -123,9 +128,6 @@ export function BlurtingCardComponent({
             </ul>
           </div>
         ) : null}
-        <Button fullWidth disabled={disabled} onClick={handleContinue}>
-          Continua
-        </Button>
       </FeedCardSurface>
     );
   }

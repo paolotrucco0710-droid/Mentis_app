@@ -1,14 +1,18 @@
 "use client";
 
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { SessionEventOutcome } from "@/domain/enums";
 import { cn } from "@/lib/utils";
 import type { FeedCardProps } from "../card-utils";
 import { isTrueFalsePayload } from "../card-utils";
 import { FeedCardSurface, FeedCardTitle } from "../feed-card-surface";
-import { useAutoContinue } from "../use-auto-continue";
 
-export function TrueFalseCardComponent({ card, disabled, onContinue }: FeedCardProps) {
+export function TrueFalseCardComponent({
+  card,
+  disabled,
+  onContinue,
+  registerAdvance,
+}: FeedCardProps) {
   const payload = isTrueFalsePayload(card.payload) ? card.payload : null;
   const [answer, setAnswer] = useState<boolean | null>(null);
   const [revealed, setRevealed] = useState(false);
@@ -28,7 +32,14 @@ export function TrueFalseCardComponent({ card, disabled, onContinue }: FeedCardP
     });
   }, [answer, isCorrect, onContinue]);
 
-  useAutoContinue(revealed, continueWithResult);
+  useEffect(() => {
+    if (!registerAdvance) {
+      return;
+    }
+
+    registerAdvance(revealed ? continueWithResult : null);
+    return () => registerAdvance(null);
+  }, [continueWithResult, registerAdvance, revealed]);
 
   if (!payload) {
     return null;

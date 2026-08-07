@@ -1,14 +1,18 @@
 "use client";
 
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { SessionEventOutcome } from "@/domain/enums";
 import { cn } from "@/lib/utils";
 import type { FeedCardProps } from "../card-utils";
 import { isQuizPayload } from "../card-utils";
 import { FeedCardHint, FeedCardSurface, FeedCardTitle } from "../feed-card-surface";
-import { useAutoContinue } from "../use-auto-continue";
 
-export function QuizCardComponent({ card, disabled, onContinue }: FeedCardProps) {
+export function QuizCardComponent({
+  card,
+  disabled,
+  onContinue,
+  registerAdvance,
+}: FeedCardProps) {
   const payload = isQuizPayload(card.payload) ? card.payload : null;
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(false);
@@ -29,7 +33,16 @@ export function QuizCardComponent({ card, disabled, onContinue }: FeedCardProps)
     });
   }, [isCorrect, onContinue, payload, selectedIndex]);
 
-  useAutoContinue(revealed && selectedIndex !== null, continueWithResult);
+  useEffect(() => {
+    if (!registerAdvance) {
+      return;
+    }
+
+    registerAdvance(
+      revealed && selectedIndex !== null ? continueWithResult : null
+    );
+    return () => registerAdvance(null);
+  }, [continueWithResult, registerAdvance, revealed, selectedIndex]);
 
   if (!payload) {
     return null;

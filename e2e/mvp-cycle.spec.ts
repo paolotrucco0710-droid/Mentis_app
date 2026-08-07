@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { loginAsDevUser, completeOnboardingIfNeeded } from "./helpers/auth";
+import {
+  interactWithCurrentCardIfNeeded,
+  swipeUpOnFeed,
+} from "./helpers/feed";
 
 test.describe("MVP study cycle", () => {
   test.beforeEach(async ({ page }) => {
@@ -24,18 +28,8 @@ test.describe("MVP study cycle", () => {
         .first()
     ).toBeVisible();
 
-    const continueButton = page
-      .getByRole("button", {
-        name: /^ho capito$/i,
-      })
-      .first();
-
-    if (await continueButton.isVisible()) {
-      await continueButton.click();
-    } else {
-      const quizOption = page.locator("button").filter({ hasText: /./ }).nth(2);
-      await quizOption.click();
-    }
+    await interactWithCurrentCardIfNeeded(page);
+    await swipeUpOnFeed(page);
 
     await expect(
       page.getByText(/sessione completata|scorri verso l'alto|caricamento/i).first()

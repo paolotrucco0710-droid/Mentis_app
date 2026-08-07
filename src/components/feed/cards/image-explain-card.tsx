@@ -14,7 +14,6 @@ import {
   getImageQuizOptionsFromPayload,
 } from "../card-utils";
 import { FeedCardHint, FeedCardSurface, FeedCardTitle } from "../feed-card-surface";
-import { useAutoContinue } from "../use-auto-continue";
 
 function ImageExplainCardComponent({
   card,
@@ -22,6 +21,7 @@ function ImageExplainCardComponent({
   imageUrl: initialImageUrl,
   disabled,
   onContinue,
+  registerAdvance,
 }: FeedCardProps) {
   const imageId = getImageIdFromPayload(card.payload);
   const conceptTitle = atomTitle?.trim() || "Illustrazione";
@@ -52,7 +52,30 @@ function ImageExplainCardComponent({
     });
   }, [isCorrect, onContinue]);
 
-  useAutoContinue(revealed && (labeling !== null || quiz !== null), continueWithResult);
+  const handleNeutralContinue = useCallback(() => {
+    onContinue({ outcome: SessionEventOutcome.Neutral, isCorrect: true });
+  }, [onContinue]);
+
+  useEffect(() => {
+    if (!registerAdvance) {
+      return;
+    }
+
+    if (labeling || quiz) {
+      registerAdvance(revealed ? continueWithResult : null);
+      return () => registerAdvance(null);
+    }
+
+    registerAdvance(handleNeutralContinue);
+    return () => registerAdvance(null);
+  }, [
+    continueWithResult,
+    handleNeutralContinue,
+    labeling,
+    quiz,
+    registerAdvance,
+    revealed,
+  ]);
 
   useEffect(() => {
     if (initialImageUrl || !imageId) {
@@ -264,15 +287,7 @@ function ImageExplainCardComponent({
           ) : null}
         </>
       ) : (
-        <Button
-          fullWidth
-          disabled={disabled}
-          onClick={() =>
-            onContinue({ outcome: SessionEventOutcome.Neutral, isCorrect: true })
-          }
-        >
-          Ho collegato l&apos;immagine al concetto
-        </Button>
+        <FeedCardHint>Scorri su quando hai collegato l&apos;immagine al concetto.</FeedCardHint>
       )}
     </FeedCardSurface>
   );
