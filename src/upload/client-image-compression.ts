@@ -38,14 +38,13 @@ export async function compressImageForUpload(file: File): Promise<File> {
     return file;
   }
 
-  if (file.size <= SKIP_COMPRESSION_BELOW_BYTES) {
-    return file;
-  }
-
   const bitmap = await loadImageBitmap(file);
   let { width, height } = bitmap;
+  const shouldResize =
+    file.size > SKIP_COMPRESSION_BELOW_BYTES &&
+    (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION);
 
-  if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+  if (shouldResize) {
     const scale = MAX_IMAGE_DIMENSION / Math.max(width, height);
     width = Math.round(width * scale);
     height = Math.round(height * scale);
@@ -65,7 +64,7 @@ export async function compressImageForUpload(file: File): Promise<File> {
   bitmap.close();
 
   const blob = await canvasToJpegBlob(canvas);
-  if (!blob || blob.size >= file.size) {
+  if (!blob) {
     return file;
   }
 

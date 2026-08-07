@@ -194,7 +194,7 @@ describe("enrichKnowledgeWithImages", () => {
     expect(enriched.atoms[0]?.images[0]?.caption).toBe(caption);
   });
 
-  it("links the nearest page illustration when exact page references do not match", async () => {
+  it("does not force-link illustrations from distant pages", async () => {
     const knowledge = makeKnowledge();
     knowledge.atoms[0] = {
       ...knowledge.atoms[0]!,
@@ -210,10 +210,10 @@ describe("enrichKnowledgeWithImages", () => {
       }),
     ]);
 
-    expect(enriched.atoms[0]?.images[0]?.imageId).toBe(imageId);
+    expect(enriched.atoms[0]?.images).toEqual([]);
   });
 
-  it("distributes remaining illustrations across atoms in chapter order", async () => {
+  it("does not distribute unmatched illustrations across atoms", async () => {
     const knowledge = makeKnowledge(3);
     const firstImageId = randomUUID();
     const secondImageId = randomUUID();
@@ -237,9 +237,9 @@ describe("enrichKnowledgeWithImages", () => {
       }),
     ]);
 
-    expect(enriched.atoms[0]?.images[0]?.imageId).toBe(firstImageId);
-    expect(enriched.atoms[1]?.images[0]?.imageId).toBe(secondImageId);
-    expect(enriched.atoms[2]?.images[0]?.imageId).toBe(thirdImageId);
+    expect(enriched.atoms[0]?.images).toEqual([]);
+    expect(enriched.atoms[1]?.images).toEqual([]);
+    expect(enriched.atoms[2]?.images).toEqual([]);
   });
 
   it("links illustrations by semantic similarity when pages do not match", async () => {

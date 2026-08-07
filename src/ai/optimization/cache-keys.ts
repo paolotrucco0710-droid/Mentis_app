@@ -15,8 +15,14 @@ export function buildOcrImageCacheKey(input: {
 export function buildFigureDetectionCacheKey(input: {
   imageHash: string;
   model: string;
+  promptVersion: string;
 }): string {
-  return buildCacheKey(["figure_detection", input.imageHash, input.model]);
+  return buildCacheKey([
+    "figure_detection",
+    input.promptVersion,
+    input.imageHash,
+    input.model,
+  ]);
 }
 
 export function buildSemanticImageLinkCacheKey(input: {
