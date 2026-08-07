@@ -459,6 +459,7 @@ export function FeedStudy() {
 
       <div
         ref={scrollContainerRef}
+        data-testid="feed-scroll-surface"
         className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4"
         {...swipeHandlers}
       >
