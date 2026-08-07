@@ -7,10 +7,15 @@ import type { SessionSummaryView } from "./session-summary";
 
 interface SessionCompleteProps {
   summary: SessionSummaryView;
-  feedHref?: string;
+  onContinue: () => void | Promise<void>;
+  continuing?: boolean;
 }
 
-export function SessionComplete({ summary, feedHref = "/feed" }: SessionCompleteProps) {
+export function SessionComplete({
+  summary,
+  onContinue,
+  continuing = false,
+}: SessionCompleteProps) {
   const reinforcedConcepts = summary.conceptsStudied.slice(0, 6);
   const extraConcepts = Math.max(summary.conceptsStudied.length - reinforcedConcepts.length, 0);
   const sessionXp =
@@ -87,9 +92,9 @@ export function SessionComplete({ summary, feedHref = "/feed" }: SessionComplete
       </Card>
 
       <div className="flex flex-col gap-3">
-        <Link href={feedHref}>
-          <Button fullWidth>Continua</Button>
-        </Link>
+        <Button fullWidth disabled={continuing} onClick={() => void onContinue()}>
+          {continuing ? "Preparazione..." : "Continua"}
+        </Button>
         <Link href="/home">
           <Button fullWidth variant="secondary">
             Torna alla home

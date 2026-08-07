@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, startTransition } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { FeedItem, FeedResponse } from "@/domain/entities/feed-item";
 import type { StudySession } from "@/domain/entities/study-session";
 import { CardType, SessionEventOutcome } from "@/domain/enums";
@@ -11,6 +11,7 @@ import {
   ApiError,
   createStudySession,
   endSession,
+  fetchDailyReview,
   fetchNextFeedItem,
   fetchSessionDetail,
   pauseSession,
@@ -49,6 +50,7 @@ function allowsSwipeWithoutAdvance(type: CardType): boolean {
 }
 
 export function FeedStudy() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const knowledgeSourceId = searchParams.get(
     "knowledgeSourceId"
@@ -60,6 +62,7 @@ export function FeedStudy() {
     useActiveSubjectId();
   const [state, setState] = useState<FeedState>({ status: "loading" });
   const [submitting, setSubmitting] = useState(false);
+  const [continuing, setContinuing] = useState(false);
   const [advanceReady, setAdvanceReady] = useState(false);
   const cardStartedAt = useRef<number>(0);
   const feedRequestId = useRef(0);
@@ -71,18 +74,6 @@ export function FeedStudy() {
   const advanceActionRef = useRef<(() => void) | null>(null);
   const conceptsStudiedRef = useRef<Map<string, string>>(new Map());
   const masteryGainRef = useRef(0);
-
-  const feedHref = (() => {
-    const params = new URLSearchParams();
-    if (subjectId) {
-      params.set("subjectId", subjectId);
-    }
-    if (knowledgeSourceId) {
-      params.set("knowledgeSourceId", knowledgeSourceId);
-    }
-    const query = params.toString();
-    return query ? `/feed?${query}` : "/feed";
-  })();
 
   const finalizeSession = useCallback(async (sessionId: StudySessionId) => {
     try {
@@ -387,6 +378,33 @@ export function FeedStudy() {
     void bootstrap();
   }
 
+  const handleContinueAfterComplete = useCallback(async () => {
+    if (!subjectId || continuing) {
+      return;
+    }
+
+    setContinuing(true);
+
+    try {
+      const review = await fetchDailyReview(subjectId).catch(() => null);
+      if (review && review.totalDue > 0) {
+        const params = new URLSearchParams({ subjectId });
+        router.push(`/review?${params.toString()}`);
+        return;
+      }
+
+      bootstrapStarted.current = false;
+      feedRequestId.current += 1;
+      conceptsStudiedRef.current = new Map();
+      masteryGainRef.current = 0;
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      setState({ status: "loading" });
+      await bootstrap();
+    } finally {
+      setContinuing(false);
+    }
+  }, [bootstrap, continuing, router, subjectId]);
+
   if (loadingSubject) {
     return <Loader label="Preparazione del feed..." />;
   }
@@ -430,7 +448,11 @@ export function FeedStudy() {
 
   if (state.status === "complete") {
     return (
-      <SessionComplete summary={state.summary} feedHref={feedHref} />
+      <SessionComplete
+        summary={state.summary}
+        onContinue={handleContinueAfterComplete}
+        continuing={continuing}
+      />
     );
   }
 
