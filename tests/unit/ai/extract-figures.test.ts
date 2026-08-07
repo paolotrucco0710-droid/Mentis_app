@@ -47,6 +47,30 @@ describe("extract-figures parsing", () => {
     expect(toPixelBoundingBox(box!, 2000, 3000)).toBeNull();
   });
 
+  it("rejects crops touching too many page edges", () => {
+    const box = normalizeBoundingBox(
+      { top: 0.01, left: 0.01, bottom: 0.99, right: 0.55 },
+      1200,
+      1600
+    );
+
+    expect(box).not.toBeNull();
+    expect(isValidFigureCrop(box!, 1200, 1600)).toBe(false);
+    expect(toPixelBoundingBox(box!, 1200, 1600)).toBeNull();
+  });
+
+  it("rejects crops spanning most of the page on one axis", () => {
+    const box = normalizeBoundingBox(
+      { top: 0.15, left: 0.08, bottom: 0.75, right: 0.92 },
+      1200,
+      1600
+    );
+
+    expect(box).not.toBeNull();
+    expect(isValidFigureCrop(box!, 1200, 1600)).toBe(false);
+    expect(toPixelBoundingBox(box!, 1200, 1600)).toBeNull();
+  });
+
   it("accepts well-proportioned illustration crops", () => {
     const box = normalizeBoundingBox(
       { top: 0.15, left: 0.1, bottom: 0.65, right: 0.75 },

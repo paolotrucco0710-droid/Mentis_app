@@ -99,31 +99,6 @@ function getUnassignedStudyImages(
   return studyImages.filter((image) => !assignedImageIds.has(image.id));
 }
 
-function findNearestUnassignedImage(
-  atom: KnowledgeJsonAtom,
-  atomIndex: number,
-  studyImages: Image[],
-  assignedImageIds: Set<string>
-): Image | undefined {
-  const unassigned = getUnassignedStudyImages(studyImages, assignedImageIds);
-  if (unassigned.length === 0) {
-    return undefined;
-  }
-
-  const atomPage = primaryPageForAtom(atom, atomIndex);
-
-  return [...unassigned].sort((left, right) => {
-    const leftDistance = Math.abs((left.pageNumber ?? 1) - atomPage);
-    const rightDistance = Math.abs((right.pageNumber ?? 1) - atomPage);
-
-    if (leftDistance !== rightDistance) {
-      return leftDistance - rightDistance;
-    }
-
-    return (left.pageNumber ?? 1) - (right.pageNumber ?? 1);
-  })[0];
-}
-
 function assignImageToAtom(
   atom: KnowledgeJsonAtom,
   image: Image,
@@ -159,64 +134,6 @@ function linkByExactPage(
       if (candidate && canLinkImageToAtom(candidate, atom)) {
         return assignImageToAtom(atom, candidate, assignedImageIds);
       }
-    }
-
-    return atom;
-  });
-}
-
-function linkByNearestPage(
-  atoms: KnowledgeJsonAtom[],
-  studyImages: Image[],
-  assignedImageIds: Set<string>
-): KnowledgeJsonAtom[] {
-  return atoms.map((atom, atomIndex) => {
-    if (atom.images.length > 0) {
-      return atom;
-    }
-
-    const candidate = findNearestUnassignedImage(
-      atom,
-      atomIndex,
-      studyImages,
-      assignedImageIds
-    );
-
-    if (candidate && canLinkImageToAtom(candidate, atom)) {
-      return assignImageToAtom(atom, candidate, assignedImageIds);
-    }
-
-    return atom;
-  });
-}
-
-function linkRemainingRoundRobin(
-  atoms: KnowledgeJsonAtom[],
-  studyImages: Image[],
-  assignedImageIds: Set<string>
-): KnowledgeJsonAtom[] {
-  const remainingImages = getUnassignedStudyImages(studyImages, assignedImageIds);
-
-  if (remainingImages.length === 0) {
-    return atoms;
-  }
-
-  let imageIndex = 0;
-
-  return atoms.map((atom) => {
-    if (atom.images.length > 0) {
-      return atom;
-    }
-
-    while (imageIndex < remainingImages.length) {
-      const candidate = remainingImages[imageIndex]!;
-      imageIndex += 1;
-
-      if (!canLinkImageToAtom(candidate, atom)) {
-        continue;
-      }
-
-      return assignImageToAtom(atom, candidate, assignedImageIds);
     }
 
     return atom;
@@ -325,19 +242,9 @@ export async function enrichKnowledgeWithImages(
     assignedImageIds,
     options?.tracker
   );
-  const nearestLinked = linkByNearestPage(
-    semanticLinked,
-    studyImages,
-    assignedImageIds
-  );
-  const linkedAtoms = linkRemainingRoundRobin(
-    nearestLinked,
-    studyImages,
-    assignedImageIds
-  );
 
   return {
     ...knowledge,
-    atoms: linkedAtoms,
+    atoms: semanticLinked,
   };
 }

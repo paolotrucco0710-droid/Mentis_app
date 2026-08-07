@@ -20,11 +20,15 @@ import {
   writeCacheResult,
 } from "./optimization";
 
+const FIGURE_DETECTION_PROMPT_VERSION = "v2";
 const MIN_FIGURE_AREA_RATIO = 0.04;
-const MAX_FIGURE_AREA_RATIO = 0.72;
-const MIN_FIGURE_ASPECT_RATIO = 0.3;
+const MAX_FIGURE_AREA_RATIO = 0.55;
+const MIN_FIGURE_ASPECT_RATIO = 0.35;
 const MAX_FIGURE_ASPECT_RATIO = 1 / MIN_FIGURE_ASPECT_RATIO;
 const MIN_FIGURE_DIMENSION_PX = 48;
+const PAGE_EDGE_INSET = 0.025;
+const MAX_PAGE_EDGE_TOUCHES = 2;
+const MAX_SINGLE_AXIS_SPAN = 0.82;
 
 const rawFigureDetectionSchema = z.object({
   figures: z
@@ -101,6 +105,25 @@ export function normalizeBoundingBox(
   return { top, left, bottom, right };
 }
 
+function countNearPageEdges(bbox: NormalizedBoundingBox): number {
+  let touches = 0;
+
+  if (bbox.top <= PAGE_EDGE_INSET) {
+    touches += 1;
+  }
+  if (bbox.left <= PAGE_EDGE_INSET) {
+    touches += 1;
+  }
+  if (bbox.bottom >= 1 - PAGE_EDGE_INSET) {
+    touches += 1;
+  }
+  if (bbox.right >= 1 - PAGE_EDGE_INSET) {
+    touches += 1;
+  }
+
+  return touches;
+}
+
 export function isValidFigureCrop(
   bbox: NormalizedBoundingBox,
   pageWidth: number,
@@ -111,6 +134,14 @@ export function isValidFigureCrop(
   const areaRatio = widthFrac * heightFrac;
 
   if (areaRatio > MAX_FIGURE_AREA_RATIO) {
+    return false;
+  }
+
+  if (widthFrac > MAX_SINGLE_AXIS_SPAN || heightFrac > MAX_SINGLE_AXIS_SPAN) {
+    return false;
+  }
+
+  if (countNearPageEdges(bbox) > MAX_PAGE_EDGE_TOUCHES) {
     return false;
   }
 
@@ -201,6 +232,7 @@ async function detectFiguresOnPage(
   const cacheKey = buildFigureDetectionCacheKey({
     imageHash,
     model: env.aiVisionModel,
+    promptVersion: FIGURE_DETECTION_PROMPT_VERSION,
   });
   const cached = await readCacheResult<string>(cacheKey);
   if (cached) {
