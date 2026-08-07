@@ -119,7 +119,7 @@ function ImageExplainCardComponent({
       <p className="text-sm font-medium leading-7">{question}</p>
 
       {imageUrl && !imageLoadError ? (
-        <div className="relative min-h-[220px] max-h-[min(55vh,460px)] w-full overflow-hidden rounded-2xl border border-border bg-muted/20">
+        <div className="relative h-[min(55vh,460px)] min-h-[220px] w-full overflow-hidden rounded-2xl border border-border bg-muted/20">
           <OptimizedImage
             src={imageUrl}
             alt={conceptTitle}

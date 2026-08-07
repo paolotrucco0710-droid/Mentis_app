@@ -46,6 +46,42 @@ export function OptimizedImage({
     setLoaded(true);
   }, []);
 
+  if (fill) {
+    return (
+      <>
+        {!loaded && !failed ? (
+          <div
+            className="absolute inset-0 animate-pulse bg-accent/60"
+            aria-hidden
+          />
+        ) : null}
+        {failed ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-accent/40 px-4 text-center text-sm text-muted">
+            Immagine non caricata
+          </div>
+        ) : (
+          <Image
+            key={src}
+            src={src}
+            alt={alt}
+            fill
+            priority={priority}
+            sizes={sizes}
+            unoptimized={useUnoptimized}
+            className={cn(
+              objectFit === "contain" ? "object-contain" : "object-cover",
+              !loaded && "opacity-0",
+              loaded && "opacity-100 transition-opacity duration-200",
+              className
+            )}
+            onLoad={handleLoad}
+            onError={handleError}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <div
       className={cn(
