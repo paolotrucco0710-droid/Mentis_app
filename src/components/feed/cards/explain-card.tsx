@@ -36,7 +36,10 @@ function ExplainCardComponent({
       return;
     }
 
-    registerAdvance(handleContinue);
+    registerAdvance(handleContinue, {
+      outcome: SessionEventOutcome.Neutral,
+      isCorrect: true,
+    });
     return () => registerAdvance(null);
   }, [handleContinue, registerAdvance]);
 

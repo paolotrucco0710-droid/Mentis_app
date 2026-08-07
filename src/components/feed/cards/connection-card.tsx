@@ -39,11 +39,26 @@ export function ConnectionCardComponent({
       return;
     }
 
+    const canAdvance = revealed && selectedIndex !== null;
     registerAdvance(
-      revealed && selectedIndex !== null ? continueWithResult : null
+      canAdvance ? continueWithResult : null,
+      canAdvance
+        ? {
+            outcome: isCorrect
+              ? SessionEventOutcome.Success
+              : SessionEventOutcome.Failure,
+            isCorrect,
+          }
+        : null
     );
     return () => registerAdvance(null);
-  }, [continueWithResult, registerAdvance, revealed, selectedIndex]);
+  }, [
+    continueWithResult,
+    isCorrect,
+    registerAdvance,
+    revealed,
+    selectedIndex,
+  ]);
 
   if (!payload) {
     return null;

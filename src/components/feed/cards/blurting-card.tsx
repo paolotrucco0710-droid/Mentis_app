@@ -57,7 +57,10 @@ export function BlurtingCardComponent({
     }
 
     if (phase === "feedback" && feedback) {
-      registerAdvance(handleContinue);
+      registerAdvance(handleContinue, {
+        outcome: SessionEventOutcome.Success,
+        isCorrect: feedback.isCorrect,
+      });
       return () => registerAdvance(null);
     }
 

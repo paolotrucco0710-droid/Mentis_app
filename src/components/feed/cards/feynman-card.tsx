@@ -40,7 +40,15 @@ export function FeynmanCardComponent({
       return;
     }
 
-    registerAdvance(feedback ? handleContinue : null);
+    registerAdvance(
+      feedback ? handleContinue : null,
+      feedback
+        ? {
+            outcome: SessionEventOutcome.Neutral,
+            isCorrect: feedback.isCorrect,
+          }
+        : null
+    );
     return () => registerAdvance(null);
   }, [feedback, handleContinue, registerAdvance]);
 

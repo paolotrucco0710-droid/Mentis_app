@@ -62,15 +62,29 @@ function ImageExplainCardComponent({
     }
 
     if (labeling || quiz) {
-      registerAdvance(revealed ? continueWithResult : null);
+      registerAdvance(
+        revealed ? continueWithResult : null,
+        revealed
+          ? {
+              outcome: isCorrect
+                ? SessionEventOutcome.Success
+                : SessionEventOutcome.Failure,
+              isCorrect,
+            }
+          : null
+      );
       return () => registerAdvance(null);
     }
 
-    registerAdvance(handleNeutralContinue);
+    registerAdvance(handleNeutralContinue, {
+      outcome: SessionEventOutcome.Neutral,
+      isCorrect: true,
+    });
     return () => registerAdvance(null);
   }, [
     continueWithResult,
     handleNeutralContinue,
+    isCorrect,
     labeling,
     quiz,
     registerAdvance,

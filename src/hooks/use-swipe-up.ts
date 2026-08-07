@@ -187,9 +187,6 @@ export function useSwipeUp(
       setDragOffsetPx(viewportHeight);
       window.setTimeout(() => {
         onSwipeRef.current();
-        dragOffsetRef.current = 0;
-        setDragOffsetPx(0);
-        setIsSnapping(false);
       }, SWIPE_UP_SNAP_ANIMATION_MS);
     },
     [readViewportHeight]
