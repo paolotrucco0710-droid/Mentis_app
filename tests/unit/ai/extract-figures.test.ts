@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyCropPadding,
   isValidFigureCrop,
   normalizeBoundingBox,
   toPixelBoundingBox,
@@ -45,6 +46,45 @@ describe("extract-figures parsing", () => {
     expect(box).not.toBeNull();
     expect(isValidFigureCrop(box!, 2000, 3000)).toBe(false);
     expect(toPixelBoundingBox(box!, 2000, 3000)).toBeNull();
+  });
+
+  it("rejects tall crops that bleed into paragraph text below", () => {
+    const box = normalizeBoundingBox(
+      { top: 0.12, left: 0.15, bottom: 0.98, right: 0.85 },
+      1200,
+      1600
+    );
+
+    expect(box).not.toBeNull();
+    expect(isValidFigureCrop(box!, 1200, 1600)).toBe(false);
+    expect(toPixelBoundingBox(box!, 1200, 1600)).toBeNull();
+  });
+
+  it("rejects portrait text columns that barely pass old aspect thresholds", () => {
+    const box = normalizeBoundingBox(
+      { top: 0.08, left: 0.38, bottom: 0.92, right: 0.78 },
+      2000,
+      2800
+    );
+
+    expect(box).not.toBeNull();
+    expect(isValidFigureCrop(box!, 2000, 2800)).toBe(false);
+    expect(toPixelBoundingBox(box!, 2000, 2800)).toBeNull();
+  });
+
+  it("expands validated crops slightly to avoid cutting photo edges", () => {
+    const box = normalizeBoundingBox(
+      { top: 0.2, left: 0.2, bottom: 0.6, right: 0.8 },
+      1000,
+      1000
+    );
+
+    expect(box).not.toBeNull();
+    const padded = applyCropPadding(box!);
+    expect(padded.top).toBeLessThan(box!.top);
+    expect(padded.bottom).toBeGreaterThan(box!.bottom);
+    expect(padded.left).toBeLessThan(box!.left);
+    expect(padded.right).toBeGreaterThan(box!.right);
   });
 
   it("rejects crops touching too many page edges", () => {
