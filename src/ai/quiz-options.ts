@@ -7,9 +7,7 @@ const META_PHRASE_PREFIXES = [
   "affermazione non corretta",
 ];
 
-import { compactPhrase, firstSentence, normalizeForComparison } from "./text-snippets";
-
-const LENGTH_BALANCE_RATIO = 1.3;
+import { firstSentence, normalizeForComparison } from "./text-snippets";
 
 export interface QuizOptionSource {
   id: string;
@@ -54,70 +52,24 @@ function pickCorrectAnswer(atom: QuizOptionSource): string {
 
   const uniqueCandidates = [...new Set(candidates)];
   if (uniqueCandidates.length === 0) {
-    return atom.summary.trim();
+    return (
+      asDeclarativeQuizOption(firstSentence(atom.summary)) ??
+      asDeclarativeQuizOption(atom.summary.trim()) ??
+      firstSentence(atom.summary.trim())
+    );
   }
 
   return uniqueCandidates.sort((left, right) => left.length - right.length)[0]!;
-}
-
-function averageLength(values: string[]): number {
-  if (values.length === 0) {
-    return 0;
-  }
-
-  return values.reduce((total, value) => total + value.length, 0) / values.length;
-}
-
-function shortenToTargetLength(value: string, targetLength: number): string {
-  const sentence = firstSentence(value);
-  if (sentence.length <= targetLength) {
-    return sentence;
-  }
-
-  const truncated = value.slice(0, targetLength);
-  const lastSpace = truncated.lastIndexOf(" ");
-
-  if (lastSpace > targetLength * 0.6) {
-    const chunk = truncated.slice(0, lastSpace).trim();
-    if (chunk.length >= 20) {
-      return chunk.endsWith(".") ? chunk : `${chunk}.`;
-    }
-  }
-
-  return compactPhrase(sentence, targetLength);
 }
 
 export function balanceQuizAnswerLength(
   correctAnswer: string,
   distractors: string[]
 ): string {
-  if (distractors.length === 0) {
-    return correctAnswer;
-  }
-
-  const distractorAverage = averageLength(distractors);
-  if (distractorAverage === 0) {
-    return correctAnswer;
-  }
-
-  const targetLength = Math.round(distractorAverage * 1.1);
-
-  if (correctAnswer.length <= distractorAverage * LENGTH_BALANCE_RATIO) {
-    return correctAnswer;
-  }
-
-  const shorterCandidates = [
-    asDeclarativeQuizOption(firstSentence(correctAnswer)),
-    shortenToTargetLength(correctAnswer, targetLength),
-  ].filter((value): value is string => Boolean(value));
-
-  const balanced = shorterCandidates.find(
-    (value) =>
-      value.length >= distractorAverage * 0.75 &&
-      value.length <= distractorAverage * LENGTH_BALANCE_RATIO
-  );
-
-  return balanced ?? shorterCandidates[0] ?? correctAnswer;
+  void distractors;
+  // Quiz options must stay complete sentences; never shorten mid-clause to match
+  // distractor length (that produced answers ending with "con.", "alle.", "e.", etc.).
+  return correctAnswer;
 }
 
 export function buildQuizOptions(
@@ -178,10 +130,8 @@ export function buildQuizOptions(
     );
   }
 
-  const compactCorrect = compactPhrase(correctAnswer, 180);
-  const compactDistractors = filteredDistractors
-    .slice(0, 3)
-    .map((option) => compactPhrase(option, 180));
+  const compactCorrect = correctAnswer;
+  const compactDistractors = filteredDistractors.slice(0, 3);
   const options = shuffle(
     [compactCorrect, ...compactDistractors],
     atom.id
@@ -235,19 +185,15 @@ export function buildSecondaryQuiz(
       );
     }
 
-  const compactCorrect = compactPhrase(correctAnswer, 180);
-  const compactDistractors = distractors
-    .slice(0, 3)
-    .map((option) => compactPhrase(option, 180));
     const options = shuffle(
-      [compactCorrect, ...compactDistractors],
+      [correctAnswer, ...distractors.slice(0, 3)],
       `${atom.id}:secondary`
     );
 
     return {
       question: `Quale affermazione su "${atom.title}" è corretta?`,
       options,
-      correctOptionIndex: options.indexOf(compactCorrect),
+      correctOptionIndex: options.indexOf(correctAnswer),
     };
   }
 

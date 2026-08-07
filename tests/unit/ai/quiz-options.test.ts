@@ -30,24 +30,44 @@ describe("buildQuizOptions", () => {
     );
   });
 
-  it("keeps the correct answer length close to the distractors", () => {
+  it("keeps the correct answer complete even when longer than distractors", () => {
     const balanced = balanceQuizAnswerLength(
-      "Il curriculum degli studi umanistici si basava su retorica, grammatica, dialettica e musica, con latino e greco.",
+      "La cultura laica inizia a svilupparsi nel Medioevo con le scuole cittadine e la traduzione dei testi sacri in volgare.",
       [
-        "Le scuole umanistiche erano esclusivamente religiose e gestite da ordini monastici.",
-        "Il curriculum umanistico si basava principalmente su matematica e scienze naturali.",
-        "L'accesso all'università non richiedeva la conoscenza del latino o del greco.",
+        "I laici non avevano accesso alla cultura fino al XV secolo.",
+        "La cultura laica si sviluppò solo nel Rinascimento.",
+        "Le scuole cittadine erano esclusivamente per i nobili.",
       ]
     );
 
-    const distractorAverage =
-      [
-        "Le scuole umanistiche erano esclusivamente religiose e gestite da ordini monastici.",
-        "Il curriculum umanistico si basava principalmente su matematica e scienze naturali.",
-        "L'accesso all'università non richiedeva la conoscenza del latino o del greco.",
-      ].reduce((total, value) => total + value.length, 0) / 3;
+    expect(balanced).toBe(
+      "La cultura laica inizia a svilupparsi nel Medioevo con le scuole cittadine e la traduzione dei testi sacri in volgare."
+    );
+    expect(balanced).not.toMatch(/\b(con|alle|e|da)\.$/i);
+  });
 
-    expect(balanced.length).toBeLessThanOrEqual(distractorAverage * 1.3);
+  it("does not truncate the correct quiz option in buildQuizOptions", () => {
+    const quiz = buildQuizOptions(
+      {
+        id: "atom-002",
+        title: "Cultura laica nel Medioevo",
+        summary:
+          "La cultura laica inizia a svilupparsi nel Medioevo con le scuole cittadine e la traduzione dei testi sacri in volgare.",
+        definitions: [
+          "La cultura laica inizia a svilupparsi nel Medioevo con le scuole cittadine e la traduzione dei testi sacri in volgare.",
+        ],
+        quizDistractors: [
+          "I laici non avevano accesso alla cultura fino al XV secolo.",
+          "La cultura laica si sviluppò solo nel Rinascimento.",
+          "Le scuole cittadine erano esclusivamente per i nobili.",
+        ],
+      },
+      (items) => items
+    );
+
+    expect(quiz.options[quiz.correctOptionIndex]).toBe(
+      "La cultura laica inizia a svilupparsi nel Medioevo con le scuole cittadine e la traduzione dei testi sacri in volgare."
+    );
   });
 
   it("filters meta-phrased distractors", () => {
