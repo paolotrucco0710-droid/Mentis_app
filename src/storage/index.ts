@@ -29,6 +29,24 @@ export function buildPageStorageKey(
   return path.posix.join(knowledgeSourceId, "pages", `${padded}.${extension}`);
 }
 
+export function buildMasterPageStorageKey(
+  knowledgeSourceId: string,
+  pageNumber: number,
+  extension: string
+): string {
+  const padded = String(pageNumber).padStart(3, "0");
+  return path.posix.join(
+    knowledgeSourceId,
+    "pages",
+    "master",
+    `${padded}.${extension}`
+  );
+}
+
+export function isMasterPageStorageKey(storageKey: string): boolean {
+  return storageKey.includes("/pages/master/");
+}
+
 export function buildFigureStorageKey(
   knowledgeSourceId: string,
   pageNumber: number,

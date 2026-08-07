@@ -1,12 +1,20 @@
 import type { Image } from "@/domain/entities/image";
 import type { KnowledgeJsonAtomImage } from "@/domain/knowledge/knowledge-json";
+import { isMasterPageStorageKey } from "@/storage";
 
 const CAMERA_FILENAME_PATTERN = /^(IMG_|DSC_|PXL_|MVIMG_|WA\d+)/i;
 const IMAGE_FILENAME_PATTERN = /\.(jpe?g|png|heic|webp)$/i;
 
-type ImageSource = Pick<Image, "caption" | "storageKey">;
+type ImageSource = Pick<Image, "caption" | "storageKey"> & {
+  fallbackToFullPage?: boolean;
+  pipelineVersion?: string | null;
+};
 
 export function isPageSourceStorageKey(storageKey: string): boolean {
+  if (isMasterPageStorageKey(storageKey)) {
+    return false;
+  }
+
   return (
     storageKey.includes("/pages/") || storageKey.endsWith("/document.pdf")
   );
@@ -37,6 +45,10 @@ export function isUploadSourcePageImage(image: Pick<Image, "caption">): boolean 
 }
 
 export function isPageSourceImage(image: ImageSource): boolean {
+  if (image.fallbackToFullPage) {
+    return false;
+  }
+
   if (isPageSourceStorageKey(image.storageKey)) {
     return true;
   }
@@ -45,6 +57,10 @@ export function isPageSourceImage(image: ImageSource): boolean {
 }
 
 export function isStudyIllustrationImage(image: ImageSource): boolean {
+  if (image.fallbackToFullPage) {
+    return true;
+  }
+
   if (isFigureStorageKey(image.storageKey)) {
     return true;
   }

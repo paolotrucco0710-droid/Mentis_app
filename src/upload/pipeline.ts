@@ -26,6 +26,7 @@ import type {
 import type { Image, KnowledgeSource, Upload } from "@/domain/entities";
 import { env, getMaxUploadFileSizeBytes } from "@/lib/env";
 import {
+  buildMasterPageStorageKey,
   buildPageStorageKey,
   buildPdfStorageKey,
   deleteStorageKeys,
@@ -35,7 +36,7 @@ import {
   type ChapterUploadResult,
   type UploadFileInput,
 } from "@/storage";
-import { processImage } from "./image-processing";
+import { processImageMaster, processImageNormalized } from "./image-processing";
 import { validateUploadFiles } from "./validation";
 
 export class UploadPipelineError extends Error {
@@ -84,31 +85,39 @@ async function saveImages(
   try {
     for (let index = 0; index < files.length; index++) {
       const file = files[index];
-      const processed = await processImage(file.buffer, file.mimeType);
+      const [master, normalized] = await Promise.all([
+        processImageMaster(file.buffer, file.mimeType),
+        processImageNormalized(file.buffer, file.mimeType),
+      ]);
       const pageNumber = index + 1;
-      const storageKey = buildPageStorageKey(
+      const normalizedKey = buildPageStorageKey(
         knowledgeSourceId,
         pageNumber,
-        processed.extension
+        normalized.extension
+      );
+      const masterKey = buildMasterPageStorageKey(
+        knowledgeSourceId,
+        pageNumber,
+        master.extension
       );
 
-      const stored = await storage.save(
-        storageKey,
-        processed.buffer,
-        processed.mimeType
-      );
-      savedKeys.push(stored.storageKey);
+      const [storedMaster, storedNormalized] = await Promise.all([
+        storage.save(masterKey, master.buffer, master.mimeType),
+        storage.save(normalizedKey, normalized.buffer, normalized.mimeType),
+      ]);
+      savedKeys.push(storedMaster.storageKey, storedNormalized.storageKey);
 
       images.push(
         await createImage({
           knowledgeSourceId,
           ownerId,
-          storageKey: stored.storageKey,
-          hash: stored.hash,
-          mimeType: stored.mimeType,
-          sizeBytes: stored.sizeBytes,
-          width: processed.width,
-          height: processed.height,
+          storageKey: storedNormalized.storageKey,
+          masterStorageKey: storedMaster.storageKey,
+          hash: hashBuffer(normalized.buffer),
+          mimeType: normalized.mimeType,
+          sizeBytes: normalized.buffer.length,
+          width: normalized.width,
+          height: normalized.height,
           pageNumber,
           caption: file.originalName,
         })

@@ -416,19 +416,27 @@ model Chapter {
 }
 
 model Image {
-  id                String    @id @default(uuid()) @db.Uuid
-  knowledgeSourceId String    @map("knowledge_source_id") @db.Uuid
-  ownerId           String    @map("owner_id") @db.Uuid
-  storageKey        String    @map("storage_key")
-  hash              String
-  mimeType          String    @map("mime_type")
-  sizeBytes         BigInt    @map("size_bytes")
-  width             Int?
-  height            Int?
-  pageNumber        Int?      @map("page_number")
-  caption           String?
-  deletedAt         DateTime? @map("deleted_at")
-  createdAt         DateTime  @default(now()) @map("created_at")
+  id                  String    @id @default(uuid()) @db.Uuid
+  knowledgeSourceId   String    @map("knowledge_source_id") @db.Uuid
+  ownerId             String    @map("owner_id") @db.Uuid
+  storageKey          String    @map("storage_key")
+  masterStorageKey    String?   @map("master_storage_key")
+  hash                String
+  mimeType            String    @map("mime_type")
+  sizeBytes           BigInt    @map("size_bytes")
+  width               Int?
+  height              Int?
+  pageNumber          Int?      @map("page_number")
+  caption             String?
+  sourcePageImageId   String?   @map("source_page_image_id") @db.Uuid
+  bboxNormalized      Json?     @map("bbox_normalized")
+  detectionConfidence Float?    @map("detection_confidence")
+  pipelineVersion     String?   @map("pipeline_version")
+  fallbackToFullPage  Boolean   @default(false) @map("fallback_to_full_page")
+  regionType          String?   @map("region_type")
+  containsText        Boolean?  @map("contains_text")
+  deletedAt           DateTime? @map("deleted_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
 
   knowledgeSource KnowledgeSource @relation(fields: [knowledgeSourceId], references: [id], onDelete: Cascade)
   owner           User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -436,6 +444,7 @@ model Image {
   @@index([knowledgeSourceId])
   @@index([ownerId])
   @@index([hash])
+  @@index([sourcePageImageId])
   @@map("images")
 }
 

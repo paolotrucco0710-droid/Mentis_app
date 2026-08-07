@@ -20,6 +20,7 @@ function makeImage(input: {
     storageKey:
       input.storageKey ??
       `00000000-0000-4000-8000-000000000201/figures/p001-f01.jpg`,
+    masterStorageKey: null,
     hash: "hash",
     mimeType: "image/jpeg",
     sizeBytes: 1024,
@@ -27,6 +28,13 @@ function makeImage(input: {
     height: 600,
     pageNumber: input.pageNumber ?? 1,
     caption: input.caption ?? null,
+    sourcePageImageId: null,
+    bboxNormalized: null,
+    detectionConfidence: null,
+    pipelineVersion: null,
+    fallbackToFullPage: false,
+    regionType: null,
+    containsText: null,
     createdAt: new Date("2026-07-31T10:00:00.000Z"),
     deletedAt: null,
   };

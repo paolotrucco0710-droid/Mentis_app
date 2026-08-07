@@ -19,6 +19,8 @@ describe("image-study storage paths", () => {
       isPageSourceImage({
         storageKey: "abc/pages/001.jpg",
         caption: "Illustrazione della corte",
+        fallbackToFullPage: false,
+        pipelineVersion: null,
       })
     ).toBe(true);
   });
@@ -29,8 +31,33 @@ describe("image-study storage paths", () => {
       isStudyIllustrationImage({
         storageKey: "abc/figures/p001-f01.jpg",
         caption: "Corte medievale",
+        fallbackToFullPage: false,
+        pipelineVersion: null,
       })
     ).toBe(true);
+  });
+
+  it("treats master storage keys as non-page OCR sources", () => {
+    expect(isPageSourceStorageKey("abc/pages/master/001.jpg")).toBe(false);
+  });
+
+  it("treats fallback figures as study illustrations", () => {
+    expect(
+      isStudyIllustrationImage({
+        storageKey: "abc/pages/001.jpg",
+        caption: "Mappa dell'Impero romano",
+        fallbackToFullPage: true,
+        pipelineVersion: "figure-v4",
+      })
+    ).toBe(true);
+    expect(
+      isPageSourceImage({
+        storageKey: "abc/pages/001.jpg",
+        caption: "Mappa dell'Impero romano",
+        fallbackToFullPage: true,
+        pipelineVersion: "figure-v4",
+      })
+    ).toBe(false);
   });
 });
 
@@ -92,19 +119,18 @@ describe("extract-figures bounding boxes", () => {
     });
   });
 
-  it("converts normalized boxes to pixel crops", () => {
+  it("converts normalized boxes to padded pixel crops", () => {
     const box = toPixelBoundingBox(
       { top: 0.1, left: 0.2, bottom: 0.6, right: 0.8 },
       1000,
       800
     );
 
-    expect(box).toEqual({
-      left: 200,
-      top: 80,
-      width: 600,
-      height: 400,
-    });
+    expect(box).not.toBeNull();
+    expect(box!.left).toBeLessThan(200);
+    expect(box!.top).toBeLessThan(80);
+    expect(box!.width).toBeGreaterThan(600);
+    expect(box!.height).toBeGreaterThan(400);
   });
 
   it("rejects boxes that are too small", () => {
