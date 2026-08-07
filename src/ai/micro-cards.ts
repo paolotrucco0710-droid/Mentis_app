@@ -13,15 +13,52 @@ export interface BlurtingKeyPointSource {
   keywords?: string[];
 }
 
+function pickDistinctBlurtingKeyword(
+  title: string,
+  keywords?: string[]
+): string | undefined {
+  const normalizedTitle = normalizeForComparison(title);
+  if (!normalizedTitle) {
+    return undefined;
+  }
+
+  for (const raw of keywords ?? []) {
+    const keyword = raw?.trim();
+    if (!keyword) {
+      continue;
+    }
+
+    const normalizedKeyword = normalizeForComparison(keyword);
+    if (!normalizedKeyword) {
+      continue;
+    }
+
+    if (normalizedKeyword === normalizedTitle) {
+      continue;
+    }
+
+    if (
+      normalizedTitle.includes(normalizedKeyword) ||
+      normalizedKeyword.includes(normalizedTitle)
+    ) {
+      continue;
+    }
+
+    return keyword;
+  }
+
+  return undefined;
+}
+
 export function buildBlurtingMainPrompt(atom: BlurtingKeyPointSource): string {
   const title = atom.title.trim();
-  const keyword = atom.keywords?.[0]?.trim();
+  const keyword = pickDistinctBlurtingKeyword(title, atom.keywords);
 
   if (keyword) {
     return `Con parole tue: cosa ricordi su «${title}» e sul legame con «${keyword}»?`;
   }
 
-  return `Cosa ricordi su «${title}»? Scrivi o parla liberamente, senza guardare gli appunti.`;
+  return `Con parole tue: cosa ricordi su «${title}»? Scrivi o parla liberamente, senza guardare gli appunti.`;
 }
 
 /** Reference points for AI evaluation — not shown as progressive steps. */
