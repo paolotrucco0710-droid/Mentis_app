@@ -18,13 +18,14 @@ import {
   resumeSession,
   submitCardResponse,
 } from "@/lib/api";
-import { useActiveSubjectId, useSwipeUp } from "@/hooks";
+import { useActiveSubjectId } from "@/hooks";
 import { SessionStatus } from "@/session/types";
 import { Button, EmptyState, Loader } from "@/components/ui";
 import { IconButton } from "@/components/ui";
 import { ChevronRightIcon } from "@/components/ui/icons";
 import { FeedCardRenderer } from "./feed-card-renderer";
 import { FeedCardStage } from "./feed-card-stage";
+import { FeedSwipeSurface } from "./feed-swipe-surface";
 import { SessionComplete } from "./session-complete";
 import {
   buildSessionSummaryView,
@@ -62,7 +63,6 @@ export function FeedStudy() {
   const [advanceReady, setAdvanceReady] = useState(false);
   const cardStartedAt = useRef<number>(0);
   const feedRequestId = useRef(0);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const loadQueue = useRef<Promise<void>>(Promise.resolve());
   const bootstrapStarted = useRef(false);
   const feedScopeRef = useRef<string | null>(null);
@@ -321,12 +321,6 @@ export function FeedStudy() {
   const swipeEnabled =
     state.status === "ready" && !submitting && advanceReady;
 
-  const swipeHandlers = useSwipeUp(
-    handleSwipeAdvance,
-    swipeEnabled,
-    scrollContainerRef
-  );
-
   async function handleSkip() {
     await handleAnswer({
       outcome: SessionEventOutcome.Skipped,
@@ -443,6 +437,7 @@ export function FeedStudy() {
   const { item } = state;
   const progressPercent = Math.min(100, Math.round(item.sessionProgress * 100));
   const cardKey = `${item.sessionId}-${item.card.id}-${item.position}`;
+  const feedCardKey = cardKey;
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
@@ -479,11 +474,10 @@ export function FeedStudy() {
         </button>
       </header>
 
-      <div
-        ref={scrollContainerRef}
-        data-testid="feed-scroll-surface"
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4"
-        {...swipeHandlers}
+      <FeedSwipeSurface
+        key={feedCardKey}
+        enabled={swipeEnabled}
+        onAdvance={handleSwipeAdvance}
       >
         <FeedCardStage cardKey={cardKey}>
           <FeedCardRenderer
@@ -498,7 +492,7 @@ export function FeedStudy() {
             registerAdvance={registerAdvance}
           />
         </FeedCardStage>
-      </div>
+      </FeedSwipeSurface>
 
       <footer className="feed-safe-bottom shrink-0 px-4 pt-2 text-center">
         <p className="text-xs text-muted">
