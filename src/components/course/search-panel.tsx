@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { SearchResults } from "@/course/types";
 import { ApiError, searchLibrary } from "@/lib/api";
@@ -27,6 +27,7 @@ export function SearchPanel() {
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const searchRequestId = useRef(0);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -36,19 +37,29 @@ export function SearchPanel() {
       return () => window.clearTimeout(timer);
     }
 
+    const requestId = ++searchRequestId.current;
+
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
           setLoading(true);
           setError(null);
           const data = await searchLibrary(query);
+          if (requestId !== searchRequestId.current) {
+            return;
+          }
           setResults(data);
         } catch (err) {
+          if (requestId !== searchRequestId.current) {
+            return;
+          }
           setError(
             err instanceof ApiError ? err.message : "Ricerca non riuscita."
           );
         } finally {
-          setLoading(false);
+          if (requestId === searchRequestId.current) {
+            setLoading(false);
+          }
         }
       })();
     }, 300);

@@ -202,17 +202,17 @@ export async function recordCardResponse(
     };
   }, PROGRESS_TRANSACTION_OPTIONS);
 
-  void unlockAtomsUnlockedByPrerequisite({
+  const unlockedAtomIds = await unlockAtomsUnlockedByPrerequisite({
     userId: input.userId,
     prerequisiteAtomId: input.atomId,
-  }).catch(() => undefined);
+  });
 
-  void scheduleReviewForAtom({
+  await scheduleReviewForAtom({
     userId: input.userId,
     atomId: input.atomId,
     atomState,
     now,
-  }).catch(() => undefined);
+  });
 
   void trackAnalyticsEvent({
     userId: input.userId,
@@ -243,7 +243,7 @@ export async function recordCardResponse(
     masteryBefore,
     masteryAfter: atomState.mastery,
     masteryDelta: atomState.mastery - masteryBefore,
-    unlockedAtomIds: [],
+    unlockedAtomIds,
     subjectProgress: null,
   };
 
