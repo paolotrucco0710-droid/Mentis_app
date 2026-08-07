@@ -30,6 +30,10 @@ import {
   type SessionSummaryView,
 } from "./session-summary";
 import type { CardAnswerResult } from "./card-utils";
+import {
+  buildFeedScopeKey,
+  shouldResetFeedForScopeChange,
+} from "./feed-scope";
 
 const SESSION_STORAGE_KEY = "mentis.activeSessionId";
 const CHAPTER_SCOPE_KEY = "mentis.activeKnowledgeSourceId";
@@ -61,6 +65,7 @@ export function FeedStudy() {
   const feedRequestId = useRef(0);
   const loadQueue = useRef<Promise<void>>(Promise.resolve());
   const bootstrapStarted = useRef(false);
+  const feedScopeRef = useRef<string | null>(null);
   const answering = useRef(false);
   const advanceActionRef = useRef<(() => void) | null>(null);
   const conceptsStudiedRef = useRef<Map<string, string>>(new Map());
@@ -233,10 +238,28 @@ export function FeedStudy() {
       return;
     }
 
+    const nextScope = buildFeedScopeKey(subjectId, knowledgeSourceId);
+    const scopeChanged = shouldResetFeedForScopeChange(
+      feedScopeRef.current,
+      nextScope
+    );
+
+    if (!scopeChanged && bootstrapStarted.current) {
+      return;
+    }
+
+    if (scopeChanged) {
+      bootstrapStarted.current = false;
+      feedRequestId.current += 1;
+      setState({ status: "loading" });
+    }
+
+    feedScopeRef.current = nextScope;
+
     startTransition(() => {
       void bootstrap();
     });
-  }, [bootstrap, loadingSubject, subjectId]);
+  }, [bootstrap, knowledgeSourceId, loadingSubject, subjectId]);
 
   const handleAnswer = useCallback(async (answer: CardAnswerResult) => {
     if (state.status !== "ready" || submitting || answering.current) {

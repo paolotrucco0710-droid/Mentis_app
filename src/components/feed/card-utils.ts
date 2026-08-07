@@ -195,6 +195,46 @@ export function getImageLabelingFromPayload(
   };
 }
 
+export function canRenderFeedCard(card: Card): boolean {
+  const payload = card.payload;
+
+  switch (card.type) {
+    case CardType.Quiz:
+    case CardType.MultipleChoice:
+      return (
+        isQuizPayload(payload) &&
+        payload.options.length >= 2 &&
+        payload.correctOptionIndex >= 0 &&
+        payload.correctOptionIndex < payload.options.length
+      );
+    case CardType.Connection:
+      return (
+        isConnectionPayload(payload) &&
+        payload.options.length >= 2 &&
+        payload.correctOptionIndex >= 0 &&
+        payload.correctOptionIndex < payload.options.length
+      );
+    case CardType.TrueFalse:
+      return isTrueFalsePayload(payload);
+    case CardType.Blurting:
+      return isBlurtingPayload(payload);
+    case CardType.Feynman:
+      return isFeynmanPayload(payload);
+    case CardType.ErrorDetection:
+      return isErrorDetectionPayload(payload);
+    case CardType.ImageExplain:
+      return (
+        getImageIdFromPayload(payload) !== null &&
+        (getImageQuizOptionsFromPayload(payload) !== null ||
+          getImageLabelingFromPayload(payload) !== null)
+      );
+    case CardType.Explain:
+      return Boolean(card.text?.trim() || card.prompt?.trim());
+    default:
+      return true;
+  }
+}
+
 export function getCardTypeLabel(type: CardType): string {
   switch (type) {
     case CardType.Explain:

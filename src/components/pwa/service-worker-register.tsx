@@ -18,35 +18,6 @@ export function ServiceWorkerRegister() {
           return;
         }
 
-        const refreshIfWaiting = () => {
-          if (!registration.waiting) {
-            return;
-          }
-
-          registration.waiting.postMessage({ type: "SKIP_WAITING" });
-          window.location.reload();
-        };
-
-        if (registration.waiting) {
-          refreshIfWaiting();
-        }
-
-        registration.addEventListener("updatefound", () => {
-          const installing = registration.installing;
-          if (!installing) {
-            return;
-          }
-
-          installing.addEventListener("statechange", () => {
-            if (
-              installing.state === "installed" &&
-              navigator.serviceWorker.controller
-            ) {
-              refreshIfWaiting();
-            }
-          });
-        });
-
         const onVisible = () => {
           void registration.update();
         };

@@ -7,6 +7,7 @@ import type { AtomId } from "@/domain/ids";
 import type { Card } from "@/domain/entities/card";
 import { Loader } from "@/components/ui";
 import type { CardAnswerResult } from "./card-utils";
+import { canRenderFeedCard } from "./card-utils";
 
 const ExplainCard = dynamic(
   () => import("./cards/explain-card").then((module) => module.ExplainCard),
@@ -82,6 +83,10 @@ function FeedCardRendererComponent({
     onSkip,
     registerAdvance,
   };
+
+  if (!canRenderFeedCard(card)) {
+    return <FallbackCard {...props} />;
+  }
 
   switch (card.type) {
     case CardType.Explain:
