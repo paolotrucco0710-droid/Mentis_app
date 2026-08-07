@@ -107,9 +107,6 @@ export function FeynmanCardComponent({
               </ul>
             </div>
           ) : null}
-          <Button fullWidth disabled={disabled} onClick={handleContinue}>
-            Continua
-          </Button>
         </div>
       ) : (
         <Button

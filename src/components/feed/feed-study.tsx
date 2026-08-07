@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { FeedItem, FeedResponse } from "@/domain/entities/feed-item";
 import type { StudySession } from "@/domain/entities/study-session";
-import { CardType, SessionEventOutcome } from "@/domain/enums";
+import { SessionEventOutcome } from "@/domain/enums";
 import type { KnowledgeSourceId, StudySessionId } from "@/domain/ids";
 import {
   ApiError,
@@ -43,10 +43,6 @@ type FeedState =
   | { status: "ready"; session: StudySession; item: FeedItem }
   | { status: "complete"; summary: SessionSummaryView }
   | { status: "error"; message: string; code?: string };
-
-function allowsSwipeWithoutAdvance(type: CardType): boolean {
-  return type === CardType.Explain;
-}
 
 export function FeedStudy() {
   const searchParams = useSearchParams();
@@ -328,23 +324,11 @@ export function FeedStudy() {
       return;
     }
 
-    if (advanceActionRef.current) {
-      advanceActionRef.current();
-      return;
-    }
-
-    if (allowsSwipeWithoutAdvance(state.item.card.type)) {
-      void handleAnswer({
-        outcome: SessionEventOutcome.Neutral,
-        isCorrect: true,
-      });
-    }
-  }, [handleAnswer, state, submitting]);
+    advanceActionRef.current?.();
+  }, [state, submitting]);
 
   const swipeEnabled =
-    state.status === "ready" &&
-    !submitting &&
-    (advanceReady || allowsSwipeWithoutAdvance(state.item.card.type));
+    state.status === "ready" && !submitting && advanceReady;
 
   const swipeHandlers = useSwipeUp(
     handleSwipeAdvance,
