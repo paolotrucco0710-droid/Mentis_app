@@ -2,14 +2,50 @@ import { describe, expect, it } from "vitest";
 import { buildBlurtingKeyPoints, buildBlurtingMainPrompt, buildTrueFalseCards } from "@/ai/micro-cards";
 
 describe("micro-cards", () => {
-  it("builds a user-facing blurting prompt", () => {
+  it("builds a user-facing blurting prompt with a distinct keyword", () => {
     expect(
       buildBlurtingMainPrompt({
         title: "Civiltà romana",
         summary: "La civiltà romana si sviluppò nel Mediterraneo.",
         keywords: ["legione"],
       })
-    ).toContain("Civiltà romana");
+    ).toBe(
+      "Con parole tue: cosa ricordi su «Civiltà romana» e sul legame con «legione»?"
+    );
+  });
+
+  it("avoids redundant blurting prompts when the keyword repeats the title", () => {
+    expect(
+      buildBlurtingMainPrompt({
+        title: "Grande Muraglia",
+        summary: "La Grande Muraglia è una fortificazione cinese.",
+        keywords: ["Grande Muraglia"],
+      })
+    ).toBe(
+      "Con parole tue: cosa ricordi su «Grande Muraglia»? Scrivi o parla liberamente, senza guardare gli appunti."
+    );
+  });
+
+  it("avoids redundant blurting prompts when the keyword is contained in the title", () => {
+    expect(
+      buildBlurtingMainPrompt({
+        title: "Shogunato giapponese",
+        summary: "Il potere militare fu centralizzato nello shogun.",
+        keywords: ["shogunato", "bakufu"],
+      })
+    ).toBe(
+      "Con parole tue: cosa ricordi su «Shogunato giapponese» e sul legame con «bakufu»?"
+    );
+
+    expect(
+      buildBlurtingMainPrompt({
+        title: "Cultura laica nel Medioevo",
+        summary: "La cultura laica si sviluppò nelle città medievali.",
+        keywords: ["cultura laica"],
+      })
+    ).toBe(
+      "Con parole tue: cosa ricordi su «Cultura laica nel Medioevo»? Scrivi o parla liberamente, senza guardare gli appunti."
+    );
   });
 
   it("builds evaluation key points without arbitrary keyword suffixes", () => {
