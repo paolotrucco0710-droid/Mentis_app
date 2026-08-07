@@ -21,6 +21,9 @@ import {
 } from "./optimization";
 
 const MIN_FIGURE_AREA_RATIO = 0.04;
+const MAX_FIGURE_AREA_RATIO = 0.72;
+const MIN_FIGURE_ASPECT_RATIO = 0.3;
+const MAX_FIGURE_ASPECT_RATIO = 1 / MIN_FIGURE_ASPECT_RATIO;
 const MIN_FIGURE_DIMENSION_PX = 48;
 
 const rawFigureDetectionSchema = z.object({
@@ -98,11 +101,42 @@ export function normalizeBoundingBox(
   return { top, left, bottom, right };
 }
 
+export function isValidFigureCrop(
+  bbox: NormalizedBoundingBox,
+  pageWidth: number,
+  pageHeight: number
+): boolean {
+  const widthFrac = bbox.right - bbox.left;
+  const heightFrac = bbox.bottom - bbox.top;
+  const areaRatio = widthFrac * heightFrac;
+
+  if (areaRatio > MAX_FIGURE_AREA_RATIO) {
+    return false;
+  }
+
+  const pixelWidth = widthFrac * pageWidth;
+  const pixelHeight = heightFrac * pageHeight;
+  if (pixelWidth <= 0 || pixelHeight <= 0) {
+    return false;
+  }
+
+  const aspect = pixelWidth / pixelHeight;
+  if (aspect < MIN_FIGURE_ASPECT_RATIO || aspect > MAX_FIGURE_ASPECT_RATIO) {
+    return false;
+  }
+
+  return true;
+}
+
 export function toPixelBoundingBox(
   bbox: NormalizedBoundingBox,
   pageWidth: number,
   pageHeight: number
 ): PixelBoundingBox | null {
+  if (!isValidFigureCrop(bbox, pageWidth, pageHeight)) {
+    return null;
+  }
+
   const left = Math.floor(Math.max(0, bbox.left) * pageWidth);
   const top = Math.floor(Math.max(0, bbox.top) * pageHeight);
   const right = Math.ceil(Math.min(1, bbox.right) * pageWidth);
@@ -120,6 +154,19 @@ export function toPixelBoundingBox(
   }
 
   return { left, top, width, height };
+}
+
+async function loadOrientedPageBuffer(buffer: Buffer): Promise<{
+  buffer: Buffer;
+  width: number;
+  height: number;
+}> {
+  const oriented = await sharp(buffer, { failOn: "none" }).rotate().toBuffer();
+  const metadata = await sharp(oriented).metadata();
+  const width = metadata.width ?? 0;
+  const height = metadata.height ?? 0;
+
+  return { buffer: oriented, width, height };
 }
 
 function parseFigureDetection(content: string): FigureDetection[] {
@@ -178,10 +225,12 @@ async function detectFiguresOnPage(
               text: `Analizza questa pagina di libro scolastico in italiano.
 Identifica SOLO illustrazioni didattiche utili allo studio: dipinti, mappe, diagrammi, grafici, tavole, foto storiche, schemi.
 NON includere:
-- blocchi di testo
+- blocchi o colonne di testo
 - margini o bordi della pagina
-- la pagina intera
+- la pagina intera o più del 60% della pagina
 - decorazioni minime senza valore didattico
+
+Il riquadro deve aderire strettamente all'illustrazione, con margini minimi attorno.
 
 Per ogni illustrazione restituisci JSON:
 {
@@ -285,7 +334,21 @@ export async function extractFiguresFromPageImages(input: {
         return [];
       }
 
-      const buffer = await storage.read(pageImage.storageKey);
+      const rawBuffer = await storage.read(pageImage.storageKey);
+      let orientedPage: Awaited<ReturnType<typeof loadOrientedPageBuffer>>;
+
+      try {
+        orientedPage = await loadOrientedPageBuffer(rawBuffer);
+      } catch {
+        return [];
+      }
+
+      const { buffer, width: pageWidth, height: pageHeight } = orientedPage;
+
+      if (pageWidth === 0 || pageHeight === 0) {
+        return [];
+      }
+
       let detections: FigureDetection[] = [];
 
       try {
@@ -300,16 +363,6 @@ export async function extractFiguresFromPageImages(input: {
       }
 
       if (detections.length === 0) {
-        return [];
-      }
-
-      const metadata = await sharp(buffer, { failOn: "none" })
-        .rotate()
-        .metadata();
-      const pageWidth = metadata.width ?? 0;
-      const pageHeight = metadata.height ?? 0;
-
-      if (pageWidth === 0 || pageHeight === 0) {
         return [];
       }
 
@@ -337,7 +390,6 @@ export async function extractFiguresFromPageImages(input: {
         }
 
         const cropped = await sharp(buffer, { failOn: "none" })
-          .rotate()
           .extract(pixelBox)
           .jpeg({ quality: 85, mozjpeg: true })
           .toBuffer();
