@@ -9,6 +9,12 @@ const META_PHRASE_PREFIXES = [
 
 import { firstSentence, normalizeForComparison } from "./text-snippets";
 
+const LENGTH_BALANCE_MIN_RATIO = 0.75;
+const LENGTH_BALANCE_MAX_RATIO = 1.35;
+
+const DANGLING_ENDING_PATTERN =
+  /\b(con|con le|con la|con i|con gli|con lo|alle|ai|agli|all|da|di|del|della|dei|delle|e|o|a|in|per|su|che|un|una|uno)\.$/i;
+
 export interface QuizOptionSource {
   id: string;
   title: string;
@@ -19,6 +25,23 @@ export interface QuizOptionSource {
   misconceptions?: string[];
   counterExamples?: string[];
   commonMistakes?: string[];
+}
+
+export function isCompleteQuizSentence(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.length < 12) {
+    return false;
+  }
+
+  if (!/[.!?]$/.test(trimmed)) {
+    return false;
+  }
+
+  if (DANGLING_ENDING_PATTERN.test(trimmed)) {
+    return false;
+  }
+
+  return true;
 }
 
 export function asDeclarativeQuizOption(value: string | undefined): string | null {
@@ -43,33 +66,147 @@ export function asDeclarativeQuizOption(value: string | undefined): string | nul
   return trimmed;
 }
 
-function pickCorrectAnswer(atom: QuizOptionSource): string {
-  const candidates = [
-    ...(atom.definitions ?? []).map(asDeclarativeQuizOption),
-    asDeclarativeQuizOption(atom.summary),
-    asDeclarativeQuizOption(firstSentence(atom.summary)),
-  ].filter((value): value is string => Boolean(value));
-
-  const uniqueCandidates = [...new Set(candidates)];
-  if (uniqueCandidates.length === 0) {
-    return (
-      asDeclarativeQuizOption(firstSentence(atom.summary)) ??
-      asDeclarativeQuizOption(atom.summary.trim()) ??
-      firstSentence(atom.summary.trim())
-    );
+function averageLength(values: string[]): number {
+  if (values.length === 0) {
+    return 0;
   }
 
-  return uniqueCandidates.sort((left, right) => left.length - right.length)[0]!;
+  return values.reduce((total, value) => total + value.length, 0) / values.length;
+}
+
+function pickClosestToLength<T extends string>(
+  items: T[],
+  targetLength: number
+): T | undefined {
+  if (items.length === 0) {
+    return undefined;
+  }
+
+  return [...items].sort(
+    (left, right) =>
+      Math.abs(left.length - targetLength) - Math.abs(right.length - targetLength)
+  )[0];
+}
+
+function pickTopByLengthProximity(
+  items: string[],
+  targetLength: number,
+  count: number
+): string[] {
+  return [...items]
+    .sort(
+      (left, right) =>
+        Math.abs(left.length - targetLength) -
+        Math.abs(right.length - targetLength)
+    )
+    .slice(0, count);
+}
+
+function uniqueCompleteOptions(values: string[]): string[] {
+  const seen = new Set<string>();
+  const options: string[] = [];
+
+  for (const value of values) {
+    const normalized = asDeclarativeQuizOption(value);
+    if (
+      !normalized ||
+      seen.has(normalized) ||
+      !isCompleteQuizSentence(normalized)
+    ) {
+      continue;
+    }
+
+    seen.add(normalized);
+    options.push(normalized);
+  }
+
+  return options;
+}
+
+export function collectCorrectAnswerCandidates(atom: QuizOptionSource): string[] {
+  return uniqueCompleteOptions([
+    ...(atom.definitions ?? []),
+    ...(atom.definitions ?? []).map(firstSentence),
+    atom.summary,
+    firstSentence(atom.summary),
+  ]);
+}
+
+export function collectDistractorCandidates(atom: QuizOptionSource): string[] {
+  return uniqueCompleteOptions([
+    ...(atom.quizDistractors ?? []),
+    ...(atom.misconceptions ?? []),
+    ...(atom.counterExamples ?? []),
+    ...(atom.commonMistakes ?? []),
+  ]);
+}
+
+function pickDefaultCorrectAnswer(atom: QuizOptionSource): string {
+  const candidates = collectCorrectAnswerCandidates(atom);
+  if (candidates.length > 0) {
+    return candidates.sort((left, right) => left.length - right.length)[0]!;
+  }
+
+  return (
+    asDeclarativeQuizOption(firstSentence(atom.summary)) ??
+    asDeclarativeQuizOption(atom.summary.trim()) ??
+    firstSentence(atom.summary.trim())
+  );
 }
 
 export function balanceQuizAnswerLength(
   correctAnswer: string,
-  distractors: string[]
+  distractors: string[],
+  alternatives: string[] = []
 ): string {
-  void distractors;
-  // Quiz options must stay complete sentences; never shorten mid-clause to match
-  // distractor length (that produced answers ending with "con.", "alle.", "e.", etc.).
-  return correctAnswer;
+  const candidates = [...new Set([correctAnswer, ...alternatives])].filter(
+    isCompleteQuizSentence
+  );
+
+  if (candidates.length === 0) {
+    return correctAnswer;
+  }
+
+  if (distractors.length === 0) {
+    return pickClosestToLength(candidates, correctAnswer.length) ?? correctAnswer;
+  }
+
+  const targetLength = averageLength(distractors);
+  const minLength = targetLength * LENGTH_BALANCE_MIN_RATIO;
+  const maxLength = targetLength * LENGTH_BALANCE_MAX_RATIO;
+
+  const inBand = candidates.filter(
+    (candidate) =>
+      candidate.length >= minLength && candidate.length <= maxLength
+  );
+
+  if (inBand.length > 0) {
+    return pickClosestToLength(inBand, targetLength)!;
+  }
+
+  return pickClosestToLength(candidates, targetLength) ?? correctAnswer;
+}
+
+export function selectBalancedDistractors(
+  candidates: string[],
+  correctAnswer: string,
+  count: number,
+  fallback: string
+): string[] {
+  const correctNorm = normalizeForComparison(correctAnswer);
+  const unique = [...new Set(candidates)].filter(
+    (candidate) =>
+      isCompleteQuizSentence(candidate) &&
+      normalizeForComparison(candidate) !== correctNorm
+  );
+
+  const selected = pickTopByLengthProximity(unique, correctAnswer.length, count);
+
+  while (selected.length < count) {
+    selected.push(fallback);
+  }
+
+  return selected.slice(0, count);
 }
 
 export function buildQuizOptions(
@@ -81,66 +218,38 @@ export function buildQuizOptions(
   correctOptionIndex: number;
 } {
   const question = `Cosa descrive meglio "${atom.title}"?`;
-  const distractors: string[] = [];
+  const distractorPool = collectDistractorCandidates(atom);
+  const correctCandidates = collectCorrectAnswerCandidates(atom);
+  const fallbackDistractor = `Questa affermazione non corrisponde al concetto di ${atom.title}.`;
 
-  if (atom.quizDistractors && atom.quizDistractors.length > 0) {
-    for (const candidate of atom.quizDistractors) {
-      const normalized = asDeclarativeQuizOption(candidate);
-      if (normalized && !distractors.includes(normalized)) {
-        distractors.push(normalized);
-      }
-      if (distractors.length >= 3) {
-        break;
-      }
-    }
-  }
-
-  if (distractors.length < 3) {
-    for (const candidate of [
-      ...(atom.misconceptions ?? []),
-      ...(atom.counterExamples ?? []),
-    ]) {
-      const normalized = asDeclarativeQuizOption(candidate);
-      if (normalized && !distractors.includes(normalized)) {
-        distractors.push(normalized);
-      }
-      if (distractors.length >= 3) {
-        break;
-      }
-    }
-  }
-
-  while (distractors.length < 3) {
-    distractors.push(
-      `Questa affermazione non corrisponde al concetto di ${atom.title}.`
-    );
-  }
+  const seedDistractors =
+    distractorPool.length > 0
+      ? pickTopByLengthProximity(
+          distractorPool,
+          averageLength(distractorPool),
+          3
+        )
+      : [];
 
   const correctAnswer = balanceQuizAnswerLength(
-    pickCorrectAnswer(atom),
-    distractors.slice(0, 3)
+    pickDefaultCorrectAnswer(atom),
+    seedDistractors,
+    correctCandidates
   );
-  const filteredDistractors = distractors
-    .filter((distractor) => distractor !== correctAnswer)
-    .slice(0, 3);
 
-  while (filteredDistractors.length < 3) {
-    filteredDistractors.push(
-      `Questa affermazione non corrisponde al concetto di ${atom.title}.`
-    );
-  }
-
-  const compactCorrect = correctAnswer;
-  const compactDistractors = filteredDistractors.slice(0, 3);
-  const options = shuffle(
-    [compactCorrect, ...compactDistractors],
-    atom.id
+  const filteredDistractors = selectBalancedDistractors(
+    distractorPool,
+    correctAnswer,
+    3,
+    fallbackDistractor
   );
+
+  const options = shuffle([correctAnswer, ...filteredDistractors], atom.id);
 
   return {
     question,
     options,
-    correctOptionIndex: options.indexOf(compactCorrect),
+    correctOptionIndex: options.indexOf(correctAnswer),
   };
 }
 
@@ -157,11 +266,14 @@ export function buildSecondaryQuiz(
     ...(atom.definitions ?? []).slice(1),
     ...(atom.examples ?? []),
   ];
+  const distractorPool = collectDistractorCandidates(atom);
+  const fallbackDistractor = `Questa affermazione non descrive correttamente ${atom.title}.`;
 
   for (const candidate of factCandidates) {
     const correctAnswer = asDeclarativeQuizOption(candidate);
     if (
       !correctAnswer ||
+      !isCompleteQuizSentence(correctAnswer) ||
       correctAnswer === primaryCorrectAnswer ||
       normalizeForComparison(correctAnswer) ===
         normalizeForComparison(primaryCorrectAnswer)
@@ -169,24 +281,21 @@ export function buildSecondaryQuiz(
       continue;
     }
 
-    const distractors = (atom.quizDistractors ?? [])
-      .map(asDeclarativeQuizOption)
-      .filter(
-        (value): value is string =>
-          Boolean(value) &&
-          value !== correctAnswer &&
-          value !== primaryCorrectAnswer
-      )
-      .slice(0, 3);
-
-    while (distractors.length < 3) {
-      distractors.push(
-        `Questa affermazione non descrive correttamente ${atom.title}.`
-      );
-    }
+    const filteredDistractors = selectBalancedDistractors(
+      distractorPool.filter(
+        (distractor) =>
+          distractor !== correctAnswer &&
+          distractor !== primaryCorrectAnswer &&
+          normalizeForComparison(distractor) !==
+            normalizeForComparison(primaryCorrectAnswer)
+      ),
+      correctAnswer,
+      3,
+      fallbackDistractor
+    );
 
     const options = shuffle(
-      [correctAnswer, ...distractors.slice(0, 3)],
+      [correctAnswer, ...filteredDistractors],
       `${atom.id}:secondary`
     );
 

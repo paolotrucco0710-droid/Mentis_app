@@ -3,6 +3,8 @@ import {
   asDeclarativeQuizOption,
   balanceQuizAnswerLength,
   buildQuizOptions,
+  isCompleteQuizSentence,
+  selectBalancedDistractors,
 } from "@/ai/quiz-options";
 
 describe("buildQuizOptions", () => {
@@ -30,7 +32,7 @@ describe("buildQuizOptions", () => {
     );
   });
 
-  it("keeps the correct answer complete even when longer than distractors", () => {
+  it("never truncates the correct answer mid-sentence", () => {
     const balanced = balanceQuizAnswerLength(
       "La cultura laica inizia a svilupparsi nel Medioevo con le scuole cittadine e la traduzione dei testi sacri in volgare.",
       [
@@ -40,10 +42,45 @@ describe("buildQuizOptions", () => {
       ]
     );
 
-    expect(balanced).toBe(
-      "La cultura laica inizia a svilupparsi nel Medioevo con le scuole cittadine e la traduzione dei testi sacri in volgare."
-    );
     expect(balanced).not.toMatch(/\b(con|alle|e|da)\.$/i);
+    expect(isCompleteQuizSentence(balanced)).toBe(true);
+  });
+
+  it("prefers a shorter complete alternative when the main answer is much longer", () => {
+    const balanced = balanceQuizAnswerLength(
+      "La cultura laica inizia a svilupparsi nel Medioevo con le scuole cittadine e la traduzione dei testi sacri in volgare.",
+      [
+        "I laici non avevano accesso alla cultura fino al XV secolo.",
+        "La cultura laica si sviluppò solo nel Rinascimento.",
+        "Le scuole cittadine erano esclusivamente per i nobili.",
+      ],
+      [
+        "La cultura laica nasce nel Medioevo con scuole cittadine e testi in volgare.",
+      ]
+    );
+
+    expect(balanced).toBe(
+      "La cultura laica nasce nel Medioevo con scuole cittadine e testi in volgare."
+    );
+  });
+
+  it("picks distractors with length close to the correct answer", () => {
+    const distractors = selectBalancedDistractors(
+      [
+        "I laici non avevano accesso alla cultura fino al XV secolo.",
+        "La cultura laica si sviluppò solo nel Rinascimento.",
+        "Le scuole cittadine erano esclusivamente per i nobili.",
+        "Le scuole cittadine erano esclusivamente per i nobili e per la classe dominante cittadina.",
+      ],
+      "La cultura laica nasce nel Medioevo con scuole cittadine e testi in volgare.",
+      3,
+      "Fallback generico."
+    );
+
+    expect(distractors).toContain(
+      "Le scuole cittadine erano esclusivamente per i nobili e per la classe dominante cittadina."
+    );
+    expect(distractors.every(isCompleteQuizSentence)).toBe(true);
   });
 
   it("does not truncate the correct quiz option in buildQuizOptions", () => {
@@ -55,6 +92,7 @@ describe("buildQuizOptions", () => {
           "La cultura laica inizia a svilupparsi nel Medioevo con le scuole cittadine e la traduzione dei testi sacri in volgare.",
         definitions: [
           "La cultura laica inizia a svilupparsi nel Medioevo con le scuole cittadine e la traduzione dei testi sacri in volgare.",
+          "La cultura laica nasce nel Medioevo con scuole cittadine e testi in volgare.",
         ],
         quizDistractors: [
           "I laici non avevano accesso alla cultura fino al XV secolo.",
@@ -66,8 +104,11 @@ describe("buildQuizOptions", () => {
     );
 
     expect(quiz.options[quiz.correctOptionIndex]).toBe(
-      "La cultura laica inizia a svilupparsi nel Medioevo con le scuole cittadine e la traduzione dei testi sacri in volgare."
+      "La cultura laica nasce nel Medioevo con scuole cittadine e testi in volgare."
     );
+    expect(
+      quiz.options.every((option) => isCompleteQuizSentence(option))
+    ).toBe(true);
   });
 
   it("filters meta-phrased distractors", () => {
