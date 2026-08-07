@@ -1,6 +1,7 @@
 import type { StudySessionId } from "@/domain/ids";
 import type { SessionEvent } from "@/domain/entities";
-import type { SessionEventOutcome, SessionEventType } from "@/domain/enums";
+import type { SessionEventOutcome } from "@/domain/enums";
+import { SessionEventType } from "@/domain/enums";
 import { getDb, type DbTx } from "../transaction";
 import { toSessionEvent } from "../mappers";
 
@@ -35,4 +36,39 @@ export async function findSessionEventsBySessionId(
     orderBy: { timestamp: "asc" },
   });
   return records.map(toSessionEvent);
+}
+
+export async function findRecentSessionEventsBySessionId(
+  sessionId: StudySessionId,
+  limit = 50,
+  tx?: DbTx
+): Promise<SessionEvent[]> {
+  const records = await getDb(tx).sessionEvent.findMany({
+    where: { sessionId },
+    orderBy: { timestamp: "desc" },
+    take: limit,
+  });
+
+  return records.reverse().map(toSessionEvent);
+}
+
+export async function findLastLifecycleEventBySessionId(
+  sessionId: StudySessionId,
+  tx?: DbTx
+): Promise<SessionEvent | null> {
+  const record = await getDb(tx).sessionEvent.findFirst({
+    where: {
+      sessionId,
+      type: {
+        in: [
+          SessionEventType.Pause,
+          SessionEventType.Resume,
+          SessionEventType.Exit,
+        ],
+      },
+    },
+    orderBy: { timestamp: "desc" },
+  });
+
+  return record ? toSessionEvent(record) : null;
 }

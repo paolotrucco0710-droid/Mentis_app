@@ -8,6 +8,7 @@ import {
 } from "@/engine";
 
 export const runtime = "nodejs";
+export const preferredRegion = "fra1";
 
 export async function GET(request: Request) {
   try {

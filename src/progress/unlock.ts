@@ -2,8 +2,12 @@ import type { Atom } from "@/domain/entities";
 import type { UserAtomState } from "@/domain/entities";
 import { UserAtomLearningState } from "@/domain/enums";
 import type { AtomId, UserId } from "@/domain/ids";
+import { findAtomsDependingOnPrerequisite } from "@/db/repositories/atoms";
+import {
+  findUserAtomStatesByUserAndAtomIds,
+  upsertUserAtomState,
+} from "@/db/repositories/user-atom-states";
 import { initialLearningStage, prerequisitesMet } from "@/engine/stages";
-import { upsertUserAtomState } from "@/db/repositories/user-atom-states";
 import type { DbTx } from "@/db/transaction";
 
 export async function unlockDependentAtoms(input: {
@@ -36,4 +40,32 @@ export async function unlockDependentAtoms(input: {
   }
 
   return unlockedAtomIds;
+}
+
+export async function unlockAtomsUnlockedByPrerequisite(input: {
+  userId: UserId;
+  prerequisiteAtomId: AtomId;
+}): Promise<AtomId[]> {
+  const dependents = await findAtomsDependingOnPrerequisite(
+    input.prerequisiteAtomId
+  );
+
+  if (dependents.length === 0) {
+    return [];
+  }
+
+  const dependentIds = dependents.map((atom) => atom.id);
+  const scopedStates = await findUserAtomStatesByUserAndAtomIds(
+    input.userId,
+    dependentIds
+  );
+  const userAtomStates = new Map(
+    scopedStates.map((state) => [state.atomId, state])
+  );
+
+  return unlockDependentAtoms({
+    userId: input.userId,
+    atoms: dependents,
+    userAtomStates,
+  });
 }

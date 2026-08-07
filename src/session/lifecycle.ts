@@ -5,6 +5,7 @@ import {
 } from "@/db/repositories/study-sessions";
 import {
   createSessionEvent,
+  findLastLifecycleEventBySessionId,
   findSessionEventsBySessionId,
   type CreateSessionEventInput,
 } from "@/db/repositories/session-events";
@@ -229,10 +230,8 @@ export async function assertSessionReadyForStudy(
   sessionId: StudySessionId
 ): Promise<StudySession> {
   const session = await requireOwnedSession(userId, sessionId);
-  const events = await findSessionEventsBySessionId(sessionId);
-  const status = resolveSessionStatus(session, events);
 
-  if (status === SessionStatus.Ended) {
+  if (session.endedAt) {
     throw new SessionEngineError(
       "La sessione di studio è già terminata.",
       "SESSION_ENDED",
@@ -240,7 +239,8 @@ export async function assertSessionReadyForStudy(
     );
   }
 
-  if (status === SessionStatus.Paused) {
+  const lastLifecycleEvent = await findLastLifecycleEventBySessionId(sessionId);
+  if (lastLifecycleEvent?.type === SessionEventType.Pause) {
     throw new SessionEngineError(
       "La sessione è in pausa. Riprendi prima di continuare.",
       "SESSION_PAUSED",
