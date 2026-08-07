@@ -5,8 +5,6 @@ import {
 } from "@/ai/extract-figures";
 import { isStudyIllustrationImage, shouldCreateImageExplainCard } from "@/ai/image-study";
 import { buildImageExplainCardFields } from "@/ai/image-explain-card-builder";
-import { buildQuizOptions } from "@/ai/quiz-options";
-import { deterministicShuffle } from "@/ai/deterministic-shuffle";
 import { getImageIdFromPayload } from "@/components/feed/card-utils";
 import { findAtomsByKnowledgeSourceId } from "@/db/repositories/atoms";
 import { findCardsByAtomIds } from "@/db/repositories/cards";
@@ -226,27 +224,10 @@ async function relinkImagesForKnowledgeSourceUncached(
     );
 
     if (!hasCard) {
-      const primaryQuiz = buildQuizOptions(
-        {
-          id: atom.id,
-          title: atom.title,
-          summary: atom.summary,
-          definitions: atom.definitions,
-          quizDistractors: atom.quizDistractors,
-          misconceptions: atom.misconceptions,
-          counterExamples: atom.counterExamples,
-          commonMistakes: atom.commonMistakes,
-        },
-        deterministicShuffle
-      );
-      const primaryCorrect =
-        primaryQuiz.options[primaryQuiz.correctOptionIndex] ?? atom.summary;
-
       const imageCard = buildImageExplainCardFields(
         atom.id as AtomId,
         atom,
-        imageReference,
-        primaryCorrect
+        imageReference
       );
 
       if (!imageCard) {

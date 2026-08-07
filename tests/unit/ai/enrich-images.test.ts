@@ -77,7 +77,8 @@ describe("enrichKnowledgeWithImages", () => {
       {
         imageId,
         caption: studyCaption("Concetto 1"),
-        description: knowledge.atoms[0]?.summary,
+        description:
+          "L'illustrazione «Illustrazione: Concetto 1» supporta la comprensione di Concetto 1.",
         referencedConcepts: knowledge.atoms[0]?.keywords.slice(0, 4),
       },
     ]);
