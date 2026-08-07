@@ -10,7 +10,7 @@ export function buildConnectionQuestion(
   atomTitle: string,
   prerequisiteTitle: string
 ): string {
-  return `Come si lega «${atomTitle}» a «${prerequisiteTitle}»?`;
+  return `Quale affermazione descrive meglio il rapporto tra «${prerequisiteTitle}» e «${atomTitle}»?`;
 }
 
 export function buildConnectionOptions(
@@ -28,10 +28,13 @@ export function buildConnectionOptions(
       140
     ),
     compactPhrase(
-      `${prerequisite.title} è solo un esempio applicato di ${atom.title}.`,
+      `${atom.title} e ${prerequisite.title} sono lo stesso concetto con nomi diversi.`,
       140
     ),
-    compactPhrase("I due concetti non hanno un legame diretto.", 140),
+    compactPhrase(
+      `Capire ${atom.title} non richiede di conoscere ${prerequisite.title}.`,
+      140
+    ),
   ];
 
   const options = deterministicShuffle(
