@@ -139,11 +139,14 @@ export function toKnowledgeSource(
 }
 
 export function toImage(record: Prisma.ImageGetPayload<object>): Image {
+  const bbox = record.bboxNormalized;
+
   return {
     id: asImageId(record.id),
     knowledgeSourceId: asKnowledgeSourceId(record.knowledgeSourceId),
     ownerId: asUserId(record.ownerId),
     storageKey: record.storageKey,
+    masterStorageKey: record.masterStorageKey,
     hash: record.hash,
     mimeType: record.mimeType,
     sizeBytes: toNumber(record.sizeBytes),
@@ -151,6 +154,24 @@ export function toImage(record: Prisma.ImageGetPayload<object>): Image {
     height: record.height,
     pageNumber: record.pageNumber,
     caption: record.caption,
+    sourcePageImageId: record.sourcePageImageId
+      ? asImageId(record.sourcePageImageId)
+      : null,
+    bboxNormalized:
+      bbox &&
+      typeof bbox === "object" &&
+      bbox !== null &&
+      "top" in bbox &&
+      "left" in bbox &&
+      "bottom" in bbox &&
+      "right" in bbox
+        ? (bbox as Image["bboxNormalized"])
+        : null,
+    detectionConfidence: record.detectionConfidence,
+    pipelineVersion: record.pipelineVersion,
+    fallbackToFullPage: record.fallbackToFullPage,
+    regionType: record.regionType,
+    containsText: record.containsText,
     createdAt: record.createdAt,
     deletedAt: record.deletedAt,
   };

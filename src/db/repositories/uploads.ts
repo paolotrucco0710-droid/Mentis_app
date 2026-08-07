@@ -1,6 +1,7 @@
 import type { ImageId, KnowledgeSourceId, UploadId, UserId } from "@/domain/ids";
 import type { Image, Upload } from "@/domain/entities";
 import type { UploadStatus } from "@/domain/enums";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../client";
 import { toImage, toUpload } from "../mappers";
 
@@ -48,6 +49,7 @@ export interface CreateImageInput {
   knowledgeSourceId: string;
   ownerId: UserId;
   storageKey: string;
+  masterStorageKey?: string | null;
   hash: string;
   mimeType: string;
   sizeBytes: number;
@@ -55,6 +57,18 @@ export interface CreateImageInput {
   height?: number | null;
   pageNumber?: number | null;
   caption?: string | null;
+  sourcePageImageId?: string | null;
+  bboxNormalized?: {
+    top: number;
+    left: number;
+    bottom: number;
+    right: number;
+  } | null;
+  detectionConfidence?: number | null;
+  pipelineVersion?: string | null;
+  fallbackToFullPage?: boolean;
+  regionType?: string | null;
+  containsText?: boolean | null;
 }
 
 export async function findImageById(id: ImageId): Promise<Image | null> {
@@ -75,10 +89,19 @@ export async function findImagesByKnowledgeSourceId(
 }
 
 export async function createImage(input: CreateImageInput): Promise<Image> {
+  const { bboxNormalized, ...rest } = input;
   const record = await prisma.image.create({
     data: {
-      ...input,
+      ...rest,
       sizeBytes: BigInt(input.sizeBytes),
+      ...(bboxNormalized === undefined
+        ? {}
+        : {
+            bboxNormalized:
+              bboxNormalized === null
+                ? Prisma.JsonNull
+                : bboxNormalized,
+          }),
     },
   });
   return toImage(record);
