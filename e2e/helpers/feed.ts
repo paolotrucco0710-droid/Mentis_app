@@ -82,48 +82,26 @@ export async function swipeUpOnFeed(page: Page): Promise<void> {
     element.scrollTop = element.scrollHeight;
   });
 
-  await surface.evaluate((element) => {
+  const { clientX, startY, endY } = await surface.evaluate((element) => {
     const rect = element.getBoundingClientRect();
-    const clientX = rect.left + rect.width / 2;
-    const startY = rect.bottom - 32;
-    const endY = rect.top + 32;
+    return {
+      clientX: rect.left + rect.width / 2,
+      startY: rect.bottom - 32,
+      endY: rect.top + 32,
+    };
+  });
 
-    const makeTouch = (clientY: number): Touch =>
-      ({
-        identifier: 1,
-        target: element,
-        clientX,
-        clientY,
-        pageX: clientX,
-        pageY: clientY,
-        screenX: clientX,
-        screenY: clientY,
-        radiusX: 1,
-        radiusY: 1,
-        rotationAngle: 0,
-        force: 1,
-      }) as Touch;
+  const startTouch = { identifier: 0, clientX, clientY: startY };
+  await surface.dispatchEvent("touchstart", {
+    touches: [startTouch],
+    changedTouches: [startTouch],
+    targetTouches: [startTouch],
+  });
 
-    const startTouch = makeTouch(startY);
-    element.dispatchEvent(
-      new TouchEvent("touchstart", {
-        bubbles: true,
-        cancelable: true,
-        touches: [startTouch],
-        targetTouches: [startTouch],
-        changedTouches: [startTouch],
-      })
-    );
-
-    const endTouch = makeTouch(endY);
-    element.dispatchEvent(
-      new TouchEvent("touchend", {
-        bubbles: true,
-        cancelable: true,
-        touches: [],
-        targetTouches: [],
-        changedTouches: [endTouch],
-      })
-    );
+  const endTouch = { identifier: 0, clientX, clientY: endY };
+  await surface.dispatchEvent("touchend", {
+    touches: [],
+    changedTouches: [endTouch],
+    targetTouches: [],
   });
 }
