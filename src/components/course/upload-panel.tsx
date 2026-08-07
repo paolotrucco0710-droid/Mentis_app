@@ -26,6 +26,7 @@ import {
   Section,
 } from "@/components/ui";
 import { formatFileSize } from "./course-utils";
+import { mergeSelectedUploadFiles } from "@/upload/merge-selected-files";
 import { prepareFilesForUpload } from "@/upload/client-image-compression";
 import {
   formatVercelUploadLimitMessage,
@@ -86,7 +87,19 @@ export function UploadPanel() {
     if (!files || files.length === 0) {
       return;
     }
-    setState({ status: "selected", files: Array.from(files) });
+
+    const incoming = Array.from(files);
+    setState((previous) => {
+      const existing = previous.status === "selected" ? previous.files : [];
+      return {
+        status: "selected",
+        files: mergeSelectedUploadFiles(existing, incoming),
+      };
+    });
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }
 
   async function handleUpload() {
