@@ -5,10 +5,12 @@ import type {
   KnowledgeJsonAtomImage,
 } from "@/domain/knowledge/knowledge-json";
 import {
+  isFigureStorageKey,
   isStudyIllustrationImage,
   shouldCreateImageExplainCard,
 } from "./image-study";
 import {
+  captionReferencesDifferentAtom,
   isImageLinkSemanticallyValid,
   resolveSemanticImageLinks,
   scoreSemanticImageMatch,
@@ -163,12 +165,26 @@ function linkByExactPage(
       }
 
       pageImages.forEach((image, imageIndex) => {
-        if (!isImageLinkSemanticallyValid(atom, image, updated)) {
+        if (captionReferencesDifferentAtom(atom, image, updated)) {
+          return;
+        }
+
+        const isExtractedFigure =
+          isFigureStorageKey(image.storageKey) || image.fallbackToFullPage;
+
+        if (
+          !isExtractedFigure &&
+          !isImageLinkSemanticallyValid(atom, image, updated)
+        ) {
           return;
         }
 
         const confidence = scoreSemanticImageMatch(atom, image);
-        if (confidence < MIN_PAGE_IMAGE_LINK_SCORE) {
+        const effectiveConfidence = isExtractedFigure
+          ? Math.max(confidence, MIN_PAGE_IMAGE_LINK_SCORE)
+          : confidence;
+
+        if (effectiveConfidence < MIN_PAGE_IMAGE_LINK_SCORE) {
           return;
         }
 
@@ -176,7 +192,11 @@ function linkByExactPage(
           return;
         }
 
-        scoredLinks.push({ atomIndex, imageIndex, confidence });
+        scoredLinks.push({
+          atomIndex,
+          imageIndex,
+          confidence: effectiveConfidence,
+        });
       });
     });
 
