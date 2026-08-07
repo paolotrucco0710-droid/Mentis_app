@@ -37,9 +37,19 @@ export function TrueFalseCardComponent({
       return;
     }
 
-    registerAdvance(revealed ? continueWithResult : null);
+    registerAdvance(
+      revealed ? continueWithResult : null,
+      revealed
+        ? {
+            outcome: isCorrect
+              ? SessionEventOutcome.Success
+              : SessionEventOutcome.Failure,
+            isCorrect,
+          }
+        : null
+    );
     return () => registerAdvance(null);
-  }, [continueWithResult, registerAdvance, revealed]);
+  }, [continueWithResult, isCorrect, registerAdvance, revealed]);
 
   if (!payload) {
     return null;

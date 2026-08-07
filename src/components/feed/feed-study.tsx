@@ -32,6 +32,7 @@ import {
   type SessionSummaryView,
 } from "./session-summary";
 import type { CardAnswerResult } from "./card-utils";
+import type { RecordCardResponseResult } from "@/lib/api/progress";
 import {
   buildFeedScopeKey,
   shouldResetFeedForScopeChange,
@@ -68,6 +69,16 @@ export function FeedStudy() {
   const feedScopeRef = useRef<string | null>(null);
   const answering = useRef(false);
   const advanceActionRef = useRef<(() => void) | null>(null);
+  const readyFeedRef = useRef<{ session: StudySession; item: FeedItem } | null>(
+    null
+  );
+  const prefetchedSubmissionRef = useRef<{
+    cardKey: string;
+    submission: RecordCardResponseResult;
+  } | null>(null);
+  const prefetchPromisesRef = useRef(
+    new Map<string, Promise<RecordCardResponseResult>>()
+  );
   const conceptsStudiedRef = useRef<Map<string, string>>(new Map());
   const masteryGainRef = useRef(0);
 
@@ -91,22 +102,32 @@ export function FeedStudy() {
     }
   }, [setState]);
 
-  const registerAdvance = useCallback((action: (() => void) | null) => {
-    advanceActionRef.current = action;
-    setAdvanceReady(action !== null);
-  }, [setAdvanceReady]);
+  function buildFeedCardKey(
+    sessionId: StudySessionId,
+    item: Pick<FeedItem, "card" | "position" | "sessionId">
+  ): string {
+    return `${sessionId}-${item.card.id}-${item.position}`;
+  }
 
   const applyFeedItem = useCallback(
     (session: StudySession | undefined, item: FeedItem) => {
       cardStartedAt.current = Date.now();
       advanceActionRef.current = null;
+      prefetchedSubmissionRef.current = null;
+      prefetchPromisesRef.current.clear();
       setAdvanceReady(false);
+      setSubmitting(false);
       conceptsStudiedRef.current.set(item.atomId, item.atomTitle);
-      setState({
-        status: "ready",
+      const nextState = {
+        status: "ready" as const,
         session: session ?? ({ id: item.sessionId } as StudySession),
         item,
-      });
+      };
+      readyFeedRef.current = {
+        session: nextState.session,
+        item: nextState.item,
+      };
+      setState(nextState);
     },
     [setAdvanceReady, setState]
   );
@@ -154,6 +175,98 @@ export function FeedStudy() {
       return loadQueue.current;
     },
     [applyFeedResponse, subjectId, knowledgeSourceId]
+  );
+
+  const applySubmission = useCallback(
+    async (
+      session: StudySession,
+      submission: RecordCardResponseResult,
+      sessionId: StudySessionId
+    ) => {
+      if (submission.masteryDelta > 0) {
+        masteryGainRef.current += submission.masteryDelta;
+      }
+
+      if (submission.nextFeed) {
+        await applyFeedResponse(session, submission.nextFeed, sessionId);
+      } else {
+        await loadNext(sessionId, session);
+      }
+    },
+    [applyFeedResponse, loadNext]
+  );
+
+  const prefetchCardSubmission = useCallback(
+    async (
+      cardKey: string,
+      session: StudySession,
+      item: FeedItem,
+      answer: CardAnswerResult
+    ) => {
+      if (!subjectId) {
+        return;
+      }
+
+      const existing = prefetchPromisesRef.current.get(cardKey);
+      if (existing) {
+        return existing;
+      }
+
+      const durationMs = Date.now() - cardStartedAt.current;
+      const request = submitCardResponse({
+        sessionId: session.id,
+        cardId: item.card.id,
+        atomId: item.atomId,
+        outcome: answer.outcome,
+        isCorrect: answer.isCorrect,
+        responseTimeMs: durationMs,
+        durationMs,
+        feedPosition: item.position,
+        includeNextFeed: true,
+        ...(knowledgeSourceId ? { knowledgeSourceId } : {}),
+      })
+        .then((submission) => {
+          if (readyFeedRef.current) {
+            const activeKey = buildFeedCardKey(
+              readyFeedRef.current.session.id,
+              readyFeedRef.current.item
+            );
+            if (activeKey === cardKey) {
+              prefetchedSubmissionRef.current = { cardKey, submission };
+            }
+          }
+          return submission;
+        })
+        .finally(() => {
+          prefetchPromisesRef.current.delete(cardKey);
+        });
+
+      prefetchPromisesRef.current.set(cardKey, request);
+      return request;
+    },
+    [knowledgeSourceId, subjectId]
+  );
+
+  const registerAdvance = useCallback(
+    (action: (() => void) | null, prefetchAnswer?: CardAnswerResult | null) => {
+      advanceActionRef.current = action;
+      setAdvanceReady(action !== null);
+
+      const readyFeed = readyFeedRef.current;
+      if (!action || !prefetchAnswer || !readyFeed || answering.current) {
+        return;
+      }
+
+      const cardKey = buildFeedCardKey(readyFeed.session.id, readyFeed.item);
+      prefetchedSubmissionRef.current = null;
+      void prefetchCardSubmission(
+        cardKey,
+        readyFeed.session,
+        readyFeed.item,
+        prefetchAnswer
+      );
+    },
+    [prefetchCardSubmission]
   );
 
   const bootstrap = useCallback(async () => {
@@ -249,44 +362,72 @@ export function FeedStudy() {
     });
   }, [bootstrap, knowledgeSourceId, loadingSubject, subjectId]);
 
+  useEffect(() => {
+    if (state.status !== "ready") {
+      return;
+    }
+
+    readyFeedRef.current = { session: state.session, item: state.item };
+  }, [state]);
+
   const handleAnswer = useCallback(async (answer: CardAnswerResult) => {
-    if (state.status !== "ready" || submitting || answering.current) {
+    if (state.status !== "ready" || answering.current) {
       return;
     }
 
     const { session, item } = state;
+    const cardKey = buildFeedCardKey(session.id, item);
     const now = Date.now();
     const durationMs = now - cardStartedAt.current;
     const responseTimeMs = durationMs;
 
     answering.current = true;
+    setSubmitting(true);
     advanceActionRef.current = null;
     setAdvanceReady(false);
 
+    const prefetched = prefetchedSubmissionRef.current;
+    if (prefetched?.cardKey === cardKey) {
+      prefetchedSubmissionRef.current = null;
+      prefetchPromisesRef.current.delete(cardKey);
+
+      try {
+        await applySubmission(session, prefetched.submission, session.id);
+      } catch (error) {
+        const message =
+          error instanceof ApiError
+            ? error.message === "Errore interno."
+              ? "Connessione lenta al server. Riprova tra qualche secondo."
+              : error.message
+            : "Errore durante l'invio della risposta.";
+        setState({ status: "error", message });
+      } finally {
+        answering.current = false;
+        setSubmitting(false);
+      }
+      return;
+    }
+
     try {
       setSubmitting(true);
-      const submission = await submitCardResponse({
-        sessionId: session.id,
-        cardId: item.card.id,
-        atomId: item.atomId,
-        outcome: answer.outcome,
-        isCorrect: answer.isCorrect,
-        responseTimeMs,
-        durationMs,
-        feedPosition: item.position,
-        includeNextFeed: true,
-        ...(knowledgeSourceId ? { knowledgeSourceId } : {}),
-      });
+      const inFlight = prefetchPromisesRef.current.get(cardKey);
+      const submission = inFlight
+        ? await inFlight
+        : await submitCardResponse({
+            sessionId: session.id,
+            cardId: item.card.id,
+            atomId: item.atomId,
+            outcome: answer.outcome,
+            isCorrect: answer.isCorrect,
+            responseTimeMs,
+            durationMs,
+            feedPosition: item.position,
+            includeNextFeed: true,
+            ...(knowledgeSourceId ? { knowledgeSourceId } : {}),
+          });
 
-      if (submission.masteryDelta > 0) {
-        masteryGainRef.current += submission.masteryDelta;
-      }
-
-      if (submission.nextFeed) {
-        await applyFeedResponse(session, submission.nextFeed, session.id);
-      } else {
-        await loadNext(session.id, session);
-      }
+      prefetchPromisesRef.current.delete(cardKey);
+      await applySubmission(session, submission, session.id);
     } catch (error) {
       const message =
         error instanceof ApiError
@@ -300,23 +441,20 @@ export function FeedStudy() {
       setSubmitting(false);
     }
   }, [
-    applyFeedResponse,
+    applySubmission,
     knowledgeSourceId,
-    loadNext,
     setAdvanceReady,
     setState,
-    setSubmitting,
     state,
-    submitting,
   ]);
 
   const handleSwipeAdvance = useCallback(() => {
-    if (state.status !== "ready" || submitting) {
+    if (state.status !== "ready" || answering.current) {
       return;
     }
 
     advanceActionRef.current?.();
-  }, [state, submitting]);
+  }, [state]);
 
   const swipeEnabled =
     state.status === "ready" && !submitting && advanceReady;
@@ -436,7 +574,7 @@ export function FeedStudy() {
 
   const { item } = state;
   const progressPercent = Math.min(100, Math.round(item.sessionProgress * 100));
-  const cardKey = `${item.sessionId}-${item.card.id}-${item.position}`;
+  const cardKey = buildFeedCardKey(item.sessionId, item);
   const feedCardKey = cardKey;
 
   return (
@@ -497,7 +635,7 @@ export function FeedStudy() {
       <footer className="feed-safe-bottom shrink-0 px-4 pt-2 text-center">
         <p className="text-xs text-muted">
           {submitting
-            ? "Caricamento..."
+            ? "\u00a0"
             : swipeEnabled
               ? "Scorri verso l'alto per continuare"
               : "\u00a0"}

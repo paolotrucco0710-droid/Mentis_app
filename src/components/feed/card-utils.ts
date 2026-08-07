@@ -273,5 +273,8 @@ export type FeedCardProps = {
   disabled?: boolean;
   onContinue: (result: CardAnswerResult) => void;
   onSkip: () => void;
-  registerAdvance?: (action: (() => void) | null) => void;
+  registerAdvance?: (
+    action: (() => void) | null,
+    prefetchAnswer?: CardAnswerResult | null
+  ) => void;
 };

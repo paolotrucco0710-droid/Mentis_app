@@ -70,7 +70,10 @@ function FeedCardRendererComponent({
   disabled?: boolean;
   onAnswer: (result: CardAnswerResult) => void;
   onSkip: () => void;
-  registerAdvance?: (action: (() => void) | null) => void;
+  registerAdvance?: (
+    action: (() => void) | null,
+    prefetchAnswer?: CardAnswerResult | null
+  ) => void;
 }) {
   const props = {
     card,
