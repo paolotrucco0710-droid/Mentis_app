@@ -37,7 +37,7 @@ function ExplainCardComponent({
 
       {imageUrl ? (
         <figure className="space-y-2">
-          <div className="relative min-h-[180px] max-h-[min(48vh,400px)] w-full overflow-hidden rounded-2xl border border-border bg-muted/20">
+          <div className="relative h-[min(48vh,400px)] min-h-[180px] w-full overflow-hidden rounded-2xl border border-border bg-muted/20">
             <OptimizedImage
               src={imageUrl}
               alt={imageCaption ?? conceptTitle}
