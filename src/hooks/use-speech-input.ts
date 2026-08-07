@@ -25,18 +25,23 @@ export function useSpeechInput({
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const processedUntilRef = useRef(0);
+  const holdActiveRef = useRef(false);
+  const onFinalTranscriptRef = useRef(onFinalTranscript);
+  const spawnRecognitionRef = useRef<(() => void) | null>(null);
   const isSupported = isSpeechRecognitionSupported();
 
-  const stopListening = useCallback(() => {
-    recognitionRef.current?.stop();
+  useEffect(() => {
+    onFinalTranscriptRef.current = onFinalTranscript;
+  }, [onFinalTranscript]);
+
+  const resetRecognitionState = useCallback(() => {
     recognitionRef.current = null;
     processedUntilRef.current = 0;
-    setIsListening(false);
     setInterimText("");
   }, []);
 
-  const startListening = useCallback(() => {
-    if (!enabled || !isSupported || isListening) {
+  const spawnRecognition = useCallback(() => {
+    if (!enabled || !isSupported) {
       return;
     }
 
@@ -50,7 +55,6 @@ export function useSpeechInput({
     recognition.lang = lang;
     recognition.continuous = true;
     recognition.interimResults = true;
-    processedUntilRef.current = 0;
 
     recognition.onresult = (event) => {
       let interim = "";
@@ -66,7 +70,7 @@ export function useSpeechInput({
           if (index >= processedUntilRef.current) {
             const finalChunk = transcript.trim();
             if (finalChunk) {
-              onFinalTranscript?.(finalChunk);
+              onFinalTranscriptRef.current?.(finalChunk);
             }
             processedUntilRef.current = index + 1;
           }
@@ -77,19 +81,29 @@ export function useSpeechInput({
 
       setInterimText(interim.trim());
     };
+
     recognition.onerror = (event) => {
-      if (event.error === "no-speech") {
+      if (event.error === "no-speech" || event.error === "aborted") {
         return;
       }
+
       setError(mapSpeechRecognitionError(event.error));
+      holdActiveRef.current = false;
       setIsListening(false);
-      recognitionRef.current = null;
-      processedUntilRef.current = 0;
-      setInterimText("");
+      resetRecognitionState();
     };
+
     recognition.onend = () => {
-      setIsListening(false);
       recognitionRef.current = null;
+
+      if (holdActiveRef.current && enabled) {
+        processedUntilRef.current = 0;
+        setInterimText("");
+        spawnRecognitionRef.current?.();
+        return;
+      }
+
+      setIsListening(false);
       processedUntilRef.current = 0;
       setInterimText("");
     };
@@ -102,45 +116,60 @@ export function useSpeechInput({
       setIsListening(true);
     } catch {
       setError(mapSpeechRecognitionError());
-      recognitionRef.current = null;
-      processedUntilRef.current = 0;
+      resetRecognitionState();
       setIsListening(false);
     }
-  }, [enabled, isListening, isSupported, lang, onFinalTranscript]);
+  }, [enabled, isSupported, lang, resetRecognitionState]);
 
-  const toggleListening = useCallback(() => {
-    if (isListening) {
-      stopListening();
+  useEffect(() => {
+    spawnRecognitionRef.current = spawnRecognition;
+  }, [spawnRecognition]);
+
+  const stopListening = useCallback(() => {
+    holdActiveRef.current = false;
+    recognitionRef.current?.stop();
+  }, []);
+
+  const beginHold = useCallback(() => {
+    if (!enabled || !isSupported || holdActiveRef.current) {
       return;
     }
 
-    startListening();
-  }, [isListening, startListening, stopListening]);
+    holdActiveRef.current = true;
+    spawnRecognition();
+  }, [enabled, isSupported, spawnRecognition]);
+
+  const endHold = useCallback(() => {
+    if (!holdActiveRef.current) {
+      return;
+    }
+
+    stopListening();
+  }, [stopListening]);
 
   useEffect(() => {
     if (!enabled && recognitionRef.current) {
+      holdActiveRef.current = false;
       recognitionRef.current.abort();
-      recognitionRef.current = null;
-      processedUntilRef.current = 0;
-      setInterimText("");
+      resetRecognitionState();
+      setIsListening(false);
     }
-  }, [enabled]);
+  }, [enabled, resetRecognitionState]);
 
   useEffect(() => {
     return () => {
+      holdActiveRef.current = false;
       recognitionRef.current?.abort();
-      recognitionRef.current = null;
-      processedUntilRef.current = 0;
+      resetRecognitionState();
     };
-  }, []);
+  }, [resetRecognitionState]);
 
   return {
     isSupported,
     isListening,
     interimText,
     error,
-    startListening,
-    stopListening,
-    toggleListening,
+    beginHold,
+    endHold,
   };
 }
