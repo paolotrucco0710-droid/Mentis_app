@@ -48,7 +48,7 @@ export function computeMasteryUpdate(input: {
     (outcome === SessionEventOutcome.Success ||
       (explainCard && outcome !== SessionEventOutcome.Failure));
 
-  if (explainCard || wasNeutral) {
+  if (explainCard || (wasNeutral && !retrievalCard)) {
     return {
       masteryDelta: 3,
       comprehensionDelta: 6,
