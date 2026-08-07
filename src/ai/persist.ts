@@ -200,7 +200,15 @@ function buildCardsForAtom(
     primaryCorrect
   );
 
-  if (secondaryQuiz) {
+  const imageReference = atom.images[0];
+  const hasImageCard =
+    Boolean(imageReference?.imageId) &&
+    shouldCreateImageExplainCard(
+      { caption: imageReference?.caption },
+      imageReference
+    );
+
+  if (secondaryQuiz && !hasImageCard) {
     cards.push({
       atomId,
       type: CardType.Quiz,
@@ -324,7 +332,6 @@ function buildCardsForAtom(
     });
   }
 
-  const imageReference = atom.images[0];
   if (
     imageReference?.imageId &&
     shouldCreateImageExplainCard(
@@ -332,9 +339,15 @@ function buildCardsForAtom(
       imageReference
     )
   ) {
-    cards.push(
-      buildImageExplainCardCreateInput(atomId, atom, imageReference)
+    const imageCard = buildImageExplainCardCreateInput(
+      atomId,
+      atom,
+      imageReference,
+      primaryCorrect
     );
+    if (imageCard) {
+      cards.push(imageCard);
+    }
   }
 
   const atomsById = new Map(allAtoms.map((entry) => [entry.id, entry]));
