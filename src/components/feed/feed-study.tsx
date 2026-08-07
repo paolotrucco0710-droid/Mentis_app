@@ -63,6 +63,7 @@ export function FeedStudy() {
   const [advanceReady, setAdvanceReady] = useState(false);
   const cardStartedAt = useRef<number>(0);
   const feedRequestId = useRef(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const loadQueue = useRef<Promise<void>>(Promise.resolve());
   const bootstrapStarted = useRef(false);
   const feedScopeRef = useRef<string | null>(null);
@@ -345,7 +346,11 @@ export function FeedStudy() {
     !submitting &&
     (advanceReady || allowsSwipeWithoutAdvance(state.item.card.type));
 
-  const swipeHandlers = useSwipeUp(handleSwipeAdvance, swipeEnabled);
+  const swipeHandlers = useSwipeUp(
+    handleSwipeAdvance,
+    swipeEnabled,
+    scrollContainerRef
+  );
 
   async function handleSkip() {
     await handleAnswer({
@@ -469,6 +474,7 @@ export function FeedStudy() {
       </header>
 
       <div
+        ref={scrollContainerRef}
         className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4"
         {...swipeHandlers}
       >
