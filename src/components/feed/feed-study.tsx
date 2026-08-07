@@ -69,6 +69,7 @@ export function FeedStudy() {
   const feedScopeRef = useRef<string | null>(null);
   const answering = useRef(false);
   const advanceActionRef = useRef<(() => void) | null>(null);
+  const advanceInPlaceRef = useRef(false);
   const readyFeedRef = useRef<{ session: StudySession; item: FeedItem } | null>(
     null
   );
@@ -113,6 +114,7 @@ export function FeedStudy() {
     (session: StudySession | undefined, item: FeedItem) => {
       cardStartedAt.current = Date.now();
       advanceActionRef.current = null;
+      advanceInPlaceRef.current = false;
       prefetchedSubmissionRef.current = null;
       prefetchPromisesRef.current.clear();
       setAdvanceReady(false);
@@ -248,8 +250,13 @@ export function FeedStudy() {
   );
 
   const registerAdvance = useCallback(
-    (action: (() => void) | null, prefetchAnswer?: CardAnswerResult | null) => {
+    (
+      action: (() => void) | null,
+      prefetchAnswer?: CardAnswerResult | null,
+      inPlace = false
+    ) => {
       advanceActionRef.current = action;
+      advanceInPlaceRef.current = inPlace;
       setAdvanceReady(action !== null);
 
       const readyFeed = readyFeedRef.current;
@@ -384,6 +391,7 @@ export function FeedStudy() {
     answering.current = true;
     setSubmitting(true);
     advanceActionRef.current = null;
+    advanceInPlaceRef.current = false;
     setAdvanceReady(false);
 
     const prefetched = prefetchedSubmissionRef.current;
@@ -448,12 +456,14 @@ export function FeedStudy() {
     state,
   ]);
 
-  const handleSwipeAdvance = useCallback(() => {
+  const handleSwipeAdvance = useCallback((): boolean => {
     if (state.status !== "ready" || answering.current) {
-      return;
+      return false;
     }
 
+    const inPlace = advanceInPlaceRef.current;
     advanceActionRef.current?.();
+    return inPlace;
   }, [state]);
 
   const swipeEnabled =

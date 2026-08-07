@@ -65,7 +65,7 @@ export function BlurtingCardComponent({
     }
 
     if (phase === "ready") {
-      registerAdvance(handleStart);
+      registerAdvance(handleStart, null, true);
       return () => registerAdvance(null);
     }
 
