@@ -275,6 +275,7 @@ export type FeedCardProps = {
   onSkip: () => void;
   registerAdvance?: (
     action: (() => void) | null,
-    prefetchAnswer?: CardAnswerResult | null
+    prefetchAnswer?: CardAnswerResult | null,
+    inPlace?: boolean
   ) => void;
 };

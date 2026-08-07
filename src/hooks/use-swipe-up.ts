@@ -21,7 +21,7 @@ type TouchStartSnapshot = {
 };
 
 export function useSwipeUp(
-  onSwipe: () => void,
+  onSwipe: () => boolean | void,
   enabled: boolean,
   scrollContainerRef?: RefObject<HTMLElement | null>
 ): {
@@ -186,7 +186,13 @@ export function useSwipeUp(
       dragOffsetRef.current = viewportHeight;
       setDragOffsetPx(viewportHeight);
       window.setTimeout(() => {
-        onSwipeRef.current();
+        const resetSwipe = onSwipeRef.current();
+        if (resetSwipe) {
+          isSnappingRef.current = false;
+          setIsSnapping(false);
+          dragOffsetRef.current = 0;
+          setDragOffsetPx(0);
+        }
       }, SWIPE_UP_SNAP_ANIMATION_MS);
     },
     [readViewportHeight]

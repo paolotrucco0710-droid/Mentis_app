@@ -9,7 +9,7 @@ export function FeedSwipeSurface({
   children,
 }: {
   enabled: boolean;
-  onAdvance: () => void;
+  onAdvance: () => boolean | void;
   children: ReactNode;
 }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
