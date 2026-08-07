@@ -5,14 +5,13 @@ import type { Prisma } from "@prisma/client";
 import { env } from "@/lib/env";
 import {
   asDeclarativeQuizOption,
-  buildSecondaryQuiz,
   collectDistractorCandidates,
   isCompleteQuizSentence,
   selectBalancedDistractors,
   type QuizOptionSource,
 } from "./quiz-options";
 import { deterministicShuffle } from "./deterministic-shuffle";
-import { normalizeForComparison } from "./text-snippets";
+import { compactPhrase, normalizeForComparison } from "./text-snippets";
 
 function buildImageExplainQuestion(
   atomTitle: string,
@@ -43,11 +42,59 @@ function toQuizOptionSource(
   };
 }
 
+export function buildImageConnectionCorrectAnswer(
+  atomTitle: string,
+  imageReference: NonNullable<KnowledgeJson["atoms"][number]["images"][number]>
+): string | null {
+  const caption = imageReference.caption?.trim();
+  const description = imageReference.description?.trim();
+
+  const captionCandidates = caption
+    ? [
+        `L'illustrazione «${caption}» aiuta a comprendere ${atomTitle}.`,
+        `«${caption}» illustra un aspetto centrale di ${atomTitle}.`,
+        `L'illustrazione «${caption}» è collegata allo studio di ${atomTitle}.`,
+      ]
+    : [];
+
+  for (const candidate of captionCandidates) {
+    const option = asDeclarativeQuizOption(compactPhrase(candidate, 180));
+    if (option) {
+      return option;
+    }
+  }
+
+  if (
+    description &&
+    caption &&
+    normalizeForComparison(description).includes(
+      normalizeForComparison(caption).slice(0, Math.min(12, caption.length))
+    )
+  ) {
+    return asDeclarativeQuizOption(compactPhrase(description, 180));
+  }
+
+  if (description) {
+    const linkedDescription = asDeclarativeQuizOption(
+      compactPhrase(description, 180)
+    );
+    if (
+      linkedDescription &&
+      normalizeForComparison(linkedDescription).includes(
+        normalizeForComparison(atomTitle)
+      )
+    ) {
+      return linkedDescription;
+    }
+  }
+
+  return null;
+}
+
 export function buildImageExplainQuiz(
   atomId: AtomId,
   atom: KnowledgeJson["atoms"][number],
   imageReference: NonNullable<KnowledgeJson["atoms"][number]["images"][number]>,
-  primaryCorrectAnswer: string,
   shuffle: <T>(items: T[], seed: string) => T[] = deterministicShuffle
 ): {
   question: string;
@@ -56,91 +103,37 @@ export function buildImageExplainQuiz(
 } | null {
   const source = toQuizOptionSource(atomId, atom);
   const question = buildImageExplainQuestion(atom.title, imageReference.caption);
-  const secondary = buildSecondaryQuiz(source, shuffle, primaryCorrectAnswer);
+  const imageCorrect = buildImageConnectionCorrectAnswer(atom.title, imageReference);
 
-  if (secondary) {
-    return {
-      question,
-      options: secondary.options,
-      correctOptionIndex: secondary.correctOptionIndex,
-    };
+  if (!imageCorrect || !isCompleteQuizSentence(imageCorrect)) {
+    return null;
   }
 
-  const primaryNorm = normalizeForComparison(primaryCorrectAnswer);
-  const imageCorrect =
-    asDeclarativeQuizOption(imageReference.description ?? undefined) ??
-    asDeclarativeQuizOption(
-      imageReference.referencedConcepts?.[0]
-        ? `L'illustrazione riguarda ${imageReference.referencedConcepts[0]}.`
-        : undefined
-    );
+  const correctNorm = normalizeForComparison(imageCorrect);
+  const distractors = selectBalancedDistractors(
+    collectDistractorCandidates(source).filter(
+      (option) => normalizeForComparison(option) !== correctNorm
+    ),
+    imageCorrect,
+    3,
+    `Questa affermazione non collega l'illustrazione a ${atom.title}.`
+  );
+  const options = shuffle(
+    [imageCorrect, ...distractors],
+    `${atomId}:image-explain`
+  );
 
-  if (
-    imageCorrect &&
-    normalizeForComparison(imageCorrect) !== primaryNorm
-  ) {
-    const distractors = selectBalancedDistractors(
-      collectDistractorCandidates(source).filter(
-        (option) => normalizeForComparison(option) !== primaryNorm
-      ),
-      imageCorrect,
-      3,
-      `Questa affermazione non descrive l'illustrazione di ${atom.title}.`
-    );
-    const options = shuffle(
-      [imageCorrect, ...distractors],
-      `${atomId}:image-explain`
-    );
-
-    return {
-      question,
-      options,
-      correctOptionIndex: options.indexOf(imageCorrect),
-    };
-  }
-
-  for (const candidate of [
-    ...(atom.examples ?? []),
-    ...(atom.definitions ?? []),
-    atom.summary,
-  ]) {
-    const alternateCorrect = asDeclarativeQuizOption(candidate);
-    if (
-      !alternateCorrect ||
-      !isCompleteQuizSentence(alternateCorrect) ||
-      normalizeForComparison(alternateCorrect) === primaryNorm
-    ) {
-      continue;
-    }
-
-    const distractors = selectBalancedDistractors(
-      collectDistractorCandidates(source).filter(
-        (option) => normalizeForComparison(option) !== primaryNorm
-      ),
-      alternateCorrect,
-      3,
-      `Questa affermazione non descrive l'illustrazione di ${atom.title}.`
-    );
-    const options = shuffle(
-      [alternateCorrect, ...distractors],
-      `${atomId}:image-explain`
-    );
-
-    return {
-      question,
-      options,
-      correctOptionIndex: options.indexOf(alternateCorrect),
-    };
-  }
-
-  return null;
+  return {
+    question,
+    options,
+    correctOptionIndex: options.indexOf(imageCorrect),
+  };
 }
 
 export function buildImageExplainCardFields(
   atomId: AtomId,
   atom: KnowledgeJson["atoms"][number],
-  imageReference: NonNullable<KnowledgeJson["atoms"][number]["images"][number]>,
-  primaryCorrectAnswer: string
+  imageReference: NonNullable<KnowledgeJson["atoms"][number]["images"][number]>
 ): {
   prompt: string;
   text: string;
@@ -151,12 +144,7 @@ export function buildImageExplainCardFields(
   cognitiveObjective: CognitiveObjective;
   payload: Prisma.InputJsonValue;
 } | null {
-  const quiz = buildImageExplainQuiz(
-    atomId,
-    atom,
-    imageReference,
-    primaryCorrectAnswer
-  );
+  const quiz = buildImageExplainQuiz(atomId, atom, imageReference);
 
   if (!quiz) {
     return null;
@@ -167,7 +155,9 @@ export function buildImageExplainCardFields(
     text: imageReference.caption ?? "",
     explanation: atom.explanation,
     correctFeedback: "Hai collegato bene immagine e concetto.",
-    incorrectFeedback: atom.summary,
+    incorrectFeedback:
+      imageReference.description?.trim() ||
+      `Rileggi come l'illustrazione «${imageReference.caption ?? atom.title}» si collega al concetto.`,
     estimatedDurationSeconds: 45,
     cognitiveObjective: CognitiveObjective.Connection,
     payload: {
@@ -184,15 +174,9 @@ export function buildImageExplainCardFields(
 export function buildImageExplainCardCreateInput(
   atomId: AtomId,
   atom: KnowledgeJson["atoms"][number],
-  imageReference: NonNullable<KnowledgeJson["atoms"][number]["images"][number]>,
-  primaryCorrectAnswer: string
+  imageReference: NonNullable<KnowledgeJson["atoms"][number]["images"][number]>
 ): Prisma.CardCreateManyInput | null {
-  const fields = buildImageExplainCardFields(
-    atomId,
-    atom,
-    imageReference,
-    primaryCorrectAnswer
-  );
+  const fields = buildImageExplainCardFields(atomId, atom, imageReference);
 
   if (!fields) {
     return null;

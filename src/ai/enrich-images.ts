@@ -30,12 +30,20 @@ function buildImageReference(
   return {
     imageId: image.id,
     caption: caption ? caption : `Figura: ${atom.title}`,
-    description: imageDescription(atom),
+    description: imageDescription(atom, image),
     referencedConcepts: atom.keywords.slice(0, 4),
   };
 }
 
-function imageDescription(atom: KnowledgeJsonAtom): string {
+function imageDescription(
+  atom: KnowledgeJsonAtom,
+  image?: Image
+): string {
+  const caption = image?.caption?.trim();
+  if (caption && caption.length >= 3) {
+    return `L'illustrazione «${caption}» supporta la comprensione di ${atom.title}.`;
+  }
+
   const summary = atom.summary.trim();
   if (summary.length >= 12) {
     return summary;
@@ -52,7 +60,7 @@ function imageDescription(atom: KnowledgeJsonAtom): string {
 function canLinkImageToAtom(image: Image, atom: KnowledgeJsonAtom): boolean {
   return shouldCreateImageExplainCard(image, {
     caption: image.caption?.trim() || `Figura: ${atom.title}`,
-    description: imageDescription(atom),
+    description: imageDescription(atom, image),
   });
 }
 

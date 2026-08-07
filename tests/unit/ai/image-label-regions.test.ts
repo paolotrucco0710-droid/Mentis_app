@@ -7,8 +7,6 @@ import {
   buildImageExplainCardFields,
   buildImageExplainQuiz,
 } from "@/ai/image-explain-card-builder";
-import { buildQuizOptions } from "@/ai/quiz-options";
-import { deterministicShuffle } from "@/ai/deterministic-shuffle";
 import type { AtomId } from "@/domain/ids";
 
 const atomId = "00000000-0000-4000-8000-000000000101" as AtomId;
@@ -108,19 +106,7 @@ const imageReference = {
 
 describe("image-explain-card-builder", () => {
   it("uses quiz payload for image explain cards until real bbox labeling ships", () => {
-    const primaryQuiz = buildQuizOptions(
-      { id: atomId, ...atom },
-      deterministicShuffle
-    );
-    const primaryCorrect =
-      primaryQuiz.options[primaryQuiz.correctOptionIndex] ?? atom.summary;
-
-    const fields = buildImageExplainCardFields(
-      atomId,
-      atom,
-      imageReference,
-      primaryCorrect
-    );
+    const fields = buildImageExplainCardFields(atomId, atom, imageReference);
 
     expect(fields).not.toBeNull();
 
@@ -137,23 +123,16 @@ describe("image-explain-card-builder", () => {
     expect(payload.question).toContain("Schema del cloroplasto");
   });
 
-  it("does not duplicate the primary quiz options on the image card", () => {
-    const primaryQuiz = buildQuizOptions(
-      { id: atomId, ...atom },
-      deterministicShuffle
-    );
-    const primaryCorrect =
-      primaryQuiz.options[primaryQuiz.correctOptionIndex] ?? atom.summary;
-
-    const imageQuiz = buildImageExplainQuiz(
-      atomId,
-      atom,
-      imageReference,
-      primaryCorrect
-    );
+  it("builds image-specific connection answers instead of generic atom quiz options", () => {
+    const imageQuiz = buildImageExplainQuiz(atomId, atom, imageReference);
 
     expect(imageQuiz).not.toBeNull();
-    expect(imageQuiz!.options).not.toEqual(primaryQuiz.options);
-    expect(imageQuiz!.question).not.toBe(primaryQuiz.question);
+    expect(imageQuiz!.question).toContain("Schema del cloroplasto");
+    expect(imageQuiz!.options[imageQuiz!.correctOptionIndex]).toContain(
+      "Schema del cloroplasto"
+    );
+    expect(imageQuiz!.options[imageQuiz!.correctOptionIndex]).toContain(
+      "Cloroplasto"
+    );
   });
 });

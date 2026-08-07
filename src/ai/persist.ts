@@ -342,8 +342,7 @@ function buildCardsForAtom(
     const imageCard = buildImageExplainCardCreateInput(
       atomId,
       atom,
-      imageReference,
-      primaryCorrect
+      imageReference
     );
     if (imageCard) {
       cards.push(imageCard);
